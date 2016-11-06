@@ -230,7 +230,7 @@ class JobExecutor:
         job_cache_path.mkdir()
         log.debug('create_job_cache: path is %r', job_cache_path)
 
-        (job_cache_path / 'archive.chunks.d').touch()
+        (job_cache_path / 'chunks.archive.d').touch()
         (job_cache_path / 'files').touch()
         with (job_cache_path / 'README').open('w') as fd:
             fd.write('This is a Borg cache')
@@ -278,6 +278,8 @@ class JobExecutor:
         log.debug('Built command line: %r', command_line)
         subprocess.check_call(command_line)
         log.debug('remote create finished (success)')
+        self.job.refresh_from_db()
+        self.job.repository.refresh_from_db()
         self.job.update_state(Job.State.client_in_progress, Job.State.client_done)
 
     def client_cleanup(self):
@@ -286,25 +288,45 @@ class JobExecutor:
         # TODO perhaps a per-client setting, to limit space usage on the client with multiple repositories.
 
     def sync_cache(self):
+        def delete_job_archive(manifest):
+            log.error('Deleting archive item of %r due to above failure', self.job.archive_name)
+            del manifest.archives[self.job.archive_name]
+            manifest.write()
+            self.job.repository.update_from_manifest(manifest)
+            self.job.update_state(Job.State.cache_sync, Job.State.failed)
+
         self.job.update_state(Job.State.client_cleanup, Job.State.cache_sync)
         with open_repository(self.repository) as repository:
             manifest, key = Manifest.load(repository)
-            with Cache(repository, key, manifest, sync=False) as cache:
+            delta_sync = bin_to_hex(manifest.id) == self.job.repository.manifest_id
+            # If the manifest in the repo and the manifest we know in our DB match, then we know the delta
+            # (=only the archive added by this job)
+            if delta_sync:
+                with Cache(repository, key, manifest, sync=False) as cache:
+                    self.check_archive_chunks_cache()
+                    cache.begin_txn()
+                    archive_id = manifest.archives[self.job.archive_name].id
+                    if self.cache_sync_archive(cache, archive_id):
+                        cache.commit()
+                    else:
+                        delete_job_archive(manifest)
+                        cache.rollback()
+                        return
+            else:
+                log.warning('Repository was modified externally during this job, performing full sync (this may take some time).')
                 self.check_archive_chunks_cache()
-                cache.begin_txn()
-                archive_id = manifest.archives[self.job.archive_name].id
-                if self.cache_sync_archive(cache, archive_id):
-                    cache.commit()
-                    self.job.update_state(Job.State.cache_sync, Job.State.done)
-                else:
-                    log.error('Deleting archive item of %r due to above failure', self.job.archive_name)
-                    del manifest.archives[self.job.archive_name]
-                    manifest.write()
-                    cache.rollback()
-                    self.job.update_state(Job.State.cache_sync, Job.State.failed)
+                try:
+                    with Cache(repository, key, manifest):
+                        pass
+                except Exception as exc:
+                    # Vanilla code could use some love there
+                    log.exception('Failed to synchronize cache')
+                    delete_job_archive(manifest)
+                    return
+        self.job.update_state(Job.State.cache_sync, Job.State.done)
 
     def check_archive_chunks_cache(self):
-        archives = Path(get_cache_dir()) / self.repository.id / 'archive.chunks.d'
+        archives = Path(get_cache_dir()) / self.repository.id / 'chunks.archive.d'
         if archives.is_dir():
             log.warning('Disabling archive chunks cache of %s', archives.parent)
             shutil.rmtree(str(archives))

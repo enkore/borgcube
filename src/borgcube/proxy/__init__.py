@@ -151,6 +151,7 @@ class ReverseRepositoryProxy(RepositoryServer):
 
         if is_manifest:
             self._manifest.write()
+            self.job.repository.update_from_manifest(self._manifest)
         else:
             # TODO Don't recompress.
             # "Trust" the compressed chunk after the chunk ID validated.

@@ -9,7 +9,7 @@ from django.utils.translation import ugettext_lazy as _
 
 from jsonfield.fields import TypedJSONField, JSONField
 
-from borg.helpers import Location
+from borg.helpers import Location, bin_to_hex
 
 log = logging.getLogger(__name__)
 
@@ -48,10 +48,15 @@ class Repository(models.Model):
     id = CharField(verbose_name=_('Repository ID'), help_text=_('32 bytes in hex'), primary_key=True)
     name = CharField()
     url = CharField(max_length=1000, help_text=_('For example /data0/reposity or user@storage:/path.'))
+    manifest_id = CharField(default=bytes(32).hex())
 
     @property
     def location(self):
         return Location(self.url)
+
+    def update_from_manifest(self, manifest):
+        self.manifest_id = bin_to_hex(manifest.id)
+        self.save()
 
     def __str__(self):
         return self.name
