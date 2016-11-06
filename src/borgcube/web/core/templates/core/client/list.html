@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% load borgcube %}
+
+{% block title %}{% trans 'Clients' context 'core/client/list title' %}{% endblock %}
+
+{% block content %}
+  <h1>{% trans 'Clients' context 'core/client/list heading' %}</h1>
+
+  <table class='jobs' cellpadding='3px'>
+    <tr>
+      <th>{{ m|field_name:'hostname' }}</th>
+      <th>{% trans 'Last job' context 'core/client/list' %}</th>
+      <th>{% trans 'Outcome' context 'core/client/list last job outcome' %}</th>
+    </tr>
+    {% for client in clients %}
+    {% with job=client.latest_job %}
+    <tr {% if job.failed %}class='failed'{% endif %}>
+      <td><a href='{{ client|get_url }}'>{{ client.hostname }}</a></td>
+      {% if job %}
+      <td><a href='{{ job|get_url }}'>{{ job.timestamp }}</a></td>
+      {% else %}
+      <td>{% trans 'No job on file' context 'core/client/list last job not found' %}</td>
+      {% endif %}
+      <td>{{ job.outcome }}</td>
+    </tr>
+    {% endwith %}
+
+    {% endfor %}
+  </table>
+{% endblock %}

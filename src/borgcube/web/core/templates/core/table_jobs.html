@@ -1,0 +1,42 @@
+{% comment %}
+Expected variables:
+- jobs: list of Job instances
+
+Options:
+- client_column: show client link for each job
+{% endcomment %}
+
+{% load i18n %}
+{% load borgcube %}
+
+{% if jobs %}
+<table class='jobs' cellpadding='3px'>
+  <tr>
+    <th>{% trans 'Timestamp (start)' context 'jobs table' %}</th>
+    {% if client_column %}
+      <th>{% trans 'Client' context 'jobs table' %}</th>
+    {% endif %}
+    <th>{% trans 'Configuration' context 'jobs table' %}</th>
+    <th>{% trans 'Outcome' context 'jobs table' %}</th>
+    <th>{% trans 'Duration' context 'jobs table' %}</th>
+  </tr>
+
+  {% for job in jobs %}
+    <tr {% if job.failed %}class='failed'{% endif %}>
+    <td><a href='{{ job|get_url }}'>{{ job.timestamp }}</a></td>
+    {% if client_column %}
+    <td><a href='{{ job.client|get_url }}'>{{ client.id }}</a></td>
+    {% endif %}
+    {% if job.config %}
+    <td><a href='{{ job.config|get_url }}'>{{ job.config.config.label }}</a></td>
+    {% else %}
+    <td>{% trans 'Unknown' context 'jobs table' %}</td>
+    {% endif %}
+    <td>{{ job.outcome }}</td>
+    <td>{{ job.duration }}</td>
+    </tr>
+  {% endfor %}
+</table>
+{% else %}
+No jobs found.
+{% endif %}

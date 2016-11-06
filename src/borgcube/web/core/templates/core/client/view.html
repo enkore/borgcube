@@ -1,0 +1,105 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% load borgcube %}
+
+{% block title %}{% blocktrans with id=client.hostname context 'core/client/view title' %}Client {{ id }}
+{% endblocktrans %}{% endblock %}
+
+{% block content %}
+  <h1>{{ client.hostname }}
+    <small>
+      {% if client.name != client.hostname %}{{ client.name }}{% else %}{{ client.hostname }}{% endif %}
+      (<a href='{% url 'core.client_edit' client.pk %}'>{% trans 'edit' context 'core/client/view edit link' %}</a>)
+    </small>
+  </h1>
+
+  <p>{{ client.description }}</p>
+
+  <h2>{% trans 'Connection' context 'core/client/view heading' %}</h2>
+
+  <table class='plist'>
+    {% with conn=client.connection %}
+      <tr>
+        <th>{{ conn|field_name:'remote' }}</th>
+        <td>{{ conn.remote }}</td>
+      </tr>
+      <tr>
+        <th>{{ conn|field_name:'rsh' }}</th>
+        <td>{{ conn.rsh }}</td>
+      </tr>
+      {% if conn.rsh_options %}
+        <tr>
+          <th>{{ conn|field_name:'rsh_options' }}</th>
+          <td>{{ conn.rsh_options }}</td>
+        </tr>
+      {% endif %}
+      {% if conn.ssh_identity_file %}
+        <tr>
+          <th>{{ conn|field_name:'ssh_identity_file' }}</th>
+          <td>{{ conn.ssh_identity_file }}</td>
+        </tr>
+      {% endif %}
+      <tr>
+        <th>{{ conn|field_name:'remote_borg' }}</th>
+        <td>{{ conn.remote_borg }}</td>
+      </tr>
+      {% if conn.remote_cache_dir %}
+        <tr>
+          <th>{{ conn|field_name:'remote_cache_dir' }}</th>
+          <td>{{ conn.remote_cache_dir }}</td>
+        </tr>
+      {% endif %}
+    {% endwith %}
+  </table>
+
+  <h2>{% trans 'Job configurations' context 'core/client/view heading' %}</h2>
+
+  {% for job_config in client.job_configs.all %}
+
+    <section class='job-config' id='job-config-{{ job_config.id }}'>
+      {% with config=job_config.config %}
+      <h3>{{ config.label }} <small>
+        (<a href='{% url 'core.job_config_trigger' client.pk job_config.id %}'>Run now</a>)
+      </small></h3>
+
+
+        <table class='plist'>
+          <tr>
+            <th>{% trans 'One file system' %}</th>
+            <td>{{ config.one_file_system|yesno }}</td>
+          </tr>
+          <tr>
+            <th>{% trans 'Compression' %}</th>
+            <td>{{ config.compression|compression_name }}</td>
+          </tr>
+          <tr>
+            <th>{% trans 'Paths' %}</th>
+            <td>
+              {% for path in config.paths %}
+                <pre>{{ path }}</pre>
+                {% if forloop.counter0 %}<br>{% endif %}
+              {% endfor %}
+            </td>
+          </tr>
+          {% if config.excludes %}
+          <tr>
+            <th>{% trans 'Exclusion patterns' %}</th>
+            <td>
+              {% for pattern in config.excludes %}
+                <pre>{{ pattern }}</pre>
+                {% if forloop.counter0 %}<br>{% endif %}
+              {% endfor %}
+            </td>
+          </tr>
+          {% endif %}
+        </table>
+      {% endwith %}
+
+    </section>
+
+  {% endfor %}
+
+  <h2>{% trans 'Jobs' context 'core/client/view heading' %}</h2>
+
+  {% include 'core/table_jobs.html' with jobs=client.jobs.all client_column=0 %}
+{% endblock %}

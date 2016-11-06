@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans 'Add client' context 'core/client/add title' %}{% endblock %}
+
+{% block content %}
+  <h1>{% trans 'Add client' context 'core/client/add heading' %}</h1>
+
+  <form method='POST'>
+    <table>
+      {% block form %}
+        {% csrf_token %}
+        {{ client_form }}
+
+        <tr>
+          <td colspan='2'>
+            <h2>{% trans 'Connection' context 'core/client client connection form' %}</h2>
+          </td>
+        </tr>
+
+        {{ connection_form }}
+      {% endblock %}
+
+      <tr>
+        <td></td>
+        <td><input type='submit' value='{% trans 'Add client' context 'core/client/add submit button' %}'/></td>
+      </tr>
+    </table>
+  </form>
+{% endblock %}
+
+{% block extrajs %}
+  <script>
+    onload = function () {
+      function update_if_derived(field, new_value) {
+        if (!field.value.length || new_value.startsWith(field.value) ||
+                (new_value.length && field.value.startsWith(new_value))) {
+          field.value = new_value;
+        }
+      }
+
+      var id = document.getElementById('id_hostname');
+      var name = document.getElementById('id_name');
+      var remote = document.getElementById('id_connection-remote');
+
+      function id_changed() {
+        var value = id.value;
+        update_if_derived(name, value);
+        var rhost = 'root@' + value;
+        update_if_derived(remote, rhost);
+      }
+
+      id.addEventListener('input', id_changed);
+      id.addEventListener('propertychange', id_changed);
+    };
+  </script>
+{% endblock %}
