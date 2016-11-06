@@ -162,6 +162,9 @@ from borgcube.keymgt import synthesize_client_key, SyntheticManifest
 from borgcube.utils import open_repository
 
 from borg.key import PlaintextKey
+from borg.item import ArchiveItem
+
+import msgpack
 
 import shlex
 import shutil
@@ -182,7 +185,9 @@ class JobExecutor:
         self.job.update_state(Job.State.client_preparing, Job.State.client_prepared)
 
         self.remote_create()
+        self.client_cleanup()
         # TODO sync cache
+        self.sync_cache()
 
     def synthesize_crypto(self):
         with open_repository(self.repository) as repository:
@@ -219,6 +224,8 @@ class JobExecutor:
         log.debug('transfer_cache: done')
 
     def create_job_cache(self, cache_path):
+        if not cache_path.is_dir():
+            self.initialize_cache()
         job_cache_path = cache_path / str(self.job.id)
         job_cache_path.mkdir()
         log.debug('create_job_cache: path is %r', job_cache_path)
@@ -271,6 +278,73 @@ class JobExecutor:
         log.debug('Built command line: %r', command_line)
         subprocess.check_call(command_line)
         log.debug('remote create finished (success)')
+        self.job.update_state(Job.State.client_in_progress, Job.State.client_done)
+
+    def client_cleanup(self):
+        self.job.update_state(Job.State.client_done, Job.State.client_cleanup)
+        # TODO do we actually want this? if we leave the cache, the next job has a good chance of rsyncing just a delta
+        # TODO perhaps a per-client setting, to limit space usage on the client with multiple repositories.
+
+    def sync_cache(self):
+        self.job.update_state(Job.State.client_cleanup, Job.State.cache_sync)
+        with open_repository(self.repository) as repository:
+            manifest, key = Manifest.load(repository)
+            with Cache(repository, key, manifest, sync=False) as cache:
+                self.check_archive_chunks_cache()
+                cache.begin_txn()
+                archive_id = manifest.archives[self.job.archive_name].id
+                if self.cache_sync_archive(cache, archive_id):
+                    cache.commit()
+                    self.job.update_state(Job.State.cache_sync, Job.State.done)
+                else:
+                    log.error('Deleting archive item of %r due to above failure', self.job.archive_name)
+                    del manifest.archives[self.job.archive_name]
+                    manifest.write()
+                    cache.rollback()
+                    self.job.update_state(Job.State.cache_sync, Job.State.failed)
+
+    def check_archive_chunks_cache(self):
+        archives = Path(get_cache_dir()) / self.repository.id / 'archive.chunks.d'
+        if archives.is_dir():
+            log.warning('Disabling archive chunks cache of %s', archives.parent)
+            shutil.rmtree(str(archives))
+            archives.touch()
+
+    def cache_sync_archive(self, cache, archive_id):
+        add_chunk = cache.chunks.add
+        cdata = cache.repository.get(archive_id)
+        _, data = cache.key.decrypt(archive_id, cdata)
+        add_chunk(archive_id, 1, len(data), len(cdata))
+        try:
+            archive = ArchiveItem(internal_dict=msgpack.unpackb(data))
+        except (TypeError, ValueError, AttributeError) as error:
+            log.error('Corrupted/unknown archive metadata: %s', error)
+            return False
+        if archive.version != 1:
+            log.error('Unknown archive metadata version %r', archive.version)
+            return False
+        unpacker = msgpack.Unpacker()
+        for item_id, chunk in zip(archive.items, cache.repository.get_many(archive.items)):
+            _, data = cache.key.decrypt(item_id, chunk)
+            add_chunk(item_id, 1, len(data), len(chunk))
+            unpacker.feed(data)
+            for item in unpacker:
+                if not isinstance(item, dict):
+                    log.error('Error: Did not get expected metadata dict - archive corrupted!')
+                    return False
+                if b'chunks' in item:
+                    for chunk_id, size, csize in item[b'chunks']:
+                        add_chunk(chunk_id, 1, size, csize)
+        return True
+
+    def initialize_cache(self):
+        log.info('No cache found, creating one')
+        with open_repository(self.repository) as repository:
+            manifest, key = Manifest.load(repository)
+            with Cache(repository, key, manifest):
+                pass
+            self.check_archive_chunks_cache()
+        log.info('Cache created')
 
     def find_remote_cache_dir(self):
         remote_cache_dir = (self.client.connection.remote_cache_dir or '.cache/borg/')

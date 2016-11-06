@@ -110,6 +110,7 @@ class ReverseRepositoryProxy(RepositoryServer):
         log.debug('Loaded key and manifest')
 
     def load_key(self):
+        log.debug('Client requested repokey')
         return self._client_key.get_key_data()
 
     def _repo_to_client(self, id, repo_data):
