@@ -46,6 +46,7 @@ setup(
         'pyzmq',
     ],
     extras_require={
+        'proctitle': ['setproctitle'],
     },
     entry_points={
         'console_scripts': [

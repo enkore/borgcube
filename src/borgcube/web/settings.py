@@ -156,6 +156,9 @@ LOGGING = {
             'level': 'DEBUG',
             'propagate': True,
         },
+        'borg.key': {
+            'level': 'WARNING',
+        }
     },
 }
 

@@ -13,6 +13,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from borg.helpers import bin_to_hex
 
 from ..core.models import Job, JobConfig
+from ..utils import set_process_name
 
 
 log = logging.getLogger('borgcubed')
@@ -85,6 +86,7 @@ class APIServer(BaseServer):
         super().__init__(address, context)
         # PID -> (command, params...)
         self.children = {}
+        set_process_name('borgcubed [main process]')
 
     def idle(self):
         self.check_schedule()
@@ -110,6 +112,7 @@ class APIServer(BaseServer):
         log.info('Created job %s for client %s, job config %d', job.id, job_config.client.hostname, job_config.id)
         pid = self.fork()
         if not pid:
+            set_process_name('borgcubed [run-job %s]' % job.id)
             executor = JobExecutor(job)
             executor.execute()
             sys.exit(0)
@@ -284,6 +287,8 @@ class JobExecutor:
 
     def client_cleanup(self):
         self.job.update_state(Job.State.client_done, Job.State.client_cleanup)
+        # TODO delete checkpoints
+
         # TODO do we actually want this? if we leave the cache, the next job has a good chance of rsyncing just a delta
         # TODO perhaps a per-client setting, to limit space usage on the client with multiple repositories.
 
@@ -333,6 +338,7 @@ class JobExecutor:
             archives.touch()
 
     def cache_sync_archive(self, cache, archive_id):
+        # TODO create core.Archive; for full sync separate implementation.
         add_chunk = cache.chunks.add
         cdata = cache.repository.get(archive_id)
         _, data = cache.key.decrypt(archive_id, cdata)

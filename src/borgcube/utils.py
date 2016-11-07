@@ -9,3 +9,10 @@ def open_repository(repository):
         return RemoteRepository(repository.location, exclusive=True)
     else:
         return Repository(repository.location.path, exclusive=True)
+
+
+try:
+    from setproctitle import setproctitle as set_process_name
+except ImportError:
+    def set_process_name(name):
+        pass
