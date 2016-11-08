@@ -68,8 +68,6 @@ class Archive(models.Model):
     compressed_size = models.BigIntegerField()
     deduplicated_size = models.BigIntegerField()
 
-    job = models.ForeignKey('Job', null=True, blank=True)
-
 
 class ClientConnection(models.Model):
     remote = CharField(help_text=_('Usually something like root@somehost, but you can also give a .ssh/config host alias, for example.'))
@@ -139,6 +137,7 @@ class Job(models.Model):
     timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
     repository = models.ForeignKey(Repository)
     client = models.ForeignKey(Client, related_name='jobs')
+    archive = models.OneToOneField(Archive, blank=True, null=True)
     config = models.ForeignKey(JobConfig, blank=True, null=True)
 
     data = JSONField()
@@ -147,14 +146,15 @@ class Job(models.Model):
 
     @property
     def state(self):
-        return self.State[self.db_state]
+        return Job.State(self.db_state)
 
     @property
     def archive_name(self):
         return self.client.hostname + '-' + str(self.id)
 
+    @property
     def failed(self):
-        return True   # self. outcome == ...
+        return self.state == Job.State.failed
 
     def update_state(self, previous, to):
         with transaction.atomic():

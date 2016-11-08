@@ -1,6 +1,9 @@
 
 from django import template
 from django.urls import reverse
+from django.utils.translation import ugettext_lazy as _
+
+from borg.helpers import format_file_size
 
 from borgcube.core import models
 from .. import views
@@ -35,3 +38,25 @@ def get_url(model_instance):
 @register.filter
 def compression_name(compression_id):
     return dict(views.JobConfigForm.COMPRESSION_CHOICES).get(compression_id, compression_id)
+
+
+@register.filter
+def summarize_archive(archive):
+    assert isinstance(archive, models.Archive)
+    return _('{size_formatted} / {archive.nfiles} files').format(
+        archive=archive, size_formatted=format_file_size(archive.original_size))
+
+
+@register.filter
+def job_outcome(job):
+    assert isinstance(job, models.Job)
+    if job.failed:
+        failure_cause = job.data.get('failure_cause')
+        if failure_cause:
+            failure_kind = failure_cause['kind']
+            if failure_kind == 'client-connection-failed':
+                return _('Could not connect to client')
+        else:
+            return _('Unknown error - see logs')
+    elif job.archive:
+        return _('Finished ({archive_summary})').format(archive_summary=summarize_archive(job.archive))

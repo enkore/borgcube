@@ -22,7 +22,7 @@ Options:
   </tr>
 
   {% for job in jobs %}
-    <tr {% if job.failed %}class='failed'{% endif %}>
+    <tr {% if job.failed %}class='failed'{% elif job.data.borg_warning %}class='warning'{% endif %}>
     <td><a href='{{ job|get_url }}'>{{ job.timestamp }}</a></td>
     {% if client_column %}
     <td><a href='{{ job.client|get_url }}'>{{ client.id }}</a></td>
@@ -32,7 +32,7 @@ Options:
     {% else %}
     <td>{% trans 'Unknown' context 'jobs table' %}</td>
     {% endif %}
-    <td>{{ job.outcome }}</td>
+    <td>{{ job|job_outcome }}</td>
     <td>{{ job.duration }}</td>
     </tr>
   {% endfor %}
