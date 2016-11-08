@@ -129,7 +129,9 @@ class ReverseRepositoryProxy(RepositoryServer):
             log.debug('Loading synthesized client key')
             self._client_key = SyntheticRepoKey.from_data(key_data, self.repository)
         self._client_manifest = SyntheticManifest.load(unhexlify(self.job.data['client_manifest_data']), self._client_key)
-        log.debug('Loaded key and manifest')
+        self._first_manifest_read = True
+        assert self._client_manifest.id_str == self.job.data['client_manifest_id_str']
+        log.debug('Loaded client key and manifest')
 
     def _load_cache(self):
         self._cache = Cache(self.repository, self._repository_key, self._manifest, lock_wait=1)
@@ -213,8 +215,12 @@ class ReverseRepositoryProxy(RepositoryServer):
             self._cache = None
             self._doomed = True
         self.repository.commit(save_space)
+        log.debug('Repository commit done.')
 
     def _manifest_repo_to_client(self):
+        if self._first_manifest_read:
+            self._first_manifest_read = False
+            return unhexlify(self.job.data['client_manifest_data'])
         return self._client_manifest.write()
 
     def _manifest_client_to_repo(self, data):
