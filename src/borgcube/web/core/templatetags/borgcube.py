@@ -72,6 +72,8 @@ def job_outcome(job):
                 return _('Failed to lock repository: %s') % failure_cause['error']
             elif failure_kind == 'lock-error':
                 return _('Locking error')
+            elif failure_kind == 'borgcubed-restart':
+                return _('borgcubed terminated/restarted')
             else:
                 return failure_kind
         else:
