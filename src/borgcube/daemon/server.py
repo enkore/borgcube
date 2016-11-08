@@ -215,7 +215,7 @@ from borg.key import PlaintextKey
 from borg.repository import Repository
 
 from borgcube.keymgt import synthesize_client_key, SyntheticManifest
-from borgcube.utils import open_repository
+from borgcube.utils import open_repository, tee_job_logs
 
 
 def cpe_means_connection_failure(called_process_error):
@@ -229,6 +229,7 @@ def cpe_means_connection_failure(called_process_error):
 
 class JobExecutor:
     def __init__(self, job):
+        tee_job_logs(job)
         self.job = job
         self.client = job.client
         self.repository = job.repository

@@ -199,6 +199,7 @@ class ReverseRepositoryProxy(RepositoryServer):
         self.repository.rollback()
 
     def _add_completed_archive(self):
+        log.debug('Saving archive metadata to database')
         archive = BorgArchive(self.repository, self._repository_key, self._manifest, self.job.archive_name, cache=self._cache)
         stats = archive.calc_stats(self._cache)
         ao = Archive(
@@ -213,6 +214,7 @@ class ReverseRepositoryProxy(RepositoryServer):
         self.job.archive = ao
         ao.save()
         self.job.save()
+        log.debug('Saved archive metadata')
 
     @doom_on_exception()
     def commit(self, save_space=False):

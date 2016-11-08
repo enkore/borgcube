@@ -1,4 +1,8 @@
 import logging
+import logging.config
+from pathlib import Path
+
+from django.conf import settings
 
 import zmq
 
@@ -62,3 +66,36 @@ class DaemonLogHandler(logging.Handler):
         reply = self.socket.recv_json()
         if not reply['success']:
             raise APIError(reply['message'])
+
+
+def log_to_daemon():
+    logging_config = settings.LOGGING
+    logging_config.update({
+        'handlers': {
+            'console': {
+                'level': 'DEBUG',
+                'class': 'borgcube.utils.DaemonLogHandler',
+                'formatter': 'standard',
+                'addr_or_socket': settings.DAEMON_ADDRESS,
+            },
+        },
+        'formatters': {
+            'standard': {
+                'format': '%(message)s'
+            },
+        },
+    })
+    logging.config.dictConfig(logging_config)
+
+
+def tee_job_logs(job):
+    logs_path = Path(settings.SERVER_LOGS_DIR)
+    logs_path.mkdir(parents=True, exist_ok=True)
+
+    logfile = str(logs_path / str(job.id))
+    loggers = logging.Logger.manager.loggerDict
+    handler = logging.FileHandler(logfile)
+    for name, logger in loggers.items():
+        if isinstance(logger, logging.PlaceHolder):
+            logger = logging.getLogger(name)
+        logger.addHandler(handler)
