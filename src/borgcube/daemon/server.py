@@ -2,6 +2,7 @@ import errno
 import logging
 import signal
 import sys
+import time
 import os
 from pathlib import Path
 
@@ -39,10 +40,12 @@ class BaseServer:
 
     def main_loop(self):
         while not self.exit:
-            if self.socket.poll(timeout=500):
-                request = self.socket.recv_json()
-                reply = self.handle_request(request)
-                self.socket.send_json(reply)
+            last_idle = time.perf_counter()
+            while time.perf_counter() < last_idle + 1:
+                if self.socket.poll(timeout=500):
+                    request = self.socket.recv_json()
+                    reply = self.handle_request(request)
+                    self.socket.send_json(reply)
             self.idle()
         self.socket.close()
         log.info('Exorcism successful. Have a nice day.')
