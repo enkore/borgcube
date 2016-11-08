@@ -166,6 +166,8 @@ LOGGING = {
 
 # SERVER_CACHE_DIR = '~/'
 
+SERVER_LOGS_DIR = str(Path(__file__).parent.parent.parent.parent / '_logs')
+
 SERVER_LOGIN = 'mabe@localhost'
 
 DAEMON_ADDRESS = 'tcp://127.0.0.1:58123'

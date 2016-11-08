@@ -55,7 +55,7 @@ class BaseServer:
         if command not in self.commands:
             log.error('invalid request was %r', request)
             return self.error('invalid request: no or invalid command.')
-        log.debug('Received command %r, request %r', command, request)
+        # log.debug('Received command %r, request %r', command, request)
         return self.commands[command](self, request)
 
     def idle(self):
@@ -123,8 +123,44 @@ class APIServer(BaseServer):
                 'job': str(job.id),
             }
 
+    def cmd_log(self, request):
+        try:
+            name = str(request['name'])
+            level = int(request['level'])
+            path = str(request['path'])
+            lineno  = int(request['lineno'])
+            message = str(request['message'])
+            function = str(request['function'])
+            created = float(request['created'])
+            asctime = str(request['asctime'])
+            pid = int(request['pid'])
+        except KeyError as ke:
+            return self.error('Missing parameter %r', ke.args[0])
+        except (ValueError, TypeError) as exc:
+            return self.error('Erroneous parameter: %s', exc)
+        record = logging.LogRecord(**{
+            'name': name,
+            'pathname': path,
+            'level': level,
+            'lineno': lineno,
+            'msg': '%s',
+            'args': (message,),
+            'exc_info': None,
+        })
+        record.__dict__.update({
+            'function': function,
+            'created': created,
+            'asctime': asctime,
+            'pid': pid,
+        })
+        logging.getLogger(name).handle(record)
+        return {
+            'success': True,
+        }
+
     commands = {
         'initiate-job': cmd_initiate_job,
+        'log': cmd_log,
     }
 
     def check_schedule(self):
