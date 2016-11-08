@@ -330,6 +330,9 @@ class JobExecutor:
         command_line.append('create')
         command_line.append(settings.SERVER_LOGIN + ':' + str(self.job.id) + '::' + self.job.archive_name)
 
+        if settings.SERVER_PROXY_PATH:
+            command_line += '--remote-path', settings.SERVER_PROXY_PATH
+
         config = self.job.config.config
         assert config['version'] == 1, 'Unknown JobConfig version: %r' % config['version']
         for path in config['paths']:

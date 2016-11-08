@@ -170,4 +170,7 @@ SERVER_LOGS_DIR = str(Path(__file__).parent.parent.parent.parent / '_logs')
 
 SERVER_LOGIN = 'mabe@localhost'
 
+# This can usually be left empty. It is only needed if no SSH forced commands are used.
+# (This is then passed as the --remote-path option to the Borg running on the client)
+SERVER_PROXY_PATH = None
 DAEMON_ADDRESS = 'tcp://127.0.0.1:58123'
