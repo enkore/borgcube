@@ -38,6 +38,8 @@ class BaseServer:
     def signal_terminate(self, signum, stack_frame):
         log.info('Received signal %d, initiating exorcism', signum)
         self.exit = True
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
 
     def main_loop(self):
         while not self.exit:
