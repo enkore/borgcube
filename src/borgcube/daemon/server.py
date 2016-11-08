@@ -145,11 +145,7 @@ class APIServer(BaseServer):
 
     def can_run_job(self, job_id):
         job = Job.objects.get(id=job_id)
-        blocking_jobs = Job.objects.filter(repository=job.repository).exclude(db_state__in=(
-            Job.State.job_created.value,
-            Job.State.done.value,
-            Job.State.failed.value
-        ))
+        blocking_jobs = Job.objects.filter(repository=job.repository).exclude(db_state__in=[s.value for s in Job.State.STABLE])
         job_is_blocked = blocking_jobs.exists()
         if job_is_blocked:
             log.debug('Job %s blocked by running jobs: %s', job_id, ' '.join(map(str, blocking_jobs)))
