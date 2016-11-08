@@ -4,6 +4,7 @@ import zmq
 
 from borg.repository import Repository
 from borg.remote import RemoteRepository
+from borg.constants import UMASK_DEFAULT
 
 from borgcube.daemon.client import APIError
 
@@ -11,7 +12,12 @@ from borgcube.daemon.client import APIError
 def open_repository(repository):
     if repository.location.proto == 'ssh':
         # TODO construct & pass args for stuff like umask and remote-path
-        return RemoteRepository(repository.location, exclusive=True, lock_wait=1)
+        class Args:
+            remote_ratelimit = None
+            remote_path = repository.remote_borg
+            umask = UMASK_DEFAULT
+
+        return RemoteRepository(repository.location, exclusive=True, lock_wait=1, args=Args)
     else:
         return Repository(repository.location.path, exclusive=True, lock_wait=1)
 

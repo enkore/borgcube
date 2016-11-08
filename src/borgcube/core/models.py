@@ -49,6 +49,8 @@ class Repository(models.Model):
     name = CharField()
     url = CharField(max_length=1000, help_text=_('For example /data0/reposity or user@storage:/path.'))
 
+    remote_borg = CharField(default='borg', verbose_name=_('Remote borg binary name (only applies to remote repositories)'))
+
     @property
     def location(self):
         return Location(self.url)
