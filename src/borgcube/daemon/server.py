@@ -143,15 +143,21 @@ class APIServer(BaseServer):
             if not pid:
                 break
             signo = waitres & 0xFF
-            code = waitres & 0xFF00
-            logger = log.debug if code == 0 else log.error
+            code = (waitres & 0xFF00) >> 8
+            failure = signo or code
+            logger = log.error if failure else log.debug
             if signo:
                 logger('Child %d exited with code %d on signal %d', pid, code, signo)
             else:
                 logger('Child %d exited with code %d', pid, code)
             command, *params = self.children.pop(pid)
             logger('Command was: %s %r', command, params)
-            # TODO if command==run-job, ensure Job is marked as failed.
+            if failure and command == 'run-job':
+                job = Job.objects.get(id=params[0])
+                if job.state != Job.State.failed:
+                    logger('Job was not marked as failed; rectifying that')
+                    job.state = Job.State.failed
+                    job.save()
 
 
 from borg.helpers import get_cache_dir, Manifest
