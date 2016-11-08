@@ -204,23 +204,17 @@ class APIServer(BaseServer):
                     job.save()
 
 
+import configparser
+import shlex
+import shutil
+import subprocess
+
 from borg.helpers import get_cache_dir, Manifest
 from borg.cache import Cache
-
-import configparser
-
-import subprocess
+from borg.key import PlaintextKey
 
 from borgcube.keymgt import synthesize_client_key, SyntheticManifest
 from borgcube.utils import open_repository
-
-from borg.key import PlaintextKey
-from borg.item import ArchiveItem
-
-import msgpack
-
-import shlex
-import shutil
 
 
 class JobExecutor:
@@ -241,6 +235,7 @@ class JobExecutor:
         self.client_cleanup()
         # TODO sync cache
         self.job.update_state(Job.State.client_cleanup, Job.State.done)
+        log.info('Job %s completed successfully', self.job.id)
 
     def synthesize_crypto(self):
         with open_repository(self.repository) as repository:

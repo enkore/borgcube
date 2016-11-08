@@ -160,7 +160,7 @@ class Job(models.Model):
                                  % (previous.value, to.value, self.state))
             self.state = to.value
             self.save()
-            log.info('%s: phase %s -> %s', self.id, previous.value, to.value)
+            log.debug('%s: phase %s -> %s', self.id, previous.value, to.value)
 
     class Meta:
         ordering = ['-timestamp']

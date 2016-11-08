@@ -247,7 +247,7 @@ class ReverseRepositoryProxy(RepositoryServer):
 
         # TODO additional sanitation?
         self._manifest.archives[archive_info.name] = archive_info.id, archive_info.ts
-        log.info('Added archive %r (id=%s) to repository.', archive_info.name, bin_to_hex(archive_info.id))
+        log.info('Added archive %r (id %s) to repository.', archive_info.name, bin_to_hex(archive_info.id))
         self._got_archive = True
 
     def _cache_sync_archive(self, archive_id):
