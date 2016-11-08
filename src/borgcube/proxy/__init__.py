@@ -5,15 +5,14 @@ from binascii import unhexlify
 
 import msgpack
 
+from borg.archive import Archive as BorgArchive
 from borg.helpers import bin_to_hex, IntegrityError, Manifest
 from borg.repository import Repository
-from borg.remote import RemoteRepository, RepositoryServer, PathNotAllowed
+from borg.remote import RepositoryServer, PathNotAllowed
 from borg.cache import Cache
 from borg.item import ArchiveItem
 
-from borg.archiver import Archiver
-
-from ..core.models import Job
+from ..core.models import Job, Archive
 from ..keymgt import SyntheticRepoKey, synthesize_client_key, SyntheticManifest
 from ..utils import set_process_name, open_repository
 
@@ -199,6 +198,22 @@ class ReverseRepositoryProxy(RepositoryServer):
         self._doomed = True
         self.repository.rollback()
 
+    def _add_completed_archive(self):
+        archive = BorgArchive(self.repository, self._repository_key, self._manifest, self.job.archive_name, cache=self._cache)
+        stats = archive.calc_stats(self._cache)
+        ao = Archive(
+            id=archive.fpr,
+            repository=self.job.repository,
+            name=archive.name,
+            nfiles=stats.nfiles,
+            original_size=stats.osize,
+            compressed_size=stats.csize,
+            deduplicated_size=stats.usize,
+        )
+        self.job.archive = ao
+        ao.save()
+        self.job.save()
+
     @doom_on_exception()
     def commit(self, save_space=False):
         if not self._got_archive:
@@ -207,6 +222,7 @@ class ReverseRepositoryProxy(RepositoryServer):
         if self._final_archive:
             log.debug('Commit for the finalised archive, committing server cache, and not accepting further modifications.')
             self._cache.commit()
+            self._add_completed_archive()
             self._cache.close()
             self._cache = None
             self._doomed = True
