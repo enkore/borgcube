@@ -3,9 +3,13 @@ import logging
 import re
 from binascii import unhexlify
 
-from borg.helpers import bin_to_hex, IntegrityError, Manifest, Chunk
+import msgpack
+
+from borg.helpers import bin_to_hex, IntegrityError, Manifest
 from borg.repository import Repository
 from borg.remote import RemoteRepository, RepositoryServer, PathNotAllowed
+from borg.cache import Cache
+from borg.item import ArchiveItem
 
 from ..core.models import Job
 from ..keymgt import SyntheticRepoKey, synthesize_client_key, SyntheticManifest
@@ -20,6 +24,8 @@ def doom_on_exception(exc_whitelist=(Repository.ObjectNotFound, IntegrityError))
         def wrapper(self, *args, **kwargs):
             if getattr(self, '_doomed_by_exception', False):
                 raise ValueError('Transaction was doomed by previous exception. Refusing to continue.')
+            if getattr(self, '_doomed', False):
+                raise ValueError('Transaction was doomed. Refusing to continue.')
             try:
                 return proxy_method(self, *args, **kwargs)
             except Exception as exc:
@@ -51,8 +57,17 @@ class ReverseRepositoryProxy(RepositoryServer):
         'commit_nonce_reservation'
     )
 
+    _cache = None
+
     def __init__(self, restrict_to_paths=(), append_only=False):
         super().__init__(restrict_to_paths, append_only)
+
+    def serve(self):
+        try:
+            super().serve()
+        finally:
+            if self._cache:
+                self._cache.close()
 
     @doom_on_exception()
     def open(self, path, create=False, lock_wait=None, lock=True, exclusive=None, append_only=False):
@@ -72,6 +87,9 @@ class ReverseRepositoryProxy(RepositoryServer):
         self._real_open(location)
         self._load_repository_key()
         self._load_client_key()
+        self._load_cache()
+        self._got_archive = False
+        self._final_archive = False
         log.debug('Repository ID is %r', self.job.repository.id)
         return unhexlify(self.job.repository.id)
 
@@ -108,6 +126,12 @@ class ReverseRepositoryProxy(RepositoryServer):
             self._client_key = SyntheticRepoKey.from_data(key_data, self.repository)
         self._client_manifest = SyntheticManifest.load(unhexlify(self.job.data['client_manifest_data']), self._client_key)
         log.debug('Loaded key and manifest')
+
+    def _load_cache(self):
+        self._cache = Cache(self.repository, self._repository_key, self._manifest, lock_wait=1)
+        self._cache.__enter__()
+        self._cache.begin_txn()
+        log.debug('Loaded cache')
 
     def load_key(self):
         log.debug('Client requested repokey')
@@ -165,17 +189,29 @@ class ReverseRepositoryProxy(RepositoryServer):
         if id not in self._checkpoint_archives:
             raise ValueError('BorgCube: illegal delete(id=%s), not a checkpoint archive ID', bin_to_hex(id))
         self.repository.delete(id, wait)
+        self._cache.chunks.decref(id)
+        assert not self._cache.seen_chunk(id)
+        del self._cache.chunks[id]
 
     @doom_on_exception()
     def rollback(self):
         self.job.update_state(Job.State.client_in_progress, Job.State.failed)
         log.error('Job failed due to client rollback.')
+        self._doomed = True
         self.repository.rollback()
 
-    # def commit(self, save_space=False):
-        # v- need to check whether we are actually done or checkpoint? or on close?
-        # self.job.state_swap('in-progress', 'client-done')
-        # log.info('Client commit')
+    @doom_on_exception()
+    def commit(self, save_space=False):
+        if not self._got_archive:
+            raise ValueError('BorgCube: Cannot commit without adding the archive we wanted')
+        log.debug('Client initiated commit')
+        if self._final_archive:
+            log.debug('Commit for the finalised archive, committing server cache, and not accepting further modifications.')
+            self._cache.commit()
+            self._cache.close()
+            self._cache = None
+            self._doomed = True
+        self.repository.commit(save_space)
 
     def _manifest_repo_to_client(self):
         return self._client_manifest.write()
@@ -196,10 +232,48 @@ class ReverseRepositoryProxy(RepositoryServer):
             log.error('Client tried to push invalid archive %r (id=%s) to repository. Aborting.', archive_info.name, bin_to_hex(archive_info.id))
             raise ValueError('BorgCube: illegal archive push %r', archive_info.name)
 
+        log.debug('Adding archive %r (id %s)', archive_info.name, bin_to_hex(archive_info.id))
+
         checkpoint_re = re.escape(self.job.archive_name) + r'\.checkpoint(\d+)?'
         if re.fullmatch(checkpoint_re, archive_info.name):
+            log.debug('%r is a checkpoint - remembering that', archive_info.name)
             self._add_checkpoint(archive_info.name)
+        else:
+            log.debug('%r is the finalised archive', archive_info.name)
+            self._final_archive = True
+
+        if not self._cache_sync_archive(archive_info.id):
+            log.error('Failed to synchronize archive %r into cache (see above), aborting.', archive_info.name)
+            raise ValueError('BorgCube: cache sync failed')
 
         # TODO additional sanitation?
         self._manifest.archives[archive_info.name] = archive_info.id, archive_info.ts
         log.info('Added archive %r (id=%s) to repository.', archive_info.name, bin_to_hex(archive_info.id))
+        self._got_archive = True
+
+    def _cache_sync_archive(self, archive_id):
+        add_chunk = self._cache.chunks.add
+        cdata = self._cache.repository.get(archive_id)
+        _, data = self._cache.key.decrypt(archive_id, cdata)
+        add_chunk(archive_id, 1, len(data), len(cdata))
+        try:
+            archive = ArchiveItem(internal_dict=msgpack.unpackb(data))
+        except (TypeError, ValueError, AttributeError) as error:
+            log.error('Corrupted/unknown archive metadata: %s', error)
+            return False
+        if archive.version != 1:
+            log.error('Unknown archive metadata version %r', archive.version)
+            return False
+        unpacker = msgpack.Unpacker()
+        for item_id, chunk in zip(archive.items, self._cache.repository.get_many(archive.items)):
+            _, data = self._cache.key.decrypt(item_id, chunk)
+            add_chunk(item_id, 1, len(data), len(chunk))
+            unpacker.feed(data)
+            for item in unpacker:
+                if not isinstance(item, dict):
+                    log.error('Error: Did not get expected metadata dict - archive corrupted!')
+                    return False
+                if b'chunks' in item:
+                    for chunk_id, size, csize in item[b'chunks']:
+                        add_chunk(chunk_id, 1, size, csize)
+        return True

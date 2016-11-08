@@ -190,7 +190,7 @@ class JobExecutor:
         self.remote_create()
         self.client_cleanup()
         # TODO sync cache
-        self.sync_cache()
+        self.job.update_state(Job.State.client_cleanup, Job.State.done)
 
     def synthesize_crypto(self):
         with open_repository(self.repository) as repository:
@@ -292,78 +292,12 @@ class JobExecutor:
         # TODO do we actually want this? if we leave the cache, the next job has a good chance of rsyncing just a delta
         # TODO perhaps a per-client setting, to limit space usage on the client with multiple repositories.
 
-    def sync_cache(self):
-        def delete_job_archive(manifest):
-            log.error('Deleting archive item of %r due to above failure', self.job.archive_name)
-            del manifest.archives[self.job.archive_name]
-            manifest.write()
-            self.job.repository.update_from_manifest(manifest)
-            self.job.update_state(Job.State.cache_sync, Job.State.failed)
-
-        self.job.update_state(Job.State.client_cleanup, Job.State.cache_sync)
-        with open_repository(self.repository) as repository:
-            manifest, key = Manifest.load(repository)
-            delta_sync = bin_to_hex(manifest.id) == self.job.repository.manifest_id
-            # If the manifest in the repo and the manifest we know in our DB match, then we know the delta
-            # (=only the archive added by this job)
-            if delta_sync:
-                with Cache(repository, key, manifest, sync=False) as cache:
-                    self.check_archive_chunks_cache()
-                    cache.begin_txn()
-                    archive_id = manifest.archives[self.job.archive_name].id
-                    if self.cache_sync_archive(cache, archive_id):
-                        cache.commit()
-                    else:
-                        delete_job_archive(manifest)
-                        cache.rollback()
-                        return
-            else:
-                log.warning('Repository was modified externally during this job, performing full sync (this may take some time).')
-                self.check_archive_chunks_cache()
-                try:
-                    with Cache(repository, key, manifest):
-                        pass
-                except Exception as exc:
-                    # Vanilla code could use some love there
-                    log.exception('Failed to synchronize cache')
-                    delete_job_archive(manifest)
-                    return
-        self.job.update_state(Job.State.cache_sync, Job.State.done)
-
     def check_archive_chunks_cache(self):
         archives = Path(get_cache_dir()) / self.repository.id / 'chunks.archive.d'
         if archives.is_dir():
             log.warning('Disabling archive chunks cache of %s', archives.parent)
             shutil.rmtree(str(archives))
             archives.touch()
-
-    def cache_sync_archive(self, cache, archive_id):
-        # TODO create core.Archive; for full sync separate implementation.
-        add_chunk = cache.chunks.add
-        cdata = cache.repository.get(archive_id)
-        _, data = cache.key.decrypt(archive_id, cdata)
-        add_chunk(archive_id, 1, len(data), len(cdata))
-        try:
-            archive = ArchiveItem(internal_dict=msgpack.unpackb(data))
-        except (TypeError, ValueError, AttributeError) as error:
-            log.error('Corrupted/unknown archive metadata: %s', error)
-            return False
-        if archive.version != 1:
-            log.error('Unknown archive metadata version %r', archive.version)
-            return False
-        unpacker = msgpack.Unpacker()
-        for item_id, chunk in zip(archive.items, cache.repository.get_many(archive.items)):
-            _, data = cache.key.decrypt(item_id, chunk)
-            add_chunk(item_id, 1, len(data), len(chunk))
-            unpacker.feed(data)
-            for item in unpacker:
-                if not isinstance(item, dict):
-                    log.error('Error: Did not get expected metadata dict - archive corrupted!')
-                    return False
-                if b'chunks' in item:
-                    for chunk_id, size, csize in item[b'chunks']:
-                        add_chunk(chunk_id, 1, size, csize)
-        return True
 
     def initialize_cache(self):
         log.info('No cache found, creating one')
