@@ -192,6 +192,18 @@ class Job(models.Model):
         self.data['failure_cause'].update(kwargs)
         self.save()
 
+    def log_path(self):
+        logs_path = Path(settings.SERVER_LOGS_DIR)
+        logs_path.mkdir(parents=True, exist_ok=True)
+        return logs_path / str(self.id)
+
+    def delete(self, using=None, keep_parents=False):
+        super().delete(using, keep_parents)
+        try:
+            self.log_path().unlink()
+        except OSError:
+            pass
+
     def __str__(self):
         return str(self.id)
 

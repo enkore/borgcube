@@ -89,10 +89,7 @@ def log_to_daemon():
 
 
 def tee_job_logs(job):
-    logs_path = Path(settings.SERVER_LOGS_DIR)
-    logs_path.mkdir(parents=True, exist_ok=True)
-
-    logfile = str(logs_path / str(job.id))
+    logfile = str(job.log_path())
     loggers = logging.Logger.manager.loggerDict
     handler = logging.FileHandler(logfile)
     for name, logger in loggers.items():
