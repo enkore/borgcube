@@ -15,6 +15,7 @@ from borg.archiver import Archiver
 
 from ..core.models import Job
 from ..keymgt import SyntheticRepoKey, synthesize_client_key, SyntheticManifest
+from ..utils import set_process_name
 
 log = logging.getLogger(__name__)
 # TODO per job log file, the log from this process should not get to the connected client
@@ -83,8 +84,9 @@ class ReverseRepositoryProxy(RepositoryServer):
             raise PathNotAllowed(path)
 
         self.job.update_state(previous=Job.State.client_prepared, to=Job.State.client_in_progress)
+        set_process_name('borgcube-proxy [job %s]' % self.job.id)
 
-        log.info('Opening repository for job %s', self.job.pk)
+        log.info('Opening repository for job %s', self.job.id)
         location = self.job.repository.location
         self._real_open(location)
         self._load_repository_key()
