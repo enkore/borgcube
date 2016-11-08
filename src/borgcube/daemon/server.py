@@ -297,13 +297,7 @@ class JobExecutor:
         log.debug('transfer_cache: done')
 
     def create_job_cache(self, cache_path):
-        if not cache_path.is_dir():
-            self.initialize_cache()
-        # Ensure that the server cache is in sync, in case the repo was modified externally.
-        with open_repository(self.repository) as repository:
-            manifest, key = Manifest.load(repository)
-            with Cache(repository, key, manifest, lock_wait=1):
-                pass
+        self.ensure_cache(cache_path)
         job_cache_path = cache_path / str(self.job.id)
         job_cache_path.mkdir()
         log.debug('create_job_cache: path is %r', job_cache_path)
@@ -379,18 +373,18 @@ class JobExecutor:
     def check_archive_chunks_cache(self):
         archives = Path(get_cache_dir()) / self.repository.id / 'chunks.archive.d'
         if archives.is_dir():
-            log.warning('Disabling archive chunks cache of %s', archives.parent)
+            log.info('Disabling archive chunks cache of %s', archives.parent)
             shutil.rmtree(str(archives))
             archives.touch()
 
-    def initialize_cache(self):
-        log.info('No cache found, creating one')
+    def ensure_cache(self, cache_path):
+        if not cache_path.is_dir():
+            log.info('No cache found, creating one')
         with open_repository(self.repository) as repository:
             manifest, key = Manifest.load(repository)
-            with Cache(repository, key, manifest):
-                pass
+            with Cache(repository, key, manifest, path=str(cache_path), lock_wait=1) as cache:
+                cache.commit()
             self.check_archive_chunks_cache()
-        log.info('Cache created')
 
     def find_remote_cache_dir(self):
         remote_cache_dir = (self.client.connection.remote_cache_dir or '.cache/borg/')
