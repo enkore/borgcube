@@ -99,6 +99,8 @@ class APIServer(BaseServer):
         self.children = {}
         self.queue = []
         set_process_name('borgcubed [main process]')
+        for job in Job.objects.exclude(db_state__in=[s.value for s in Job.State.STABLE]):
+            job.set_failure_cause('borgcubed-restart')
         for job in Job.objects.filter(db_state=Job.State.job_created.value):
             self.queue_job(job)
 
@@ -149,6 +151,8 @@ class APIServer(BaseServer):
             Job.State.failed.value
         ))
         job_is_blocked = blocking_jobs.exists()
+        if job_is_blocked:
+            log.debug('Job %s blocked by running jobs: %s', job_id, ' '.join(map(str, blocking_jobs)))
         return not job_is_blocked
 
     def cmd_log(self, request):
@@ -222,11 +226,12 @@ class APIServer(BaseServer):
                     logger('Job was not marked as failed; rectified that')
 
     def check_queue(self):
-        for i in range(len(self.queue)):
-            predicate, method, *args = self.queue[i]
+        nope = []
+        while self.queue:
+            predicate, method, *args = self.queue.pop()
             if not predicate(*args):
+                nope.append((predicate, method, *args))
                 continue
-            self.queue.pop(i)
             pid = self.fork()
             if pid:
                 # Parent, gotta watch the kids
@@ -234,6 +239,7 @@ class APIServer(BaseServer):
             else:
                 method(*args)
                 sys.exit(0)
+        self.queue.extend(nope)
 
 
 import configparser
@@ -244,6 +250,7 @@ from borg.helpers import get_cache_dir, Manifest, Location
 from borg.cache import Cache
 from borg.key import PlaintextKey
 from borg.repository import Repository
+from borg.locking import LockTimeout, LockFailed, LockError, LockErrorT
 
 from borgcube.keymgt import synthesize_client_key, SyntheticManifest
 from borgcube.utils import open_repository, tee_job_logs
@@ -293,6 +300,25 @@ class JobExecutor:
         except Repository.InsufficientFreeSpaceError:
             self.job.set_failure_cause('repository-enospc')
             log.error('Job %s failed because the repository %r had not enough free space', self.job.id, self.repository.url)
+        except LockTimeout as lock_error:
+            if get_cache_dir() in lock_error.args[0]:
+                self.job.set_failure_cause('cache-lock-timeout')
+                log.error('Job %s failed because locking the cache timed out', self.job)
+            else:
+                self.job.set_failure_cause('repository-lock-timeout')
+                log.error('Job %s failed because locking the repository %r timed out', self.job, self.repository.url)
+        except LockFailed as lock_error:
+            error = lock_error.args[1]
+            if get_cache_dir() in lock_error.args[0]:
+                self.job.set_failure_cause('cache-lock-failed', error=error)
+                log.error('Job %s failed because locking the cache failed (%s)', self.job, error)
+            else:
+                self.job.set_failure_cause('repository-lock-failed', error=error)
+                log.error('Job %s failed because locking the repository %r failed (%s)', self.job, self.repository.url, error)
+        except (LockError, LockErrorT) as lock_error:
+            error = lock_error.get_message()
+            self.job.set_failure_cause('lock-error', error=error)
+            log.error('Job %s failed because a locking error occured: %s', self.job, error)
 
     def analyse_job_process_error(self, called_process_error):
         if cpe_means_connection_failure(called_process_error):
