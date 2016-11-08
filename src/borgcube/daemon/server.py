@@ -58,8 +58,13 @@ class BaseServer:
         if command not in self.commands:
             log.error('invalid request was %r', request)
             return self.error('invalid request: no or invalid command.')
-        # log.debug('Received command %r, request %r', command, request)
-        return self.commands[command](self, request)
+        try:
+            return self.commands[command](self, request)
+        except Exception as exc:
+            log.exception('Error during request processing. Request was %r', request)
+            if not isinstance(exc, zmq.ZMQError):
+                # Probably need to send a reply
+                self.error('Uncaught exception during processing')
 
     def idle(self):
         pass
