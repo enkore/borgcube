@@ -325,7 +325,7 @@ class JobExecutor:
         if connection.rsh_options:
             command_line.append(connection.rsh_options)
         command_line.append(connection.remote)
-        command_line.append('BORG_CACHE_DIR=' + shlex.quote(self.remote_cache_dir))
+        command_line.append('BORG_CACHE_DIR=' + self.remote_cache_dir)
         command_line.append(connection.remote_borg)
         command_line.append('create')
         command_line.append(settings.SERVER_LOGIN + ':' + str(self.job.id) + '::' + self.job.archive_name)
@@ -392,7 +392,10 @@ class JobExecutor:
 
     def find_remote_cache_dir(self):
         remote_cache_dir = (self.client.connection.remote_cache_dir or '.cache/borg/')
+        escape = not self.client.connection.remote_cache_dir
         if remote_cache_dir[-1] != '/':
             remote_cache_dir += '/'
+        if escape:
+            remote_cache_dir = shlex.quote(remote_cache_dir)
         log.debug('remote_cache_dir is %r', remote_cache_dir)
         return remote_cache_dir
