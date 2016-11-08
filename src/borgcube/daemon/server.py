@@ -64,7 +64,8 @@ class BaseServer:
             log.exception('Error during request processing. Request was %r', request)
             if not isinstance(exc, zmq.ZMQError) and self.socket:
                 # Probably need to send a reply
-                self.error('Uncaught exception during processing')
+                return self.error('Uncaught exception during processing')
+            sys.exit(1)
 
     def idle(self):
         pass
