@@ -143,7 +143,11 @@ class Job(models.Model):
 
     data = JSONField()
 
-    state = CharField(default='job-created', choices=State.choices())
+    db_state = CharField(default='job-created', choices=State.choices())
+
+    @property
+    def state(self):
+        return self.State[self.db_state]
 
     @property
     def archive_name(self):
@@ -155,12 +159,17 @@ class Job(models.Model):
     def update_state(self, previous, to):
         with transaction.atomic():
             self.refresh_from_db()
-            if self.state != previous.value:
-                raise ValueError('Cannot transition job state from %r to %r, because current state is %r'
-                                 % (previous.value, to.value, self.state))
-            self.state = to.value
+            if self.db_state != previous.value:
+                raise ValueError('Cannot transition job _state from %r to %r, because current _state is %r'
+                                 % (previous.value, to.value, self.db_state))
+            self.db_state = to.value
             self.save()
             log.debug('%s: phase %s -> %s', self.id, previous.value, to.value)
+
+    def force_state(self, state):
+        log.debug('%s: Forced _state %s -> %s', self.id, self.db_state, state.value)
+        self.db_state = state.value
+        self.save()
 
     class Meta:
         ordering = ['-timestamp']

@@ -5,6 +5,7 @@ import sys
 import time
 import os
 from pathlib import Path
+from subprocess import check_output, check_call, CalledProcessError
 
 import zmq
 
@@ -200,16 +201,15 @@ class APIServer(BaseServer):
             logger('Command was: %s %r', command, params)
             if failure and command == 'run-job':
                 job = Job.objects.get(id=params[0])
+                job.refresh_from_db()
                 if job.state != Job.State.failed:
                     logger('Job was not marked as failed; rectifying that')
-                    job.state = Job.State.failed
-                    job.save()
+                    job.force_state(Job.State.failed)
 
 
 import configparser
 import shlex
 import shutil
-import subprocess
 
 from borg.helpers import get_cache_dir, Manifest
 from borg.cache import Cache
@@ -227,17 +227,33 @@ class JobExecutor:
         self.remote_cache_dir = self.find_remote_cache_dir()
 
     def execute(self):
-        self.job.update_state(Job.State.job_created, Job.State.client_preparing)
+        try:
+            self.job.update_state(Job.State.job_created, Job.State.client_preparing)
 
-        self.synthesize_crypto()
-        self.transfer_cache()
-        self.job.update_state(Job.State.client_preparing, Job.State.client_prepared)
+            self.synthesize_crypto()
+            self.transfer_cache()
+            self.job.update_state(Job.State.client_preparing, Job.State.client_prepared)
 
-        self.remote_create()
-        self.client_cleanup()
-        # TODO sync cache
-        self.job.update_state(Job.State.client_cleanup, Job.State.done)
-        log.info('Job %s completed successfully', self.job.id)
+            self.remote_create()
+            self.client_cleanup()
+            self.job.update_state(Job.State.client_cleanup, Job.State.done)
+            log.info('Job %s completed successfully', self.job.id)
+        except CalledProcessError as cpe:
+            self.job.refresh_from_db()
+            self.job.force_state(Job.State.failed)
+            rsync_errors = (2, 3, 5, 6, 10, 11, 12, 13, 14, 21, 22, 23, 24, 25, 30, 35)
+            if (('ssh' in cpe.cmd[0] and cpe.returncode == 255) or
+                ('rsync' in cpe.cmd[0] and cpe.returncode in rsync_errors)):
+                # SSH connection error, or rsync error, which is likely also connection related
+                self.job.data['failure_cause'] = {
+                    'kind': 'client-connection-failed',
+                    'command': cpe.cmd,
+                    'exit-code': cpe.returncode,
+                }
+                log.error('Job %s failed due to client connection failure', self.job.id)
+                self.job.save()
+            else:
+                raise
 
     def synthesize_crypto(self):
         with open_repository(self.repository) as repository:
@@ -264,13 +280,13 @@ class JobExecutor:
         log.debug('transfer_cache: rsync connection string is %r', connstr)
         log.debug('transfer_cache: auxiliary files')
         try:
-            subprocess.check_call(('ssh', self.client.connection.remote, 'mkdir', '-p', self.remote_cache_dir + self.repository.id + '/'))
-            subprocess.check_call(rsync + (str(job_cache_path) + '/', connstr))
+            check_output(('ssh', self.client.connection.remote, 'mkdir', '-p', self.remote_cache_dir + self.repository.id + '/'))
+            check_call(rsync + (str(job_cache_path) + '/', connstr))
         finally:
             shutil.rmtree(str(job_cache_path))
         log.debug('transfer_cache: chunks cache')
         chunks_cache = cache_path / 'chunks'
-        subprocess.check_call(rsync + (str(chunks_cache), connstr))
+        check_call(rsync + (str(chunks_cache), connstr))
         log.debug('transfer_cache: done')
 
     def create_job_cache(self, cache_path):
@@ -331,9 +347,18 @@ class JobExecutor:
             command_line += extra_options,
 
         log.debug('Built command line: %r', command_line)
-        subprocess.check_call(command_line)
-        log.debug('remote create finished (success)')
-        self.job.refresh_from_db()
+        try:
+            check_call(command_line)
+        except CalledProcessError as cpe:
+            if cpe.returncode == 1:
+                self.job.refresh_from_db()
+                self.job.data['borg_warning'] = True
+                self.job.save()
+            else:
+                raise
+        else:
+            self.job.refresh_from_db()
+        log.debug('remote create finished (success/warning)')
         self.job.repository.refresh_from_db()
         self.job.update_state(Job.State.client_in_progress, Job.State.client_done)
 
