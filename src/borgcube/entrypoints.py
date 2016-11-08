@@ -11,6 +11,8 @@ logger.configured = True
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'borgcube.web.settings')
 django.setup()
 
+os.environ.setdefault('BORG_HOSTNAME_IS_UNIQUE', 'yes')
+
 
 def daemon():
     from borgcube.daemon.server import APIServer
