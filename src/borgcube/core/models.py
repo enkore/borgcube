@@ -167,7 +167,7 @@ class Job(models.Model):
         with transaction.atomic():
             self.refresh_from_db()
             if self.db_state != previous.value:
-                raise ValueError('Cannot transition job _state from %r to %r, because current _state is %r'
+                raise ValueError('Cannot transition job state from %r to %r, because current state is %r'
                                  % (previous.value, to.value, self.db_state))
             self.db_state = to.value
             self.save()
@@ -177,7 +177,7 @@ class Job(models.Model):
         self.refresh_from_db()
         if self.db_state == state.value:
             return False
-        log.debug('%s: Forced _state %s -> %s', self.id, self.db_state, state.value)
+        log.debug('%s: Forced state %s -> %s', self.id, self.db_state, state.value)
         self.db_state = state.value
         self.save()
         return True
