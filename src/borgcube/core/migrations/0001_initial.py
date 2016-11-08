@@ -54,7 +54,7 @@ class Migration(migrations.Migration):
                 ('timestamp', models.DateTimeField(auto_now_add=True, db_index=True)),
                 ('data', jsonfield.fields.JSONField(default=dict)),
                 ('state', models.CharField(choices=[('job-created', 'job_created'), ('client-preparing', 'client_preparing'), ('client-prepared', 'client_prepared'), ('client-in-progress', 'client_in_progress'), ('client-done', 'client_done'), ('client-cleanup', 'client_cleanup'), ('cache_sync', 'cache_sync'), ('done', 'done'), ('failed', 'failed')], default='job-created', max_length=200)),
-                ('client', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='core.Client')),
+                ('client', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='jobs', to='core.Client')),
             ],
             options={
                 'ordering': ['-timestamp'],
