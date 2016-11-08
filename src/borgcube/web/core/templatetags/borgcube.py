@@ -62,6 +62,16 @@ def job_outcome(job):
                 return _('Repository needs check')
             elif failure_kind == 'repository-enospc':
                 return _('Repository ran out of space')
+            elif failure_kind == 'cache-lock-timeout':
+                return _('Timeout while locking server cache')
+            elif failure_kind == 'cache-lock-failed':
+                return _('Failed to lock server cache: %s') % failure_cause['error']
+            elif failure_kind == 'repository-lock-timeout':
+                return _('Timeout while locking repository')
+            elif failure_kind == 'repository-lock-failed':
+                return _('Failed to lock repository: %s') % failure_cause['error']
+            elif failure_kind == 'lock-error':
+                return _('Locking error')
             else:
                 return failure_kind
         else:
