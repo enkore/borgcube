@@ -97,11 +97,15 @@ class APIServer(BaseServer):
         super().__init__(address, context)
         # PID -> (command, params...)
         self.children = {}
+        self.queue = []
         set_process_name('borgcubed [main process]')
+        for job in Job.objects.filter(db_state=Job.State.job_created.value):
+            self.queue_job(job)
 
     def idle(self):
         self.check_schedule()
         self.check_children()
+        self.check_queue()
 
     def cmd_initiate_job(self, request):
         # TODO catch all!111 the exceptions, log'em.
@@ -121,18 +125,31 @@ class APIServer(BaseServer):
             client=job_config.client
         )
         log.info('Created job %s for client %s, job config %d', job.id, job_config.client.hostname, job_config.id)
-        pid = self.fork()
-        if not pid:
-            set_process_name('borgcubed [run-job %s]' % job.id)
-            executor = JobExecutor(job)
-            executor.execute()
-            sys.exit(0)
-        else:
-            self.children[pid] = ('run-job', str(job.id))
-            return {
-                'success': True,
-                'job': str(job.id),
-            }
+        self.queue_job(job)
+        return {
+            'success': True,
+            'job': str(job.id),
+        }
+
+    def queue_job(self, job):
+        log.debug('Enqueued job %s', job.id)
+        self.queue.append((self.can_run_job, self.run_job, str(job.id)))
+
+    def run_job(self, job_id):
+        job = Job.objects.get(id=job_id)
+        set_process_name('borgcubed [run-job %s]' % job_id)
+        executor = JobExecutor(job)
+        executor.execute()
+
+    def can_run_job(self, job_id):
+        job = Job.objects.get(id=job_id)
+        blocking_jobs = Job.objects.filter(repository=job.repository).exclude(db_state__in=(
+            Job.State.job_created.value,
+            Job.State.done.value,
+            Job.State.failed.value
+        ))
+        job_is_blocked = blocking_jobs.exists()
+        return not job_is_blocked
 
     def cmd_log(self, request):
         try:
@@ -203,6 +220,20 @@ class APIServer(BaseServer):
                 job = Job.objects.get(id=params[0])
                 if job.force_state(Job.State.failed):
                     logger('Job was not marked as failed; rectified that')
+
+    def check_queue(self):
+        for i in range(len(self.queue)):
+            predicate, method, *args = self.queue[i]
+            if not predicate(*args):
+                continue
+            self.queue.pop(i)
+            pid = self.fork()
+            if pid:
+                # Parent, gotta watch the kids
+                self.children[pid] = method.__name__, *args
+            else:
+                method(*args)
+                sys.exit(0)
 
 
 import configparser

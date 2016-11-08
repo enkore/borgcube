@@ -192,5 +192,8 @@ class Job(models.Model):
         self.data['failure_cause'].update(kwargs)
         self.save()
 
+    def __str__(self):
+        return str(self.id)
+
     class Meta:
         ordering = ['-timestamp']

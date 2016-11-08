@@ -140,7 +140,7 @@ LOGGING = {
     },
     'handlers': {
         'console': {
-            'level': 'INFO',
+            'level': 'DEBUG',
             'class': 'logging.StreamHandler',
             'formatter': 'standard',
         },
@@ -173,4 +173,6 @@ SERVER_LOGIN = 'mabe@localhost'
 # This can usually be left empty. It is only needed if no SSH forced commands are used.
 # (This is then passed as the --remote-path option to the Borg running on the client)
 SERVER_PROXY_PATH = None
+SERVER_PROXY_PATH = '/home/mabe/Projekte/_oss/borgcube/_venv/bin/borgcube-proxy'
+
 DAEMON_ADDRESS = 'tcp://127.0.0.1:58123'
