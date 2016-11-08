@@ -235,6 +235,11 @@ class JobExecutor:
     def create_job_cache(self, cache_path):
         if not cache_path.is_dir():
             self.initialize_cache()
+        # Ensure that the server cache is in sync, in case the repo was modified externally.
+        with open_repository(self.repository) as repository:
+            manifest, key = Manifest.load(repository)
+            with Cache(repository, key, manifest, lock_wait=1):
+                pass
         job_cache_path = cache_path / str(self.job.id)
         job_cache_path.mkdir()
         log.debug('create_job_cache: path is %r', job_cache_path)
