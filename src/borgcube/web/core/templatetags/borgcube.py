@@ -60,3 +60,5 @@ def job_outcome(job):
             return _('Unknown error - see logs')
     elif job.archive:
         return _('Finished ({archive_summary})').format(archive_summary=summarize_archive(job.archive))
+    else:
+        return job.state.verbose_name

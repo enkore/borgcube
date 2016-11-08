@@ -170,7 +170,34 @@ def job_config_add(request, client_id):
 
 
 def job_config_edit(request, client_id, config_id):
-    config = get_object_or_404(JobConfig, client=client_id, id=config_id)
+    job_config = get_object_or_404(JobConfig, client=client_id, id=config_id)
+    data = request.POST or None
+    initial_data = dict(job_config.config)
+    initial_data['paths'] = '\n'.join(initial_data['paths'])
+    initial_data['excludes'] = '\n'.join(initial_data['excludes'])
+    initial_data['repository'] = job_config.repository
+    form = JobConfigForm(data=data, initial=initial_data)
+    advanced_form = JobConfigForm.AdvancedForm(data=data, initial=initial_data)
+    if data and form.is_valid() and advanced_form.is_valid():
+        config = form.cleaned_data
+        config.update(advanced_form.cleaned_data)
+        repository = config.pop('repository')
+        config['version'] = 1
+        # TODO StringListValidator
+        # TODO Pattern validation
+        # TODO fancy pattern editor with test area
+        config['paths'] = config.get('paths', '').split('\n')
+        config['excludes'] = [s for s in config.get('excludes', '').split('\n') if s]
+
+        job_config.repository = repository
+        job_config.config = config
+        job_config.save()
+        return redirect(reverse(client_view, args=[job_config.client.pk]) + '#jobconfig-%d' % job_config.id)
+    return TemplateResponse(request, 'core/client/config_edit.html', {
+        'form': form,
+        'advanced_form': advanced_form,
+        'job_config': job_config,
+    })
 
 
 def job_config_delete(request, client_id, config_id):

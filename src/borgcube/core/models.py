@@ -126,12 +126,19 @@ class Job(models.Model):
         client_done = 'client-done'
         # Cache is removed from client
         client_cleanup = 'client-cleanup'
-        # Server syncs it's cache
-        cache_sync = 'cache_sync'
 
         done = 'done'
 
         failed = 'failed'
+
+    State.job_created.verbose_name = _('Job created')
+    State.client_preparing.verbose_name = _('Preparing client')
+    State.client_prepared.verbose_name = _('Prepared client')
+    State.client_in_progress.verbose_name =_('In progress')
+    State.client_done.verbose_name = _('Client is done')
+    State.client_cleanup.verbose_name = _('Client is cleaned up')
+    State.done.verbose_name = _('Done')
+    State.failed.verbose_name = _('Failed')
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     timestamp = models.DateTimeField(auto_now_add=True, db_index=True)

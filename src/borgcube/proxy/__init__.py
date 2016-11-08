@@ -11,6 +11,8 @@ from borg.remote import RemoteRepository, RepositoryServer, PathNotAllowed
 from borg.cache import Cache
 from borg.item import ArchiveItem
 
+from borg.archiver import Archiver
+
 from ..core.models import Job
 from ..keymgt import SyntheticRepoKey, synthesize_client_key, SyntheticManifest
 
@@ -251,6 +253,7 @@ class ReverseRepositoryProxy(RepositoryServer):
         self._got_archive = True
 
     def _cache_sync_archive(self, archive_id):
+        log.debug('Started cache sync for %s', archive_id)
         add_chunk = self._cache.chunks.add
         cdata = self._cache.repository.get(archive_id)
         _, data = self._cache.key.decrypt(archive_id, cdata)
@@ -275,4 +278,5 @@ class ReverseRepositoryProxy(RepositoryServer):
                 if b'chunks' in item:
                     for chunk_id, size, csize in item[b'chunks']:
                         add_chunk(chunk_id, 1, size, csize)
+        log.debug('Completed cache sync for %s', archive_id)
         return True
