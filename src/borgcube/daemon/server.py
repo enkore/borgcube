@@ -62,7 +62,7 @@ class BaseServer:
             return self.commands[command](self, request)
         except Exception as exc:
             log.exception('Error during request processing. Request was %r', request)
-            if not isinstance(exc, zmq.ZMQError):
+            if not isinstance(exc, zmq.ZMQError) and self.socket:
                 # Probably need to send a reply
                 self.error('Uncaught exception during processing')
 
@@ -82,6 +82,7 @@ class BaseServer:
             log.debug('Forked worker PID is %d', pid)
         else:
             self.socket.close()
+            self.socket = None
             signal.signal(signal.SIGINT, signal.SIG_DFL)
             signal.signal(signal.SIGTERM, signal.SIG_DFL)
         return pid
