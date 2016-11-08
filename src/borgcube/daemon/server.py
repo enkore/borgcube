@@ -50,7 +50,7 @@ class BaseServer:
                     reply = self.handle_request(request)
                     self.socket.send_json(reply)
             self.idle()
-        self.socket.close()
+        self.close()
         log.info('Exorcism successful. Have a nice day.')
 
     def handle_request(self, request):
@@ -72,6 +72,9 @@ class BaseServer:
 
     def idle(self):
         pass
+
+    def close(self):
+        self.socket.close()
 
     def error(self, message, *parameters):
         log.error('Request failed: ' + message, *parameters)
@@ -97,6 +100,7 @@ class BaseServer:
 class APIServer(BaseServer):
     def __init__(self, address, context=None):
         super().__init__(address, context)
+        os.setpgrp()
         # PID -> (command, params...)
         self.children = {}
         self.queue = []
@@ -110,6 +114,14 @@ class APIServer(BaseServer):
         self.check_schedule()
         self.check_children()
         self.check_queue()
+
+    def close(self):
+        super().close()
+        log.debug('Killing children')
+        os.killpg(0, signal.SIGTERM)
+        log.debug('Waiting for all children to die')
+        while self.children:
+            self.check_children()
 
     def cmd_initiate_job(self, request):
         # TODO catch all!111 the exceptions, log'em.
