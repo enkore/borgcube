@@ -201,10 +201,8 @@ class APIServer(BaseServer):
             logger('Command was: %s %r', command, params)
             if failure and command == 'run-job':
                 job = Job.objects.get(id=params[0])
-                job.refresh_from_db()
-                if job.state != Job.State.failed:
-                    logger('Job was not marked as failed; rectifying that')
-                    job.force_state(Job.State.failed)
+                if job.force_state(Job.State.failed):
+                    logger('Job was not marked as failed; rectified that')
 
 
 import configparser
@@ -217,6 +215,15 @@ from borg.key import PlaintextKey
 
 from borgcube.keymgt import synthesize_client_key, SyntheticManifest
 from borgcube.utils import open_repository
+
+
+def cpe_means_connection_failure(called_process_error):
+    command = called_process_error.cmd[0]
+    exit_code = called_process_error.returncode
+    rsync_errors = (2, 3, 5, 6, 10, 11, 12, 13, 14, 21, 22, 23, 24, 25, 30, 35)
+    # SSH connection error, or rsync error, which is likely also connection related
+    return (('ssh' in command and exit_code == 255) or
+            ('rsync' in command and exit_code in rsync_errors))
 
 
 class JobExecutor:
@@ -239,21 +246,21 @@ class JobExecutor:
             self.job.update_state(Job.State.client_cleanup, Job.State.done)
             log.info('Job %s completed successfully', self.job.id)
         except CalledProcessError as cpe:
-            self.job.refresh_from_db()
             self.job.force_state(Job.State.failed)
-            rsync_errors = (2, 3, 5, 6, 10, 11, 12, 13, 14, 21, 22, 23, 24, 25, 30, 35)
-            if (('ssh' in cpe.cmd[0] and cpe.returncode == 255) or
-                ('rsync' in cpe.cmd[0] and cpe.returncode in rsync_errors)):
-                # SSH connection error, or rsync error, which is likely also connection related
-                self.job.data['failure_cause'] = {
-                    'kind': 'client-connection-failed',
-                    'command': cpe.cmd,
-                    'exit-code': cpe.returncode,
-                }
-                log.error('Job %s failed due to client connection failure', self.job.id)
-                self.job.save()
-            else:
+            if not self.analyse_job_process_error(cpe):
                 raise
+            self.job.save()
+
+    def analyse_job_process_error(self, called_process_error):
+        if cpe_means_connection_failure(called_process_error):
+            self.job.data['failure_cause'] = {
+                'kind': 'client-connection-failed',
+                'command': called_process_error.cmd,
+                'exit-code': called_process_error.returncode,
+            }
+            log.error('Job %s failed due to client connection failure', self.job.id)
+            return True
+        return False
 
     def synthesize_crypto(self):
         with open_repository(self.repository) as repository:

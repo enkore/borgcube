@@ -167,9 +167,13 @@ class Job(models.Model):
             log.debug('%s: phase %s -> %s', self.id, previous.value, to.value)
 
     def force_state(self, state):
+        self.refresh_from_db()
+        if self.db_state == state.value:
+            return False
         log.debug('%s: Forced _state %s -> %s', self.id, self.db_state, state.value)
         self.db_state = state.value
         self.save()
+        return True
 
     class Meta:
         ordering = ['-timestamp']
