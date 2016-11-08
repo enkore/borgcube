@@ -56,6 +56,14 @@ def job_outcome(job):
             failure_kind = failure_cause['kind']
             if failure_kind == 'client-connection-failed':
                 return _('Could not connect to client')
+            elif failure_kind == 'repository-does-not-exist':
+                return _('Repository does not exist')
+            elif failure_kind == 'repository-check-needed':
+                return _('Repository needs check')
+            elif failure_kind == 'repository-enospc':
+                return _('Repository ran out of space')
+            else:
+                return failure_kind
         else:
             return _('Unknown error - see logs')
     elif job.archive:

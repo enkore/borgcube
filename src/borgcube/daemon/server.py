@@ -212,6 +212,7 @@ import shutil
 from borg.helpers import get_cache_dir, Manifest, Location
 from borg.cache import Cache
 from borg.key import PlaintextKey
+from borg.repository import Repository
 
 from borgcube.keymgt import synthesize_client_key, SyntheticManifest
 from borgcube.utils import open_repository
@@ -250,14 +251,20 @@ class JobExecutor:
             if not self.analyse_job_process_error(cpe):
                 raise
             self.job.save()
+        except Repository.DoesNotExist:
+            self.job.set_failure_cause('repository-does-not-exist')
+            log.error('Job %s failed because the repository %r does not exist', self.job.id, self.repository.url)
+        except Repository.CheckNeeded:
+            # TODO: schedule check automatically?
+            self.job.set_failure_cause('repository-check-needed')
+            log.error('Job %s failed because the repository %r needs a check run', self.job.id, self.repository.url)
+        except Repository.InsufficientFreeSpaceError:
+            self.job.set_failure_cause('repository-enospc')
+            log.error('Job %s failed because the repository %r had not enough free space', self.job.id, self.repository.url)
 
     def analyse_job_process_error(self, called_process_error):
         if cpe_means_connection_failure(called_process_error):
-            self.job.data['failure_cause'] = {
-                'kind': 'client-connection-failed',
-                'command': called_process_error.cmd,
-                'exit-code': called_process_error.returncode,
-            }
+            self.job.set_failure_cause('client-connection-failed', command=called_process_error.cmd, exit_code=called_process_error.returncode)
             log.error('Job %s failed due to client connection failure', self.job.id)
             return True
         return False

@@ -184,5 +184,13 @@ class Job(models.Model):
         self.save()
         return True
 
+    def set_failure_cause(self, kind, **kwargs):
+        self.force_state(Job.State.failed)
+        self.data['failure_cause'] = {
+            'kind': kind,
+        }
+        self.data['failure_cause'].update(kwargs)
+        self.save()
+
     class Meta:
         ordering = ['-timestamp']

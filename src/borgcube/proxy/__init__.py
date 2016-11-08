@@ -15,7 +15,7 @@ from borg.archiver import Archiver
 
 from ..core.models import Job
 from ..keymgt import SyntheticRepoKey, synthesize_client_key, SyntheticManifest
-from ..utils import set_process_name
+from ..utils import set_process_name, open_repository
 
 log = logging.getLogger(__name__)
 # TODO per job log file, the log from this process should not get to the connected client
@@ -107,11 +107,7 @@ class ReverseRepositoryProxy(RepositoryServer):
         self.job.save()
 
     def _real_open(self, location):
-        if location.proto == 'ssh':
-            # TODO construct & pass args for stuff like umask and remote-path
-            self.repository = RemoteRepository(location, exclusive=True)
-        else:
-            self.repository = Repository(location.path, exclusive=True)
+        self.repository = open_repository(self.job.repository)
         # RepositoryServer.serve() handles this
         self.repository.__enter__()
 
