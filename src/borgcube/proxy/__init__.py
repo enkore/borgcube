@@ -99,11 +99,11 @@ class ReverseRepositoryProxy(RepositoryServer):
 
     @property
     def _checkpoint_archives(self):
-        return self.job.data.get('checkpoint-archives', [])
+        return self.job.data.setdefault('checkpoint-archives', [])
 
-    def _add_checkpoint(self, name):
+    def _add_checkpoint(self, id):
         # XXX TODO does this work? Test!
-        self._checkpoint_archives.append(name)
+        self._checkpoint_archives.append(bin_to_hex(id))
         self.job.save()
 
     def _real_open(self, location):
@@ -187,9 +187,7 @@ class ReverseRepositoryProxy(RepositoryServer):
 
     @doom_on_exception()
     def delete(self, id, wait=True):
-        # TODO: _checkpoint_archives must be built from ALL archives in the repo... or does it?
-        # TODO: we control archive names. if we abort, we won't use the same archive name again.
-        if id not in self._checkpoint_archives:
+        if bin_to_hex(id) not in self._checkpoint_archives:
             raise ValueError('BorgCube: illegal delete(id=%s), not a checkpoint archive ID', bin_to_hex(id))
         self.repository.delete(id, wait)
         self._cache.chunks.decref(id)
@@ -240,7 +238,7 @@ class ReverseRepositoryProxy(RepositoryServer):
         checkpoint_re = re.escape(self.job.archive_name) + r'\.checkpoint(\d+)?'
         if re.fullmatch(checkpoint_re, archive_info.name):
             log.debug('%r is a checkpoint - remembering that', archive_info.name)
-            self._add_checkpoint(archive_info.name)
+            self._add_checkpoint(archive_info.id)
         else:
             log.debug('%r is the finalised archive', archive_info.name)
             self._final_archive = True
@@ -255,7 +253,7 @@ class ReverseRepositoryProxy(RepositoryServer):
         self._got_archive = True
 
     def _cache_sync_archive(self, archive_id):
-        log.debug('Started cache sync for %s', archive_id)
+        log.debug('Started cache sync')
         add_chunk = self._cache.chunks.add
         cdata = self._cache.repository.get(archive_id)
         _, data = self._cache.key.decrypt(archive_id, cdata)
@@ -280,5 +278,5 @@ class ReverseRepositoryProxy(RepositoryServer):
                 if b'chunks' in item:
                     for chunk_id, size, csize in item[b'chunks']:
                         add_chunk(chunk_id, 1, size, csize)
-        log.debug('Completed cache sync for %s', archive_id)
+        log.debug('Completed cache sync')
         return True
