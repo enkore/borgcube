@@ -2,7 +2,9 @@ import enum
 import logging
 import re
 import uuid
+from pathlib import Path
 
+from django.conf import settings
 from django.core import validators
 from django.db import models, transaction
 from django.utils.translation import ugettext_lazy as _
@@ -132,6 +134,8 @@ class Job(models.Model):
         done = 'done'
 
         failed = 'failed'
+
+    State.STABLE = (State.job_created, State.done, State.failed)
 
     State.job_created.verbose_name = _('Job created')
     State.client_preparing.verbose_name = _('Preparing client')
