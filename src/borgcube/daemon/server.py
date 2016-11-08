@@ -342,6 +342,7 @@ class JobExecutor:
             command_line += '--read-special',
         if config['ignore_inode']:
             command_line += '--ignore-inode',
+        command_line += '--checkpoint-interval', str(config['checkpoint_interval'])
         command_line += '--compression', config['compression']
         extra_options = config.get('extra_options')
         if extra_options:
