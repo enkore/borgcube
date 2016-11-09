@@ -197,9 +197,11 @@ class Job(models.Model):
         self.save()
 
     def log_path(self):
-        logs_path = Path(settings.SERVER_LOGS_DIR)
+        short_timestamp = self.timestamp.replace(microsecond=0).isoformat()
+        logs_path = Path(settings.SERVER_LOGS_DIR) / str(self.timestamp.year)
+        file = short_timestamp + '-' + self.client.hostname  + '-' + str(self.id)
         logs_path.mkdir(parents=True, exist_ok=True)
-        return logs_path / str(self.id)
+        return logs_path / file
 
     def delete(self, using=None, keep_parents=False):
         super().delete(using, keep_parents)
