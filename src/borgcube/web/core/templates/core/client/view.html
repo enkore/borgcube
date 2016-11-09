@@ -66,6 +66,10 @@
 
         <table class='plist'>
           <tr>
+            <th>{{ job_config|field_name:'repository' }}</th>
+            <td><a href='{{ job_config.repository|get_url }}'>{{ job_config.repository.name }}</a></td>
+          </tr>
+          <tr>
             <th>{% trans 'One file system' %}</th>
             <td>{{ config.one_file_system|yesno }}</td>
           </tr>
