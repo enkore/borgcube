@@ -123,5 +123,5 @@ def configure_plugins():
     pm.load_setuptools_entrypoints('borgcube0')
     hook = pm.hook
 
-    log.info('Loaded plugins: %s', ', '.join(name for name, plugin in pm.list_name_plugin()))
+    log.debug('Loaded plugins: %s', ', '.join(name for name, plugin in pm.list_name_plugin()))
     hook.borgcube_startup()
