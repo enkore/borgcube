@@ -71,6 +71,7 @@ class Archive(models.Model):
     original_size = models.BigIntegerField()
     compressed_size = models.BigIntegerField()
     deduplicated_size = models.BigIntegerField()
+    duration = models.DurationField()
 
 
 class ClientConnection(models.Model):

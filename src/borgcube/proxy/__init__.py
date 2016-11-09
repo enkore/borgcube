@@ -202,6 +202,7 @@ class ReverseRepositoryProxy(RepositoryServer):
         log.debug('Saving archive metadata to database')
         archive = BorgArchive(self.repository, self._repository_key, self._manifest, self.job.archive_name, cache=self._cache)
         stats = archive.calc_stats(self._cache)
+        duration = archive.end - archive.start
         ao = Archive(
             id=archive.fpr,
             repository=self.job.repository,
@@ -210,6 +211,7 @@ class ReverseRepositoryProxy(RepositoryServer):
             original_size=stats.osize,
             compressed_size=stats.csize,
             deduplicated_size=stats.usize,
+            duration=duration,
         )
         self.job.archive = ao
         ao.save()
