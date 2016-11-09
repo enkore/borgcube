@@ -177,6 +177,28 @@ class APIServer(BaseServer):
         executor = JobExecutor(job)
         executor.execute()
 
+    def cmd_cancel_job(self, request):
+        try:
+            job_id = request['job_id']
+            job = Job.objects.get(id=job_id)
+        except KeyError as ke:
+            return self.error('Missing parameter %r', ke.args[0])
+        except ObjectDoesNotExist:
+            return self.error('No such JobConfig')
+        log.info('Cancelling job %s', job_id)
+        for i, (p, pf, method, *args) in enumerate(self.queue[:]):
+            if method == self.run_job and args[0] == job_id:
+                del self.queue[i]
+                log.info('Cancelled queued job %s', job_id)
+                return {'success': True}
+        for pid, (command, *args) in self.children.items():
+            log.info("%r %r", command, args)
+            if command == 'run_job' and args[0] == job_id:
+                os.kill(pid, signal.SIGTERM)
+                log.info('Cancelled job %s (worker pid was %d)', job_id, pid)
+                return {'success': True}
+        return {'success': True, 'message': 'Job neither active nor queued'}
+
     def cmd_log(self, request):
         try:
             name = str(request['name'])
@@ -214,6 +236,7 @@ class APIServer(BaseServer):
 
     commands = {
         'initiate-job': cmd_initiate_job,
+        'cancel-job': cmd_cancel_job,
         'log': cmd_log,
     }
 
@@ -384,7 +407,7 @@ class JobExecutor:
 
         remote_dir = self.remote_cache_dir + self.repository.repository_id + '/'
         connstr = self.client.connection.remote + ':' + remote_dir
-        rsync = ('rsync', '-rI', '--delete', '--exclude', 'files')
+        rsync = ('rsync', '-rI', '--delete', '--exclude', '/files')
         log.debug('transfer_cache: rsync connection string is %r', connstr)
         log.debug('transfer_cache: auxiliary files')
         try:

@@ -27,6 +27,7 @@ client_urls = [
     url(r'^config/(?P<config_id>\d+)/delete/$', core_views.job_config_delete, name='core.job_config_delete'),
     url(r'^config/(?P<config_id>\d+)/trigger/$', core_views.job_config_trigger, name='core.job_config_trigger'),
     url(r'^job/(?P<job_id>[-\w]+)/$', core_views.job_view, name='core.job_view'),
+    url(r'^job/(?P<job_id>[-\w]+)/cancel/$', core_views.job_cancel, name='core.job_cancel'),
 ]
 
 repo_urls = [

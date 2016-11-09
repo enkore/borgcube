@@ -19,6 +19,7 @@ Options:
     <th>{% trans 'Configuration' context 'jobs table' %}</th>
     <th>{% trans 'Outcome' context 'jobs table' %}</th>
     <th>{% trans 'Duration' context 'jobs table' %}</th>
+    <th></th>
   </tr>
 
   {% for job in jobs %}
@@ -35,8 +36,10 @@ Options:
     <td>{{ job|job_outcome }}</td>
     {% if job.done or job.failed %}
     <td>{{ job.duration|format_timedelta }}</td>
+    <td></td>
     {% else %}
     <td><em>{{ job.duration|format_timedelta }}</em></td>
+    <td><a href='{% url 'core.job_cancel' client.pk job.pk %}'>C</a></td>
     {% endif %}
     </tr>
   {% endfor %}

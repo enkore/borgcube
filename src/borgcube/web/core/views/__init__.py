@@ -111,6 +111,13 @@ def job_view(request, client_id, job_id):
     job = get_object_or_404(Job, client=client_id, id=job_id)
 
 
+def job_cancel(request, client_id, job_id):
+    job = get_object_or_404(Job, client=client_id, id=job_id)
+    daemon = APIClient()
+    daemon.cancel_job(job)
+    return redirect(client_view, job.client.pk)
+
+
 class JobConfigForm(forms.Form):
     COMPRESSION_CHOICES = [
         ('none', _('No compression')),

@@ -24,6 +24,8 @@ class APIClient:
     def __init__(self, address=settings.DAEMON_ADDRESS, context=None):
         self.socket = (context or zmq.Context.instance()).socket(zmq.REQ)
         self.socket.rcvtimeo = 2000
+        self.socket.sndtimeo = 2000
+        self.socket.linger = 2000
         self.socket.connect(address)
 
     def initiate_job(self, client, job_config):
@@ -38,3 +40,14 @@ class APIClient:
             raise APIError(reply['message'])
         log.info('Initiated job %s', reply['job'])
         return Job.objects.get(id=reply['job'])
+
+    def cancel_job(self, job):
+        self.socket.send_json({
+            'command': 'cancel-job',
+            'job_id': str(job.id),
+        })
+        reply = self.socket.recv_json()
+        if not reply['success']:
+            log.error('APIClient.cancel_job(%r) failed: %s', job.id, reply['message'])
+            raise APIError(reply['message'])
+        log.info('Cancelled job %s', job.id)
