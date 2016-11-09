@@ -32,13 +32,18 @@ class BaseServer:
         log.info('bound to %s', address)
 
         self.exit = False
+        self.shutdown = False
         signal.signal(signal.SIGTERM, self.signal_terminate)
-        signal.signal(signal.SIGINT, self.signal_terminate)
+        signal.signal(signal.SIGINT, self.signal_shutdown)
 
     def signal_terminate(self, signum, stack_frame):
         log.info('Received signal %d, initiating exorcism', signum)
         self.exit = True
         signal.signal(signal.SIGTERM, signal.SIG_IGN)
+
+    def signal_shutdown(self, signum, stack_frame):
+        log.info('Received signal %d, initiating slow exorcism', signum)
+        self.shutdown = True
         signal.signal(signal.SIGINT, signal.SIG_IGN)
 
     def main_loop(self):
@@ -234,8 +239,12 @@ class APIServer(BaseServer):
                 job = Job.objects.get(id=params[0])
                 if job.force_state(Job.State.failed):
                     logger('Job was not marked as failed; rectified that')
+        self.exit |= self.shutdown and not self.children
 
     def check_queue(self):
+        if self.shutdown:
+            self.queue.clear()
+            return
         nope = []
         while self.queue:
             predicate, method, *args = self.queue.pop()
