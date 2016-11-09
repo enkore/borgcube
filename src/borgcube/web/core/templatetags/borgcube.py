@@ -82,3 +82,19 @@ def job_outcome(job):
         return _('Finished ({archive_summary})').format(archive_summary=summarize_archive(job.archive))
     else:
         return job.state.verbose_name
+
+
+@register.filter
+def format_timedelta(td):
+    ts = td.total_seconds()
+    s = ts % 60
+    m = int(ts / 60) % 60
+    h = int(ts / 3600) % 24
+    if td.days and h and m and s:
+        return _('%d days %d hours %d minutes %d seconds') % (td.days, h, m, s)
+    elif h and m and s:
+        return _('%d hours %d minutes %d seconds') % (h, m, s)
+    elif m and s:
+        return _('%d minutes %d seconds') % (m, s)
+    else:
+        return _('%d seconds') % s

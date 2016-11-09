@@ -57,4 +57,4 @@ class BackupsToday(Metric):
 
     def formatted_value(self):
         today_begin = timezone.now().replace(hour=0, minute=0, microsecond=0)
-        return str(Job.objects.filter(timestamp__gte=today_begin, db_state=Job.State.done.value).count())
+        return str(Job.objects.filter(timestamp_end__gte=today_begin, db_state=Job.State.done.value).count())

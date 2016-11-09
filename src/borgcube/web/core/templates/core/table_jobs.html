@@ -12,7 +12,7 @@ Options:
 {% if jobs %}
 <table class='jobs' cellpadding='3px'>
   <tr>
-    <th>{% trans 'Timestamp (start)' context 'jobs table' %}</th>
+    <th>{% trans 'Timestamp' context 'jobs table' %}</th>
     {% if client_column %}
       <th>{% trans 'Client' context 'jobs table' %}</th>
     {% endif %}
@@ -23,7 +23,7 @@ Options:
 
   {% for job in jobs %}
     <tr {% if job.failed %}class='failed'{% elif job.data.borg_warning %}class='warning'{% endif %}>
-    <td><a href='{{ job|get_url }}'>{{ job.timestamp }}</a></td>
+    <td><a href='{{ job|get_url }}'>{{ job.timestamp_start|default:job.created }}</a></td>
     {% if client_column %}
     <td><a href='{{ job.client|get_url }}'>{{ client.id }}</a></td>
     {% endif %}
@@ -33,7 +33,7 @@ Options:
     <td>{% trans 'Unknown' context 'jobs table' %}</td>
     {% endif %}
     <td>{{ job|job_outcome }}</td>
-    <td>{{ job.duration }}</td>
+    <td>{{ job.duration|format_timedelta }}</td>
     </tr>
   {% endfor %}
 </table>

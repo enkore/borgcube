@@ -8,6 +8,7 @@ from django.conf import settings
 from django.core import validators
 from django.db import models, transaction
 from django.utils.translation import ugettext_lazy as _
+from django.utils import timezone
 
 from jsonfield.fields import TypedJSONField, JSONField
 
@@ -148,7 +149,10 @@ class Job(models.Model):
     State.failed.verbose_name = _('Failed')
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
+    created = models.DateTimeField(auto_now_add=True, db_index=True)
+    timestamp_start = models.DateTimeField(blank=True, null=True)
+    timestamp_end = models.DateTimeField(blank=True, null=True)
+
     repository = models.ForeignKey(Repository)
     client = models.ForeignKey(Client, related_name='jobs')
     archive = models.OneToOneField(Archive, blank=True, null=True)
@@ -170,6 +174,24 @@ class Job(models.Model):
     def failed(self):
         return self.state == Job.State.failed
 
+    @property
+    def duration(self):
+        if self.timestamp_end and self.timestamp_start:
+            return self.timestamp_end - self.timestamp_start
+        else:
+            return timezone.now() - (self.timestamp_start or self.created)
+
+    def _check_set_start_timestamp(self, from_state):
+        if from_state == Job.State.job_created:
+            self.timestamp_start = timezone.now()
+            log.debug('%s: Recording %s as start time', self.id, self.timestamp_start.isoformat())
+
+
+    def _check_set_end_timestamp(self):
+        if self.state in Job.State.STABLE:
+            self.timestamp_end = timezone.now()
+            log.debug('%s: Recording %s as end time', self.id, self.timestamp_end.isoformat())
+
     def update_state(self, previous, to):
         with transaction.atomic():
             self.refresh_from_db()
@@ -177,6 +199,8 @@ class Job(models.Model):
                 raise ValueError('Cannot transition job state from %r to %r, because current state is %r'
                                  % (previous.value, to.value, self.db_state))
             self.db_state = to.value
+            self._check_set_start_timestamp(previous)
+            self._check_set_end_timestamp()
             self.save()
             log.debug('%s: phase %s -> %s', self.id, previous.value, to.value)
 
@@ -185,7 +209,9 @@ class Job(models.Model):
         if self.db_state == state.value:
             return False
         log.debug('%s: Forced state %s -> %s', self.id, self.db_state, state.value)
+        self._check_set_start_timestamp(self.state)
         self.db_state = state.value
+        self._check_set_end_timestamp()
         self.save()
         return True
 
@@ -198,8 +224,8 @@ class Job(models.Model):
         self.save()
 
     def log_path(self):
-        short_timestamp = self.timestamp.replace(microsecond=0).isoformat()
-        logs_path = Path(settings.SERVER_LOGS_DIR) / str(self.timestamp.year)
+        short_timestamp = self.created.replace(microsecond=0).isoformat()
+        logs_path = Path(settings.SERVER_LOGS_DIR) / str(self.created.year)
         file = short_timestamp + '-' + self.client.hostname  + '-' + str(self.id)
         logs_path.mkdir(parents=True, exist_ok=True)
         return logs_path / file
@@ -215,4 +241,4 @@ class Job(models.Model):
         return str(self.id)
 
     class Meta:
-        ordering = ['-timestamp']
+        ordering = ['-created']
