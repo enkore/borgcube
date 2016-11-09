@@ -80,6 +80,9 @@ class BaseServer:
 
     def close(self):
         self.socket.close()
+        self.socket = None
+        signal.signal(signal.SIGINT, signal.SIG_DFL)
+        signal.signal(signal.SIGTERM, signal.SIG_DFL)
 
     def error(self, message, *parameters):
         log.error('Request failed: ' + message, *parameters)
