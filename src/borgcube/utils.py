@@ -1,6 +1,5 @@
 import logging
 import logging.config
-from pathlib import Path
 
 from django.conf import settings
 
@@ -11,6 +10,9 @@ from borg.remote import RemoteRepository
 from borg.constants import UMASK_DEFAULT
 
 from borgcube.daemon.client import APIError
+from .vendor import pluggy
+
+log = logging.getLogger(__name__)
 
 
 def open_repository(repository):
@@ -104,3 +106,22 @@ def tee_job_logs(job):
         if isinstance(logger, logging.PlaceHolder):
             logger = logging.getLogger(name)
         logger.addHandler(handler)
+
+pm = None
+hook = None
+
+
+def configure_plugins():
+    global pm
+    global hook
+    import borgcube.core.hookspec
+    import borgcube.web.core.hookspec
+
+    pm = pluggy.PluginManager('borgcube', 'borgcube')
+    pm.add_hookspecs(borgcube.core.hookspec)
+    pm.add_hookspecs(borgcube.web.core.hookspec)
+    pm.load_setuptools_entrypoints('borgcube0')
+    hook = pm.hook
+
+    log.info('Loaded plugins: %s', ', '.join(name for name, plugin in pm.list_name_plugin()))
+    hook.borgcube_startup()
