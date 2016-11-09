@@ -43,6 +43,9 @@ class DaemonLogHandler(logging.Handler):
             self.socket.connect(addr_or_socket)
         else:
             self.socket = addr_or_socket
+        self.socket.linger = 2000
+        self.socket.rcvtimeo = 2000
+        self.socket.sndtimeo = 2000
 
     def emit(self, record):
         (self.formatter or logging._defaultFormatter).usesTime = lambda: True
