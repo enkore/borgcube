@@ -33,7 +33,11 @@ Options:
     <td>{% trans 'Unknown' context 'jobs table' %}</td>
     {% endif %}
     <td>{{ job|job_outcome }}</td>
+    {% if job.done or job.failed %}
     <td>{{ job.duration|format_timedelta }}</td>
+    {% else %}
+    <td><em>{{ job.duration|format_timedelta }}</em></td>
+    {% endif %}
     </tr>
   {% endfor %}
 </table>

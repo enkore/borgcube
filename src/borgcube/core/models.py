@@ -150,7 +150,7 @@ class Job(models.Model):
     State.client_in_progress.verbose_name =_('In progress')
     State.client_done.verbose_name = _('Client is done')
     State.client_cleanup.verbose_name = _('Client is cleaned up')
-    State.done.verbose_name = _('Done')
+    State.done.verbose_name = _('Finished')
     State.failed.verbose_name = _('Failed')
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -178,6 +178,10 @@ class Job(models.Model):
     @property
     def failed(self):
         return self.state == Job.State.failed
+
+    @property
+    def done(self):
+        return self.state == Job.State.done
 
     @property
     def duration(self):
