@@ -8,7 +8,7 @@
 {% block content %}
   <h1>{{ client.hostname }}
     <small>
-      {% if client.name != client.hostname %}{{ client.name }}{% else %}{{ client.hostname }}{% endif %}
+      {% if client.name != client.hostname %}{{ client.name }}{% endif %}
       (<a href='{% url 'core.client_edit' client.pk %}'>{% trans 'edit' context 'core/client/view edit link' %}</a>)
     </small>
   </h1>
