@@ -453,6 +453,7 @@ class JobExecutor:
             check_call(command_line)
         except CalledProcessError as cpe:
             if cpe.returncode == 1:
+                log.debug('remote create finished (warning)')
                 self.job.refresh_from_db()
                 self.job.data['borg_warning'] = True
                 self.job.save()
@@ -460,7 +461,7 @@ class JobExecutor:
                 raise
         else:
             self.job.refresh_from_db()
-        log.debug('remote create finished (success/warning)')
+            log.debug('remote create finished (success)')
         self.job.repository.refresh_from_db()
         self.job.update_state(Job.State.client_in_progress, Job.State.client_done)
 

@@ -18,7 +18,7 @@
     <tr {% if job.failed %}class='failed'{% endif %}>
       <td><a href='{{ client|get_url }}'>{{ client.hostname }}</a></td>
       {% if job %}
-      <td><a href='{{ job|get_url }}'>{{ job.timestamp }}</a></td>
+      <td><a href='{{ job|get_url }}'>{{ job.timestamp_start|default:job.created }}</a></td>
       {% else %}
       <td>{% trans 'No job on file' context 'core/client/list last job not found' %}</td>
       {% endif %}

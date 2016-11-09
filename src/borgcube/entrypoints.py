@@ -44,10 +44,10 @@ def daemon():
 def proxy():
     from borgcube.proxy import ReverseRepositoryProxy
     from .utils import log_to_daemon
-    log_to_daemon()
-    configure_plugins()
-    proxy = ReverseRepositoryProxy()
-    proxy.serve()
+    with log_to_daemon():
+        configure_plugins()
+        proxy = ReverseRepositoryProxy()
+        proxy.serve()
 
 
 def manage():

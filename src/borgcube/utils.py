@@ -71,24 +71,29 @@ class DaemonLogHandler(logging.Handler):
             raise APIError(reply['message'])
 
 
-def log_to_daemon():
-    logging_config = settings.LOGGING
-    logging_config.update({
-        'handlers': {
-            'console': {
-                'level': 'DEBUG',
-                'class': 'borgcube.utils.DaemonLogHandler',
-                'formatter': 'standard',
-                'addr_or_socket': settings.DAEMON_ADDRESS,
+class log_to_daemon:
+    def __enter__(self):
+        logging_config = settings.LOGGING
+        logging_config.update({
+            'handlers': {
+                'console': {
+                    'level': 'DEBUG',
+                    'class': 'borgcube.utils.DaemonLogHandler',
+                    'formatter': 'standard',
+                    'addr_or_socket': settings.DAEMON_ADDRESS,
+                },
             },
-        },
-        'formatters': {
-            'standard': {
-                'format': '%(message)s'
+            'formatters': {
+                'standard': {
+                    'format': '%(message)s'
+                },
             },
-        },
-    })
-    logging.config.dictConfig(logging_config)
+        })
+        logging.config.dictConfig(logging_config)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        handler = logging.getLogger('').handlers[-1]
+        handler.socket.close()
 
 
 def tee_job_logs(job):
