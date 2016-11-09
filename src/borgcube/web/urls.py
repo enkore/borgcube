@@ -17,7 +17,7 @@ from django.conf.urls import url, include
 from django.contrib import admin
 
 from .core import views as core_views
-
+from borgcube.utils import hook
 
 client_urls = [
     url(r'^$', core_views.client_view, name='core.client_view'),
@@ -46,3 +46,5 @@ urlpatterns = [
 
     url(r'^admin/', admin.site.urls),
 ]
+
+hook.borgcube_web_urlpatterns(urlpatterns=urlpatterns)
