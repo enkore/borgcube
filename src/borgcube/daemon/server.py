@@ -5,7 +5,7 @@ import sys
 import time
 import os
 from pathlib import Path
-from subprocess import check_output, check_call, CalledProcessError
+from subprocess import check_call, CalledProcessError
 
 import zmq
 
@@ -23,6 +23,25 @@ log = logging.getLogger('borgcubed')
 
 def check_schedules():
     pass
+
+
+def exit_by_exception():
+    class SignalException(BaseException):
+        pass
+
+    def signal_fork(signum, stack_frame):
+        log.info('Received signal %d, procuring hariki', signum)
+        raise SignalException(signum)
+
+    def excepthook(exc_type, exc_value, exc_trace):
+        if exc_type is SignalException:
+            sys.exit(1)
+        else:
+            sys.__excepthook__(exc_type, exc_value, exc_trace)
+
+    sys.excepthook = excepthook
+    signal.signal(signal.SIGINT, signal_fork)
+    signal.signal(signal.SIGTERM, signal_fork)
 
 
 class BaseServer:
@@ -98,8 +117,7 @@ class BaseServer:
         else:
             self.socket.close()
             self.socket = None
-            signal.signal(signal.SIGINT, signal.SIG_DFL)
-            signal.signal(signal.SIGTERM, signal.SIG_DFL)
+            exit_by_exception()
         return pid
 
     commands = {}
@@ -318,7 +336,6 @@ class RepositoryIDMismatch(RuntimeError):
     pass
 
 
-
 class JobExecutor:
     def __init__(self, job):
         tee_job_logs(job)
@@ -411,14 +428,14 @@ class JobExecutor:
         log.debug('transfer_cache: rsync connection string is %r', connstr)
         log.debug('transfer_cache: auxiliary files')
         try:
-            check_output(('ssh', self.client.connection.remote, 'mkdir', '-p', remote_dir))
+            check_call(('ssh', self.client.connection.remote, 'mkdir', '-p', remote_dir))
             check_call(rsync + (str(job_cache_path) + '/', connstr))
         finally:
             shutil.rmtree(str(job_cache_path))
         log.debug('transfer_cache: chunks cache')
         chunks_cache = cache_path / 'chunks'
         check_call(rsync + (str(chunks_cache), connstr))
-        check_output(('ssh', self.client.connection.remote, 'touch', remote_dir + 'files'))
+        check_call(('ssh', self.client.connection.remote, 'touch', remote_dir + 'files'))
         log.debug('transfer_cache: done')
 
     def create_job_cache(self, cache_path):
