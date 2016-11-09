@@ -154,21 +154,25 @@ class APIServer(BaseServer):
 
     def queue_job(self, job):
         log.debug('Enqueued job %s', job.id)
-        self.queue.append((self.can_run_job, self.run_job, str(job.id)))
-
-    def run_job(self, job_id):
-        job = Job.objects.get(id=job_id)
-        set_process_name('borgcubed [run-job %s]' % job_id)
-        executor = JobExecutor(job)
-        executor.execute()
+        self.queue.append((self.can_run_job, self.prefork_job, self.run_job, str(job.id)))
 
     def can_run_job(self, job_id):
         job = Job.objects.get(id=job_id)
         blocking_jobs = Job.objects.filter(repository=job.repository).exclude(db_state__in=[s.value for s in Job.State.STABLE])
         job_is_blocked = blocking_jobs.exists()
         if job_is_blocked:
-            log.debug('Job %s blocked by running jobs: %s', job_id, ' '.join(map(str, blocking_jobs)))
+            log.debug('Job %s blocked by running jobs: %s', job_id, ' '.join('{} ({})'.format(job.id, job.db_state) for job in blocking_jobs))
         return not job_is_blocked
+
+    def prefork_job(self, job_id):
+        job = Job.objects.get(id=job_id)
+        job.update_state(Job.State.job_created, Job.State.client_preparing)
+
+    def run_job(self, job_id):
+        job = Job.objects.get(id=job_id)
+        set_process_name('borgcubed [run-job %s]' % job_id)
+        executor = JobExecutor(job)
+        executor.execute()
 
     def cmd_log(self, request):
         try:
@@ -247,10 +251,11 @@ class APIServer(BaseServer):
             return
         nope = []
         while self.queue:
-            predicate, method, *args = self.queue.pop()
+            predicate, prefork, method, *args = self.queue.pop()
             if not predicate(*args):
-                nope.append((predicate, method, *args))
+                nope.append((predicate, prefork, method, *args))
                 continue
+            prefork(*args)
             pid = self.fork()
             if pid:
                 # Parent, gotta watch the kids
@@ -294,8 +299,6 @@ class JobExecutor:
 
     def execute(self):
         try:
-            self.job.update_state(Job.State.job_created, Job.State.client_preparing)
-
             self.synthesize_crypto()
             self.transfer_cache()
             self.job.update_state(Job.State.client_preparing, Job.State.client_prepared)
