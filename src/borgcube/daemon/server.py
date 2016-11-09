@@ -372,18 +372,20 @@ class JobExecutor:
         # TODO per-client files cache, on the client or on the server?
         # TODO rsh, rsh_options
 
-        connstr = self.client.connection.remote + ':' + self.remote_cache_dir + self.repository.id + '/'
+        remote_dir = self.remote_cache_dir + self.repository.id + '/'
+        connstr = self.client.connection.remote + ':' + remote_dir
         rsync = ('rsync', '-rI', '--delete')
         log.debug('transfer_cache: rsync connection string is %r', connstr)
         log.debug('transfer_cache: auxiliary files')
         try:
-            check_output(('ssh', self.client.connection.remote, 'mkdir', '-p', self.remote_cache_dir + self.repository.id + '/'))
+            check_output(('ssh', self.client.connection.remote, 'mkdir', '-p', remote_dir))
             check_call(rsync + (str(job_cache_path) + '/', connstr))
         finally:
             shutil.rmtree(str(job_cache_path))
         log.debug('transfer_cache: chunks cache')
         chunks_cache = cache_path / 'chunks'
         check_call(rsync + (str(chunks_cache), connstr))
+        check_output(('ssh', self.client.connection.remote, 'touch', remote_dir + 'files'))
         log.debug('transfer_cache: done')
 
     def create_job_cache(self, cache_path):
@@ -393,7 +395,6 @@ class JobExecutor:
         log.debug('create_job_cache: path is %r', job_cache_path)
 
         (job_cache_path / 'chunks.archive.d').touch()
-        (job_cache_path / 'files').touch()
         with (job_cache_path / 'README').open('w') as fd:
             fd.write('This is a Borg cache')
         config = configparser.ConfigParser(interpolation=None)
