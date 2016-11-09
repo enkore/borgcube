@@ -10,8 +10,8 @@
   <table class='jobs' cellpadding='3px'>
     <tr>
       <th>{{ m|field_name:'hostname' }}</th>
-      <th>{% trans 'Last job' context 'core/client/list' %}</th>
-      <th>{% trans 'Outcome' context 'core/client/list last job outcome' %}</th>
+      <th>{% trans 'Last job' %}</th>
+      <th>{% trans 'Outcome' %}</th>
     </tr>
     {% for client in clients %}
     {% with job=client.latest_job %}
@@ -19,8 +19,9 @@
       <td><a href='{{ client|get_url }}'>{{ client.hostname }}</a></td>
       {% if job %}
       <td><a href='{{ job|get_url }}'>{{ job.timestamp_start|default:job.created }}</a></td>
+      <td>{{ job.outcome }}</td>
       {% else %}
-      <td>{% trans 'No job on file' context 'core/client/list last job not found' %}</td>
+      <td colspan='2'>{% trans 'No job on file' %}</td>
       {% endif %}
       <td>{{ job.outcome }}</td>
     </tr>

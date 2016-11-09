@@ -222,3 +222,49 @@ def job_config_trigger(request, client_id, config_id):
     daemon = APIClient()
     job = daemon.initiate_job(client, config)
     return redirect(client_view, client_id)
+
+
+class RepositoryForm(forms.ModelForm):
+    # TODO update repo id during connection check
+    class Meta:
+        model = Repository
+        fields = '__all__'
+
+
+def repositories(request):
+    return TemplateResponse(request, 'core/repository/list.html', {
+        'm': Repository,
+        'repositories': Repository.objects.all(),
+    })
+
+
+def repository_view(request, id):
+    repository = get_object_or_404(Repository, id=id)
+    return TemplateResponse(request, 'core/repository/view.html', {
+        'repository': repository,
+    })
+
+
+def repository_edit(request, id):
+    repository = get_object_or_404(Repository, pk=id)
+    data = request.POST or None
+    repository_form = RepositoryForm(data, instance=repository)
+    if data and repository_form.is_valid():
+        repository_form.save()
+        return redirect(repository_view, repository.pk)
+    return TemplateResponse(request, 'core/repository/edit.html', {
+        'repository': repository,
+        'repository_form': repository_form,
+    })
+
+
+def repository_add(request):
+    repository = get_object_or_404(Repository, pk=id)
+    data = request.POST or None
+    repository_form = RepositoryForm(data, instance=repository)
+    if data and repository_form.is_valid():
+        repository = repository_form.save()
+        return redirect(repository_view, repository.pk)
+    return TemplateResponse(request, 'core/repository/add.html', {
+        'repository_form': repository_form,
+    })

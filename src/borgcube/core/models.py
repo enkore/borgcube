@@ -49,6 +49,8 @@ class SlugWithDotField(models.CharField):
 
 class Repository(models.Model):
     name = CharField()
+    description = models.TextField(blank=True)
+
     url = CharField(max_length=1000, help_text=_('For example /data0/reposity or user@storage:/path.'))
     repository_id = CharField(verbose_name=_('Repository ID'), help_text=_('32 bytes in hex'))
 

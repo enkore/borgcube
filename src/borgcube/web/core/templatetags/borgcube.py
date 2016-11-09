@@ -13,8 +13,10 @@ register = template.Library()
 
 @register.filter
 def field_name(model_instance, field):
-    # TODO want the exact same behaviour as django has built in (name -> Name)
-    return model_instance._meta.get_field(field).verbose_name
+    name = model_instance._meta.get_field(field).verbose_name
+    if name == field:
+        return name.title()
+    return name
 
 
 @register.filter
@@ -31,6 +33,8 @@ def get_url(model_instance):
         return reverse(views.client_view, args=(obj.pk,))
     elif isinstance(obj, models.JobConfig):
         return reverse(views.client_view, args=(obj.client.pk,)) + '#job-config-%d' % obj.pk
+    elif isinstance(obj, models.Repository):
+        return reverse(views.repository_view, args=(obj.pk,))
     else:
         raise ValueError('Can\'t generate URL for %r (type %r)' % (obj, type(obj)))
 

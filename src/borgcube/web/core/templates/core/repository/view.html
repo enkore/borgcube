@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% load borgcube %}
+
+{% block title %}{% blocktrans with name=repository.name%}Repository {{ name }}{% endblocktrans %}{% endblock %}
+
+{% block content %}
+  <h1>{{ repository.name }}
+    <small>
+      (<a href='{% url 'core.repository_edit' repository.pk %}'>{% trans 'edit' %}</a>)
+    </small>
+  </h1>
+
+  <p>{{ repository.description }}</p>
+
+  <table class='plist'>
+      <tr>
+        <th>{{ repository|field_name:'url' }}</th>
+        <td>{{ repository.url }}</td>
+      </tr>
+      <tr>
+        <th>{{ repository|field_name:'repository_id' }}</th>
+        <td>{{ repository.repository_id }}</td>
+      </tr>
+      <tr>
+        <th>{{ repository|field_name:'remote_borg' }}</th>
+        <td>{{ repository.remote_borg }}</td>
+      </tr>
+  </table>
+
+  <h2>{% trans 'Jobs' %}</h2>
+
+  {% include 'core/table_jobs.html' with jobs=repository.jobs.all %}
+{% endblock %}

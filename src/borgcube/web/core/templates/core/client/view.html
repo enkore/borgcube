@@ -59,7 +59,8 @@
     <section class='job-config' id='job-config-{{ job_config.id }}'>
       {% with config=job_config.config %}
       <h3>{{ config.label }} <small>
-        (<a href='{% url 'core.job_config_trigger' client.pk job_config.id %}'>Run now</a>)
+        (<a href='{% url 'core.job_config_trigger' client.pk job_config.id %}'>{% trans 'run now' %}</a>)
+        (<a href='{% url 'core.job_config_edit' client.pk job_config.id %}'>{% trans 'edit' %}</a>)
       </small></h3>
 
 

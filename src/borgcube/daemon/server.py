@@ -242,10 +242,9 @@ class APIServer(BaseServer):
                 logger('Child %d exited with code %d', pid, code)
             command, *params = self.children.pop(pid)
             logger('Command was: %s %r', command, params)
-            if failure and command == 'run-job':
+            if failure and command == 'run_job':
                 job = Job.objects.get(id=params[0])
-                if job.force_state(Job.State.failed):
-                    logger('Job was not marked as failed; rectified that')
+                job.force_state(Job.State.failed)
         self.exit |= self.shutdown and not self.children
 
     def check_queue(self):
@@ -290,6 +289,11 @@ def cpe_means_connection_failure(called_process_error):
     # SSH connection error, or rsync error, which is likely also connection related
     return (('ssh' in command and exit_code == 255) or
             ('rsync' in command and exit_code in rsync_errors))
+
+
+class RepositoryIDMismatch(RuntimeError):
+    pass
+
 
 
 class JobExecutor:
@@ -344,6 +348,10 @@ class JobExecutor:
             error = lock_error.get_message()
             self.job.set_failure_cause('lock-error', error=error)
             log.error('Job %s failed because a locking error occured: %s', self.job, error)
+        except RepositoryIDMismatch as id_mismatch:
+            repo, db = id_mismatch.args
+            self.job.set_failure_cause('repository-id-mismatch', repository_id=repo, saved_id=db)
+            log.error('Job %s failed because the stored repository ID (%s) doesn\'t match the real repository ID (%s)', self.job, repo, db)
 
     def analyse_job_process_error(self, called_process_error):
         if cpe_means_connection_failure(called_process_error):
@@ -354,6 +362,8 @@ class JobExecutor:
 
     def synthesize_crypto(self):
         with open_repository(self.repository) as repository:
+            if bin_to_hex(repository.id) != self.repository.repository_id:
+                raise RepositoryIDMismatch(bin_to_hex(repository.id), self.repository.repository_id)
             manifest, key = Manifest.load(repository)
             client_key = synthesize_client_key(key, repository)
             if not isinstance(client_key, PlaintextKey):
@@ -365,14 +375,14 @@ class JobExecutor:
             self.job.save()
 
     def transfer_cache(self):
-        cache_path = Path(get_cache_dir()) / self.repository.id
+        cache_path = Path(get_cache_dir()) / self.repository.repository_id
         log.debug('transfer_cache: local cache is %r', cache_path)
         job_cache_path = self.create_job_cache(cache_path)
 
         # TODO per-client files cache, on the client or on the server?
         # TODO rsh, rsh_options
 
-        remote_dir = self.remote_cache_dir + self.repository.id + '/'
+        remote_dir = self.remote_cache_dir + self.repository.repository_id + '/'
         connstr = self.client.connection.remote + ':' + remote_dir
         rsync = ('rsync', '-rI', '--delete', '--exclude', 'files')
         log.debug('transfer_cache: rsync connection string is %r', connstr)
@@ -400,7 +410,7 @@ class JobExecutor:
         config = configparser.ConfigParser(interpolation=None)
         config.add_section('cache')
         config.set('cache', 'version', '1')
-        config.set('cache', 'repository', self.repository.id)
+        config.set('cache', 'repository', self.repository.repository_id)
         config.set('cache', 'manifest',  self.job.data['client_manifest_id_str'])
         # TODO: path canoniciialailaition thing
         config.set('cache', 'previous_location', Location(self.job_location).canonical_path().replace('/./', '/~/'))
@@ -473,7 +483,7 @@ class JobExecutor:
         # TODO perhaps a per-client setting, to limit space usage on the client with multiple repositories.
 
     def check_archive_chunks_cache(self):
-        archives = Path(get_cache_dir()) / self.repository.id / 'chunks.archive.d'
+        archives = Path(get_cache_dir()) / self.repository.repository_id / 'chunks.archive.d'
         if archives.is_dir():
             log.info('Disabling archive chunks cache of %s', archives.parent)
             shutil.rmtree(str(archives))

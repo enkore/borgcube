@@ -29,13 +29,20 @@ client_urls = [
     url(r'^job/(?P<job_id>[-\w]+)/$', core_views.job_view, name='core.job_view'),
 ]
 
+repo_urls = [
+    url(r'^$', core_views.repository_view, name='core.repository_view'),
+    url(r'^edit/$', core_views.repository_edit, name='core.repository_edit'),
+]
+
 urlpatterns = [
     url(r'^$', core_views.dashboard, name='core.dashboard'),
     url(r'^clients/$', core_views.clients, name='core.clients'),
     url(r'^clients/add/$', core_views.client_add, name='core.client_add'),
     url(r'^clients/id/(?P<client_id>[-.\w]+)/', include(client_urls)),
 
+    url(r'^repositories/$', core_views.repositories, name='core.repositories'),
+    url(r'^repositories/add/$', core_views.repository_add, name='core.repository_add'),
+    url(r'^repositories/(?P<id>\d+)/', include(repo_urls)),
+
     url(r'^admin/', admin.site.urls),
 ]
-
-import django.core.management.commands.runserver

@@ -93,8 +93,8 @@ class ReverseRepositoryProxy(RepositoryServer):
         self._load_cache()
         self._got_archive = False
         self._final_archive = False
-        log.debug('Repository ID is %r', self.job.repository.id)
-        return unhexlify(self.job.repository.id)
+        log.debug('Repository ID is %r', self.job.repository.repository_id)
+        return unhexlify(self.job.repository.repository_id)
 
     @property
     def _checkpoint_archives(self):
