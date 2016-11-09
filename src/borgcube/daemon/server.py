@@ -374,7 +374,7 @@ class JobExecutor:
 
         remote_dir = self.remote_cache_dir + self.repository.id + '/'
         connstr = self.client.connection.remote + ':' + remote_dir
-        rsync = ('rsync', '-rI', '--delete')
+        rsync = ('rsync', '-rI', '--delete', '--exclude', 'files')
         log.debug('transfer_cache: rsync connection string is %r', connstr)
         log.debug('transfer_cache: auxiliary files')
         try:
