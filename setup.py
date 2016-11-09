@@ -58,9 +58,4 @@ setup(
             'web_builtin_metrics = borgcube.web.core.builtin_metrics',
         ]
     }
-#    entry_points={
-#        'console_scripts': [
-#            'nameless = nameless.cli:main',
-#        ]
-#    },
 )
