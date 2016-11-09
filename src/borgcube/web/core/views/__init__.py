@@ -1,3 +1,5 @@
+import logging
+
 from django import forms
 from django.shortcuts import redirect, get_object_or_404
 from django.template.response import TemplateResponse
@@ -12,13 +14,20 @@ from borgcube.core.models import Client, ClientConnection, Repository
 from borgcube.core.models import Job, JobConfig
 from borgcube.daemon.client import APIClient
 
+log = logging.getLogger(__name__)
+
 
 def fetch_metrics():
     metrics = []
-    # TODO caching (unconditional, time-based)
-    for metric in OverviewMetric.objects.all():
-        MetricClass = import_string(metric.py_class)
-        assert issubclass(MetricClass, Metric), ('%r is not a Metric' % metric.py_class)
+    for metric in OverviewMetric.objects.all()[:]:
+        try:
+            MetricClass = import_string(metric.py_class)
+            if not issubclass(MetricClass, Metric):
+                raise ImportError('Not a Metric')
+        except ImportError as ie:
+            log.error('Could not import metric %r: %s', metric.py_class, ie)
+            metric.delete()
+            continue
         instance = MetricClass()
         metrics.append({
             'label': metric.label,
