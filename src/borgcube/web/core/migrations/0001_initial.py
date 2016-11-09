@@ -2,15 +2,6 @@ from __future__ import unicode_literals
 
 from django.db import migrations, models
 
-from ..metrics import ArchiveCount, TotalData, BackupsToday
-
-
-def configure_default_metrics(apps, schema_editor):
-    OverviewMetric = apps.get_model('web_core', 'OverviewMetric')
-    OverviewMetric(py_class='borgcube.web.core.metrics.ArchiveCount', label=ArchiveCount.default_label, order=0).save()
-    OverviewMetric(py_class='borgcube.web.core.metrics.TotalData', label=TotalData.default_label, order=1).save()
-    OverviewMetric(py_class='borgcube.web.core.metrics.BackupsToday', label=BackupsToday.default_label, order=2).save()
-
 
 class Migration(migrations.Migration):
 
@@ -30,5 +21,4 @@ class Migration(migrations.Migration):
             ],
             options={'ordering': ['order']},
         ),
-        migrations.RunPython(configure_default_metrics),
     ]

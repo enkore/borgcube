@@ -52,6 +52,10 @@ setup(
         'console_scripts': [
             'borgcubed = borgcube.entrypoints:daemon',
             'borgcube-proxy = borgcube.entrypoints:proxy',
+            'borgcube-manage = borgcube.entrypoints:manage',
+        ],
+        'borgcube0': [
+            'web_builtin_metrics = borgcube.web.core.builtin_metrics',
         ]
     }
 #    entry_points={
