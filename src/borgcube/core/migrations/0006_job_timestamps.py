@@ -11,15 +11,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.CreateModel(
-            name='ScheduleItem',
-            fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('py_class', models.CharField(max_length=100)),
-                ('py_args', jsonfield.fields.JSONField(default=dict)),
-                ('name', models.CharField(max_length=200)),
-            ],
-        ),
         migrations.AlterModelOptions(
             name='job',
             options={'ordering': ['-created']},

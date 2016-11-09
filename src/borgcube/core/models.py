@@ -48,15 +48,18 @@ class SlugWithDotField(models.CharField):
 
 
 class Repository(models.Model):
-    id = CharField(verbose_name=_('Repository ID'), help_text=_('32 bytes in hex'), primary_key=True)
     name = CharField()
     url = CharField(max_length=1000, help_text=_('For example /data0/reposity or user@storage:/path.'))
+    repository_id = CharField(verbose_name=_('Repository ID'), help_text=_('32 bytes in hex'))
 
     remote_borg = CharField(default='borg', verbose_name=_('Remote borg binary name (only applies to remote repositories)'))
 
     @property
     def location(self):
         return Location(self.url)
+
+    def latest_job(self):
+        return self.jobs.all()[:1].get()
 
     def __str__(self):
         return self.name
@@ -153,7 +156,7 @@ class Job(models.Model):
     timestamp_start = models.DateTimeField(blank=True, null=True)
     timestamp_end = models.DateTimeField(blank=True, null=True)
 
-    repository = models.ForeignKey(Repository)
+    repository = models.ForeignKey(Repository, related_name='jobs')
     client = models.ForeignKey(Client, related_name='jobs')
     archive = models.OneToOneField(Archive, blank=True, null=True)
     config = models.ForeignKey(JobConfig, blank=True, null=True)
