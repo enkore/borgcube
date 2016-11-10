@@ -125,6 +125,28 @@ class ModelEnum(enum.Enum):
 
 
 class Job(models.Model):
+    """
+    Core job model.
+
+    A job is some kind of task that is run by borgcubed. Normally these are concerned with
+    a repository, but if that's not the case - the field is nullable.
+
+    Steps to implement a Job class:
+
+    1. Derive from this
+    2. Define enum.Enum called State
+    3. The State enum needs at least job_created, failed, done
+    4. The State enum needs an attribute STABLE, which should be a tuple of stable end-states, usually::
+
+        State.STABLE = (State.job_created, State.done, State.failed)
+
+    5. borgcubed needs to know how to run the job, therefore implement the borgcubed_job_executor hook.
+       Also, implement the required JobExecutor class.
+    6. You also want to implement a borgcubed command through borgcubed_handle_request to actually queue
+       your job for execution (unless it always runs off a schedule).
+    7. Other relevant hooks: borgcube_job_blocked, borgcubed_job_exit.
+    """
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     created = models.DateTimeField(auto_now_add=True, db_index=True)
     timestamp_start = models.DateTimeField(blank=True, null=True)
