@@ -57,6 +57,7 @@ setup(
         'borgcube0': [
             'web_builtin_metrics = borgcube.web.core.builtin_metrics',
             'borgcubed_backupjob = borgcube.daemon.backupjob',
+            'borgcubed_scheduler = borgcube.daemon.scheduler',
         ]
     }
 )
