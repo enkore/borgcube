@@ -138,7 +138,7 @@ class APIServer(BaseServer):
         return hook.borgcubed_handle_request(apiserver=self, request=request)
 
     def idle(self):
-        self.check_schedule()
+        hook.borgcubed_idle(apiserver=self)
         self.check_children()
         self.check_queue()
 
@@ -222,9 +222,6 @@ class APIServer(BaseServer):
         'cancel-job': cmd_cancel_job,
         'log': cmd_log,
     }
-
-    def check_schedule(self):
-        """Check schedule. Are we supposed to do something right about now?"""
 
     def check_children(self):
         while self.children:

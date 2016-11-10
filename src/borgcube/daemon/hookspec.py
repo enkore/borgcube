@@ -27,6 +27,13 @@ def borgcubed_handle_request(apiserver, request):
     """
 
 
+@hookspec
+def borgcubed_idle(apiserver):
+    """
+    Called on every 'idle' iteration in the daemon. This typically occurs roughly every second.
+    """
+
+
 @hookspec(firstresult=True)
 def borgcubed_job_executor(job_id):
     """
