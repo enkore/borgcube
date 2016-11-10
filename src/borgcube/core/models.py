@@ -163,6 +163,8 @@ class Job(models.Model):
 
     db_state = CharField(default='job-created')
 
+    data = JSONField()
+
     @property
     def state(self):
         return self.State(self.db_state)
@@ -203,6 +205,12 @@ class Job(models.Model):
 
     def set_failure_cause(self, kind, **kwargs):
         borgcube.utils.hook.borgcube_job_failure_cause(job=self, kind=kind, kwargs=kwargs)
+        self.force_state(self.State.failed)
+        self.data['failure_cause'] = {
+            'kind': kind,
+        }
+        self.data['failure_cause'].update(kwargs)
+        self.save()
 
     def log_path(self):
         short_timestamp = self.created.replace(microsecond=0).isoformat()
@@ -218,6 +226,16 @@ class Job(models.Model):
             self.log_path().unlink()
         except OSError:
             pass
+
+    def _check_set_start_timestamp(self, from_state):
+        if from_state == self.State.job_created:
+            self.timestamp_start = timezone.now()
+            log.debug('%s: Recording %s as start time', self.id, self.timestamp_start.isoformat())
+
+    def _check_set_end_timestamp(self):
+        if self.state in self.State.STABLE:
+            self.timestamp_end = timezone.now()
+            log.debug('%s: Recording %s as end time', self.id, self.timestamp_end.isoformat())
 
     def __str__(self):
         return str(self.id)
@@ -259,31 +277,13 @@ class BackupJob(Job):
     archive = models.OneToOneField(Archive, blank=True, null=True)
     config = models.ForeignKey(JobConfig, blank=True, null=True)
 
-    data = JSONField()
-
     @property
     def archive_name(self):
         return self.client.hostname + '-' + str(self.id)
 
-    def _check_set_start_timestamp(self, from_state):
-        if from_state == BackupJob.State.job_created:
-            self.timestamp_start = timezone.now()
-            log.debug('%s: Recording %s as start time', self.id, self.timestamp_start.isoformat())
 
 
-    def _check_set_end_timestamp(self):
-        if self.state in BackupJob.State.STABLE:
-            self.timestamp_end = timezone.now()
-            log.debug('%s: Recording %s as end time', self.id, self.timestamp_end.isoformat())
 
-    def set_failure_cause(self, kind, **kwargs):
-        super().set_failure_cause(kind, **kwargs)
-        self.force_state(BackupJob.State.failed)
-        self.data['failure_cause'] = {
-            'kind': kind,
-        }
-        self.data['failure_cause'].update(kwargs)
-        self.save()
 
 
 class ScheduleItem(models.Model):
