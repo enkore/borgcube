@@ -20,6 +20,13 @@ def borgcube_startup(db, process=None):
     """
 
 
+@hookspec(firstresult=True)
+def borgcube_job_blocked(job):
+    """
+    Return True if *job* is blocked by other jobs (and log a DEBUG diagnostic), or None if it is not blocked.
+    """
+
+
 @hookspec
 def borgcube_job_pre_state_update(job, current_state, target_state):
     """

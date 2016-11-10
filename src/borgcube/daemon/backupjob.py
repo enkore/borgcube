@@ -44,6 +44,15 @@ def borgcubed_job_exit(apiserver, job_id, exit_code, signo):
         job.force_state(BackupJob.State.failed)
 
 
+def borgcube_job_blocked(job):
+    blocking_jobs = BackupJob.objects.filter(repository=job.repository).exclude(db_state__in=[s.value for s in BackupJob.State.STABLE])
+    job_is_blocked = blocking_jobs.exists()
+    if job_is_blocked:
+        log.debug('Job %s blocked by running backup jobs: %s', job.id,
+                  ' '.join('{} ({})'.format(job.id, job.db_state) for job in blocking_jobs))
+        return True
+
+
 def borgcubed_handle_request(apiserver, request):
     if request['command'] != 'initiate-backup-job':
         return
@@ -84,15 +93,6 @@ class RepositoryIDMismatch(RuntimeError):
 
 class BackupJobExecutor(JobExecutor):
     name = 'backup-job'
-
-    @classmethod
-    def can_run(cls, job_id):
-        job = BackupJob.objects.get(id=job_id)
-        blocking_jobs = BackupJob.objects.filter(repository=job.repository).exclude(db_state__in=[s.value for s in BackupJob.State.STABLE])
-        job_is_blocked = blocking_jobs.exists()
-        if job_is_blocked:
-            log.debug('Job %s blocked by running jobs: %s', job_id, ' '.join('{} ({})'.format(job.id, job.db_state) for job in blocking_jobs))
-        return not job_is_blocked
 
     @classmethod
     def prefork(cls, job_id):

@@ -1,4 +1,6 @@
 from borgcube.vendor import pluggy
+from borgcube.core.models import Job
+from borgcube.utils import hook
 
 hookspec = pluggy.HookspecMarker('borgcube')
 
@@ -57,7 +59,8 @@ class JobExecutor:
 
     @classmethod
     def can_run(cls, job_id):
-        return True
+        job = Job.objects.get(id=job_id)
+        return not hook.borgcube_job_blocked(job=job)
 
     @classmethod
     def prefork(cls, job_id):
