@@ -130,6 +130,10 @@ class APIServer(BaseServer):
         self.queue = []
         set_process_name('borgcubed [main process]')
         hook.borgcubed_startup(apiserver=self)
+        for job in Job.objects.exclude(state__in=Job.State.STABLE):
+            job.set_failure_cause('borgcubed-restart')
+        for job in Job.objects.filter(state=Job.State.job_created):
+            self.queue_job(job)
 
     def handle_request(self, request):
         command = request['command']
@@ -245,6 +249,9 @@ class APIServer(BaseServer):
                 logger('Child %d exited with code %d', pid, code)
             command, job_id = self.children.pop(pid)
             logger('Command was: %s %r', command, job_id)
+            if code or signo:
+                job = Job.objects.get(id=job_id)
+                job.force_state(Job.State.failed)
             hook.borgcubed_job_exit(apiserver=self, job_id=job_id, exit_code=code, signo=signo)
         self.exit |= self.shutdown and not self.children
 

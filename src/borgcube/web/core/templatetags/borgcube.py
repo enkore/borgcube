@@ -27,8 +27,8 @@ def help_text(model_instance, field):
 @register.filter
 def get_url(model_instance):
     obj = model_instance
-    if isinstance(obj, models.BackupJob):
-        return reverse(views.job_view, args=(obj.client.pk, obj.pk))
+    if isinstance(obj, models.Job):
+        return reverse(views.job_view, args=(obj.pk,))
     elif isinstance(obj, models.Client):
         return reverse(views.client_view, args=(obj.pk,))
     elif isinstance(obj, models.JobConfig):
@@ -53,7 +53,7 @@ def summarize_archive(archive):
 
 @register.filter
 def job_outcome(job):
-    assert isinstance(job, models.BackupJob)
+    assert isinstance(job, models.Job)
     if job.failed:
         failure_cause = job.data.get('failure_cause')
         if failure_cause:
@@ -82,11 +82,12 @@ def job_outcome(job):
                 return failure_kind
         else:
             return _('Unknown error - see logs')
-    elif job.archive:
-        return _('{statename} ({archive_summary})').format(
-            statename=job.state.verbose_name, archive_summary=summarize_archive(job.archive))
+    #TODO
+    #elif job.archive:
+    #    return _('{statename} ({archive_summary})').format(
+    #        statename=job.state.verbose_name, archive_summary=summarize_archive(job.archive))
     else:
-        return job.state.verbose_name
+        return job.State.verbose_name(job.state)
 
 
 @register.filter

@@ -11,13 +11,6 @@ from .hookspec import JobExecutor
 log = logging.getLogger('borgcubed.checkjob')
 
 
-def borgcubed_startup(apiserver):
-    for job in CheckJob.objects.exclude(db_state__in=[s.value for s in CheckJob.State.STABLE]):
-        job.set_failure_cause('borgcubed-restart')
-    for job in CheckJob.objects.filter(db_state=CheckJob.State.job_created.value):
-        apiserver.queue_job(job)
-
-
 def borgcubed_job_executor(job_id):
     if CheckJob.objects.filter(id=job_id).exists():
         return CheckJobExecutor
@@ -30,15 +23,6 @@ def borgcubed_job_exit(apiserver, job_id, exit_code, signo):
         return
     if exit_code or signo:
         job.force_state(CheckJob.State.failed)
-
-
-def borgcube_job_blocked(job):
-    blocking_jobs = CheckJob.objects.filter(repository=job.repository).exclude(db_state__in=[s.value for s in CheckJob.State.STABLE])
-    job_is_blocked = blocking_jobs.exists()
-    if job_is_blocked:
-        log.debug('Job %s blocked by running backup jobs: %s', job.id,
-                  ' '.join('{} ({})'.format(job.id, job.db_state) for job in blocking_jobs))
-        return True
 
 
 class CheckJobExecutor(JobExecutor):

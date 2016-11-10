@@ -26,13 +26,16 @@ client_urls = [
     url(r'^config/(?P<config_id>\d+)/edit/$', core_views.job_config_edit, name='core.job_config_edit'),
     url(r'^config/(?P<config_id>\d+)/delete/$', core_views.job_config_delete, name='core.job_config_delete'),
     url(r'^config/(?P<config_id>\d+)/trigger/$', core_views.job_config_trigger, name='core.job_config_trigger'),
-    url(r'^job/(?P<job_id>[-\w]+)/$', core_views.job_view, name='core.job_view'),
-    url(r'^job/(?P<job_id>[-\w]+)/cancel/$', core_views.job_cancel, name='core.job_cancel'),
 ]
 
 repo_urls = [
     url(r'^$', core_views.repository_view, name='core.repository_view'),
     url(r'^edit/$', core_views.repository_edit, name='core.repository_edit'),
+]
+
+job_urls = [
+    url(r'^(?P<job_id>[-\w]+)/$', core_views.job_view, name='core.job_view'),
+    url(r'^(?P<job_id>[-\w]+)/cancel/$', core_views.job_cancel, name='core.job_cancel'),
 ]
 
 urlpatterns = [
@@ -44,6 +47,8 @@ urlpatterns = [
     url(r'^repositories/$', core_views.repositories, name='core.repositories'),
     url(r'^repositories/add/$', core_views.repository_add, name='core.repository_add'),
     url(r'^repositories/(?P<id>\d+)/', include(repo_urls)),
+
+    url(r'^job/', include(job_urls)),
 
     url(r'^admin/', admin.site.urls),
 ]
