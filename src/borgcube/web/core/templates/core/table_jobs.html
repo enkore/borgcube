@@ -16,7 +16,9 @@ Options:
     {% if client_column %}
       <th>{% trans 'Client' context 'jobs table' %}</th>
     {% endif %}
+    {% if config_column %}
     <th>{% trans 'Configuration' context 'jobs table' %}</th>
+    {% endif %}
     <th>{% trans 'Outcome' context 'jobs table' %}</th>
     <th>{% trans 'Duration' context 'jobs table' %}</th>
     <th></th>
@@ -26,12 +28,18 @@ Options:
     <tr {% if job.failed %}class='failed'{% elif job.data.borg_warning %}class='warning'{% endif %}>
     <td><a href='{{ job|get_url }}'>{{ job.timestamp_start|default:job.created }}</a></td>
     {% if client_column %}
-    <td><a href='{{ job.client|get_url }}'>{{ client.id }}</a></td>
+    <td><a href='{{ job.config|default:job.client|get_url }}'>{{ job.client.hostname }}</a>
+      {% if job.config %}
+        ({{ job.config.config.label }})
+      {% endif %}
+    </td>
     {% endif %}
+    {% if config_column %}
     {% if job.config %}
     <td><a href='{{ job.config|get_url }}'>{{ job.config.config.label }}</a></td>
     {% else %}
     <td>{% trans 'Unknown' context 'jobs table' %}</td>
+    {% endif %}
     {% endif %}
     <td>{{ job|job_outcome }}</td>
     {% if job.done or job.failed %}

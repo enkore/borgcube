@@ -30,5 +30,5 @@
 
   <h2>{% trans 'Jobs' %}</h2>
 
-  {% include 'core/table_jobs.html' with jobs=repository.jobs.all %}
+  {% include 'core/table_jobs.html' with jobs=repository.jobs.all config_column=0 client_column=1 %}
 {% endblock %}

@@ -19,11 +19,10 @@
       <td><a href='{{ client|get_url }}'>{{ client.hostname }}</a></td>
       {% if job %}
       <td><a href='{{ job|get_url }}'>{{ job.timestamp_start|default:job.created }}</a></td>
-      <td>{{ job.outcome }}</td>
+      <td>{{ job|job_outcome }}</td>
       {% else %}
       <td colspan='2'>{% trans 'No job on file' %}</td>
       {% endif %}
-      <td>{{ job.outcome }}</td>
     </tr>
     {% endwith %}
 

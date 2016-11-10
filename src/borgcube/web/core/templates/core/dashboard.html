@@ -70,42 +70,5 @@
 
   <h2>Recent Jobs</h2>
 
-  <table class='jobs' cellpadding='3px'>
-    <tr>
-      <th>Timestamp (start)</th>
-      <th>Client</th>
-      <th>Outcome</th>
-      <th>Duration</th>
-    </tr>
-    <tr>
-      <td><a href='/'>2016-10-29 17:09:22 UTC</a></td>
-      <td><a href='/'>tiger.enkore.de</a></td>
-      <td>In progress (791 GB / 582341 files)</td>
-      <td>9 minutes so far</td>
-    </tr>
-    <tr>
-      <td><a href='/'>2016-10-29 17:05:31 UTC</a></td>
-      <td><a href='/'>g5-1.enkore.de</a></td>
-      <td>Finished (3.8 GB / 67431 files)</td>
-      <td>3 minutes 45 seconds</td>
-    </tr>
-    <tr class='failed'>
-      <td><a href='/'>2016-10-29 17:01:22 UTC</a></td>
-      <td><a href='/'>g5-2.enkore.de</a></td>
-      <td>Failed (No route to host)</td>
-      <td>22 seconds</td>
-    </tr>
-    <tr class='failed'>
-      <td><a href='/'>2016-10-29 16:59:47 UTC</a></td>
-      <td><a href='/'>c2-1.enkore.de</a></td>
-      <td>Failed (No route to host)</td>
-      <td>21 seconds</td>
-    </tr>
-    <tr>
-      <td><a href='/'>2016-10-29 16:54:47 UTC</a></td>
-      <td><a href='/'>pdu.enkore.de</a></td>
-      <td>Finished (427 MB / 23431 files)</td>
-      <td>57 seconds</td>
-    </tr>
-  </table>
+  {% include 'core/table_jobs.html' with jobs=recent_jobs client_column=1 config_column=0 %}
 {% endblock %}
