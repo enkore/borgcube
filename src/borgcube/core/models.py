@@ -282,8 +282,37 @@ class BackupJob(Job):
         return self.client.hostname + '-' + str(self.id)
 
 
+class CheckConfig(models.Model):
+    repository = models.ForeignKey(Repository, related_name='check_configs')
+
+    check_repository = models.BooleanField(default=True)
+    verify_data = models.BooleanField(default=False, help_text=_('Verify all data cryptographically (slow)'))
+    check_archives = models.BooleanField(default=True)
+
+    check_only_new_archives = models.BooleanField(default=False, help_text=_('Check only archives added since the last check'))
 
 
+class CheckJob(Job):
+    @enum.unique
+    class State(enum.Enum):
+        job_created = 'job-created'
+        done = 'done'
+        failed = 'failed'
+
+        repository_check = 'repository-check'
+        verify_data = 'verify-data'
+        archives_check = 'archives-check'
+
+    State.STABLE = (State.job_created, State.done, State.failed)
+
+    State.job_created.verbose_name = _('Job created')
+    State.done.verbose_name = _('Finished')
+    State.failed.verbose_name = _('Failed')
+    State.repository_check.verbose_name = _('Checking repository')
+    State.verify_data.verbose_name = _('Verifying data')
+    State.archives_check.verbose_name = _('Checking archives')
+
+    config = models.ForeignKey(CheckConfig, blank=True, null=True)
 
 
 class ScheduleItem(models.Model):
