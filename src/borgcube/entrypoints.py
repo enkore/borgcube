@@ -37,6 +37,10 @@ def proxy():
 
 def manage():
     from django.core.management import execute_from_command_line
+    try:
+        plugins = sys.argv[1] not in ('makemigrations', 'migrate')
+    except IndexError:
+        plugins = True
     from .utils import configure_plugins
-    configure_plugins()
+    configure_plugins(plugins)
     sys.exit(execute_from_command_line())
