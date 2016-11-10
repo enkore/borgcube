@@ -12,7 +12,7 @@ from borg.remote import RepositoryServer, PathNotAllowed
 from borg.cache import Cache
 from borg.item import ArchiveItem
 
-from ..core.models import Job, Archive
+from ..core.models import BackupJob, Archive
 from ..keymgt import SyntheticRepoKey, synthesize_client_key, SyntheticManifest
 from ..utils import set_process_name, open_repository
 
@@ -78,11 +78,11 @@ class ReverseRepositoryProxy(RepositoryServer):
         log.debug('ReverseRepositoryProxy lock_wait=%s, lock=%s, exclusive=%s, append_only=%s, path=%r',
                   lock_wait, lock, exclusive, append_only, path)
         try:
-            self.job = Job.objects.get(pk=path.decode())
-        except (Job.DoesNotExist, ValueError):
+            self.job = BackupJob.objects.get(pk=path.decode())
+        except (BackupJob.DoesNotExist, ValueError):
             raise PathNotAllowed(path)
 
-        self.job.update_state(previous=Job.State.client_prepared, to=Job.State.client_in_progress)
+        self.job.update_state(previous=BackupJob.State.client_prepared, to=BackupJob.State.client_in_progress)
         set_process_name('borgcube-proxy [job %s]' % self.job.id)
 
         log.info('Opening repository for job %s', self.job.id)
@@ -193,7 +193,7 @@ class ReverseRepositoryProxy(RepositoryServer):
 
     @doom_on_exception()
     def rollback(self):
-        self.job.update_state(Job.State.client_in_progress, Job.State.failed)
+        self.job.update_state(BackupJob.State.client_in_progress, BackupJob.State.failed)
         log.error('Job failed due to client rollback.')
         self._doomed = True
         self.repository.rollback()

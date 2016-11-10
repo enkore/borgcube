@@ -6,7 +6,7 @@ from borg.helpers import Manifest
 from borg.logger import setup_logging
 
 from . import ReverseRepositoryProxy
-from ..core.models import Job
+from ..core.models import BackupJob
 from ..core.tests import job, repository, client, client_connection, borg_repo, borg_passphrase
 
 

@@ -3,7 +3,7 @@ from subprocess import check_call
 
 import pytest
 
-from .models import Client, ClientConnection, Job, Repository
+from .models import Client, ClientConnection, BackupJob, Repository
 
 
 @pytest.fixture
@@ -43,22 +43,22 @@ def repository(db, borg_repo):
 
 @pytest.fixture
 def job(client, repository):
-    return Job.objects.create(
+    return BackupJob.objects.create(
         repository=repository,
         client=client,
     )
 
 
 def test_job_state(job):
-    assert job.state == Job.State.job_created
+    assert job.state == BackupJob.State.job_created
     assert job.db_state == 'job-created'
     assert not job.failed
 
 
 def test_job_update_state(job):
-    assert job.state == Job.State.job_created
-    job.update_state(Job.State.job_created, Job.State.failed)
-    assert job.state == Job.State.failed
+    assert job.state == BackupJob.State.job_created
+    job.update_state(BackupJob.State.job_created, BackupJob.State.failed)
+    assert job.state == BackupJob.State.failed
     assert job.failed
 
 
@@ -71,14 +71,14 @@ def test_job_update_state_str(job):
 
 def test_job_update_state_fail(job):
     with pytest.raises(ValueError):
-        job.update_state(Job.State.client_done, Job.State.failed)
-    assert job.state == Job.State.job_created
+        job.update_state(BackupJob.State.client_done, BackupJob.State.failed)
+    assert job.state == BackupJob.State.job_created
 
 
 def test_job_force_state(job):
     assert not job.force_state(job.state)
-    assert job.force_state(Job.State.failed)
-    assert job.state == Job.State.failed
+    assert job.force_state(BackupJob.State.failed)
+    assert job.state == BackupJob.State.failed
 
 
 def test_job_archive_name(job):

@@ -11,7 +11,7 @@ from ..models import OverviewMetric
 from ..metrics import Metric
 
 from borgcube.core.models import Client, ClientConnection, Repository
-from borgcube.core.models import Job, JobConfig
+from borgcube.core.models import BackupJob, JobConfig
 from borgcube.daemon.client import APIClient
 
 log = logging.getLogger(__name__)
@@ -39,7 +39,7 @@ def fetch_metrics():
 def dashboard(request):
     return TemplateResponse(request, 'core/dashboard.html', {
         'metrics': fetch_metrics(),
-        'recent_jobs': Job.objects.all()[:20],
+        'recent_jobs': BackupJob.objects.all()[:20],
     })
 
 
@@ -108,11 +108,11 @@ def client_edit(request, client_id):
 
 
 def job_view(request, client_id, job_id):
-    job = get_object_or_404(Job, client=client_id, id=job_id)
+    job = get_object_or_404(BackupJob, client=client_id, id=job_id)
 
 
 def job_cancel(request, client_id, job_id):
-    job = get_object_or_404(Job, client=client_id, id=job_id)
+    job = get_object_or_404(BackupJob, client=client_id, id=job_id)
     daemon = APIClient()
     daemon.cancel_job(job)
     return redirect(client_view, job.client.pk)
@@ -266,9 +266,8 @@ def repository_edit(request, id):
 
 
 def repository_add(request):
-    repository = get_object_or_404(Repository, pk=id)
     data = request.POST or None
-    repository_form = RepositoryForm(data, instance=repository)
+    repository_form = RepositoryForm(data)
     if data and repository_form.is_valid():
         repository = repository_form.save()
         return redirect(repository_view, repository.pk)

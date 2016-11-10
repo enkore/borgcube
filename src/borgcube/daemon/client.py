@@ -5,7 +5,7 @@ from django.conf import settings
 
 import zmq
 
-from ..core.models import Job
+from ..core.models import BackupJob
 
 log = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ class APIClient:
             log.error('APIClient.initiate_job(%r, %d) failed: %s', client.hostname, job_config.id, reply['message'])
             raise APIError(reply['message'])
         log.info('Initiated job %s', reply['job'])
-        return Job.objects.get(id=reply['job'])
+        return BackupJob.objects.get(id=reply['job'])
 
     def cancel_job(self, job):
         self.socket.send_json({

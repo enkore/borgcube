@@ -14,7 +14,7 @@ from django.core.exceptions import ObjectDoesNotExist
 
 from borg.helpers import bin_to_hex
 
-from ..core.models import Job, JobConfig
+from ..core.models import BackupJob, JobConfig
 from ..utils import set_process_name
 
 
@@ -131,9 +131,9 @@ class APIServer(BaseServer):
         self.children = {}
         self.queue = []
         set_process_name('borgcubed [main process]')
-        for job in Job.objects.exclude(db_state__in=[s.value for s in Job.State.STABLE]):
+        for job in BackupJob.objects.exclude(db_state__in=[s.value for s in BackupJob.State.STABLE]):
             job.set_failure_cause('borgcubed-restart')
-        for job in Job.objects.filter(db_state=Job.State.job_created.value):
+        for job in BackupJob.objects.filter(db_state=BackupJob.State.job_created.value):
             self.queue_job(job)
 
     def idle(self):
@@ -161,7 +161,7 @@ class APIServer(BaseServer):
             job_config = JobConfig.objects.get(client=client_hostname, id=jobconfig_id)
         except ObjectDoesNotExist:
             return self.error('No such JobConfig')
-        job = Job.objects.create(
+        job = BackupJob.objects.create(
             repository=job_config.repository,
             config=job_config,
             client=job_config.client
@@ -178,27 +178,27 @@ class APIServer(BaseServer):
         self.queue.append((self.can_run_job, self.prefork_job, self.run_job, str(job.id)))
 
     def can_run_job(self, job_id):
-        job = Job.objects.get(id=job_id)
-        blocking_jobs = Job.objects.filter(repository=job.repository).exclude(db_state__in=[s.value for s in Job.State.STABLE])
+        job = BackupJob.objects.get(id=job_id)
+        blocking_jobs = BackupJob.objects.filter(repository=job.repository).exclude(db_state__in=[s.value for s in BackupJob.State.STABLE])
         job_is_blocked = blocking_jobs.exists()
         if job_is_blocked:
             log.debug('Job %s blocked by running jobs: %s', job_id, ' '.join('{} ({})'.format(job.id, job.db_state) for job in blocking_jobs))
         return not job_is_blocked
 
     def prefork_job(self, job_id):
-        job = Job.objects.get(id=job_id)
-        job.update_state(Job.State.job_created, Job.State.client_preparing)
+        job = BackupJob.objects.get(id=job_id)
+        job.update_state(BackupJob.State.job_created, BackupJob.State.client_preparing)
 
     def run_job(self, job_id):
-        job = Job.objects.get(id=job_id)
+        job = BackupJob.objects.get(id=job_id)
         set_process_name('borgcubed [run-job %s]' % job_id)
-        executor = JobExecutor(job)
+        executor = BackupJobExecutor(job)
         executor.execute()
 
     def cmd_cancel_job(self, request):
         try:
             job_id = request['job_id']
-            job = Job.objects.get(id=job_id)
+            job = BackupJob.objects.get(id=job_id)
         except KeyError as ke:
             return self.error('Missing parameter %r', ke.args[0])
         except ObjectDoesNotExist:
@@ -284,8 +284,8 @@ class APIServer(BaseServer):
             command, *params = self.children.pop(pid)
             logger('Command was: %s %r', command, params)
             if failure and command == 'run_job':
-                job = Job.objects.get(id=params[0])
-                job.force_state(Job.State.failed)
+                job = BackupJob.objects.get(id=params[0])
+                job.force_state(BackupJob.State.failed)
         self.exit |= self.shutdown and not self.children
 
     def check_queue(self):
@@ -336,7 +336,7 @@ class RepositoryIDMismatch(RuntimeError):
     pass
 
 
-class JobExecutor:
+class BackupJobExecutor:
     def __init__(self, job):
         tee_job_logs(job)
         self.job = job
@@ -348,14 +348,14 @@ class JobExecutor:
         try:
             self.synthesize_crypto()
             self.transfer_cache()
-            self.job.update_state(Job.State.client_preparing, Job.State.client_prepared)
+            self.job.update_state(BackupJob.State.client_preparing, BackupJob.State.client_prepared)
 
             self.remote_create()
             self.client_cleanup()
-            self.job.update_state(Job.State.client_cleanup, Job.State.done)
+            self.job.update_state(BackupJob.State.client_cleanup, BackupJob.State.done)
             log.info('Job %s completed successfully', self.job.id)
         except CalledProcessError as cpe:
-            self.job.force_state(Job.State.failed)
+            self.job.force_state(BackupJob.State.failed)
             if not self.analyse_job_process_error(cpe):
                 raise
             self.job.save()
@@ -499,6 +499,7 @@ class JobExecutor:
             command_line += extra_options,
 
         log.debug('Built command line: %r', command_line)
+        log.debug('%s', ' '.join(command_line))
         try:
             check_call(command_line)
         except CalledProcessError as cpe:
@@ -513,10 +514,10 @@ class JobExecutor:
             self.job.refresh_from_db()
             log.debug('remote create finished (success)')
         self.job.repository.refresh_from_db()
-        self.job.update_state(Job.State.client_in_progress, Job.State.client_done)
+        self.job.update_state(BackupJob.State.client_in_progress, BackupJob.State.client_done)
 
     def client_cleanup(self):
-        self.job.update_state(Job.State.client_done, Job.State.client_cleanup)
+        self.job.update_state(BackupJob.State.client_done, BackupJob.State.client_cleanup)
         # TODO delete checkpoints
 
         # TODO do we actually want this? if we leave the cache, the next job has a good chance of rsyncing just a delta

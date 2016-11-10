@@ -15,14 +15,14 @@ def borgcube_startup():
 @hookspec
 def borgcube_job_pre_state_update(job, current_state, target_state):
     """
-    Called before the state of *job* is updated from *current_state* (Job.State) to *target_state* (ditto).
+    Called before the state of *job* is updated from *current_state* (BackupJob.State) to *target_state* (ditto).
     """
 
 
 @hookspec
 def borgcube_job_post_state_update(job, prior_state, current_state):
     """
-    Called after the state of *job* was updated from *prior_state* (Job.State) to *current_state*.
+    Called after the state of *job* was updated from *prior_state* (BackupJob.State) to *current_state*.
 
     *job* is already saved, but the database transaction has not yet completed.
     """
@@ -31,7 +31,7 @@ def borgcube_job_post_state_update(job, prior_state, current_state):
 @hookspec
 def borgcube_job_post_force_state(job, forced_state):
     """
-    Called after the state of *job* was forced to *forced_state* (Job.State).
+    Called after the state of *job* was forced to *forced_state* (BackupJob.State).
     """
 
 

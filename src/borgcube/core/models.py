@@ -123,65 +123,10 @@ class ModelEnum(enum.Enum):
 
 
 class Job(models.Model):
-    @enum.unique
-    class State(ModelEnum):
-        job_created = 'job-created'
-
-        # Cache is uploaded to client
-        client_preparing = 'client-preparing'
-        # Cache upload done, borg-create will be started
-        client_prepared = 'client-prepared'
-        # borg-create has connected to reverse proxy
-        client_in_progress = 'client-in-progress'
-        # borg-create is done
-        client_done = 'client-done'
-        # Cache is removed from client
-        client_cleanup = 'client-cleanup'
-
-        done = 'done'
-
-        failed = 'failed'
-
-    State.STABLE = (State.job_created, State.done, State.failed)
-
-    State.job_created.verbose_name = _('Job created')
-    State.client_preparing.verbose_name = _('Preparing client')
-    State.client_prepared.verbose_name = _('Prepared client')
-    State.client_in_progress.verbose_name =_('In progress')
-    State.client_done.verbose_name = _('Client is done')
-    State.client_cleanup.verbose_name = _('Client is cleaned up')
-    State.done.verbose_name = _('Finished')
-    State.failed.verbose_name = _('Failed')
-
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     created = models.DateTimeField(auto_now_add=True, db_index=True)
     timestamp_start = models.DateTimeField(blank=True, null=True)
     timestamp_end = models.DateTimeField(blank=True, null=True)
-
-    repository = models.ForeignKey(Repository, related_name='jobs')
-    client = models.ForeignKey(Client, related_name='jobs')
-    archive = models.OneToOneField(Archive, blank=True, null=True)
-    config = models.ForeignKey(JobConfig, blank=True, null=True)
-
-    data = JSONField()
-
-    db_state = CharField(default='job-created', choices=State.choices())
-
-    @property
-    def state(self):
-        return Job.State(self.db_state)
-
-    @property
-    def archive_name(self):
-        return self.client.hostname + '-' + str(self.id)
-
-    @property
-    def failed(self):
-        return self.state == Job.State.failed
-
-    @property
-    def done(self):
-        return self.state == Job.State.done
 
     @property
     def duration(self):
@@ -190,16 +135,19 @@ class Job(models.Model):
         else:
             return timezone.now() - (self.timestamp_start or self.created)
 
-    def _check_set_start_timestamp(self, from_state):
-        if from_state == Job.State.job_created:
-            self.timestamp_start = timezone.now()
-            log.debug('%s: Recording %s as start time', self.id, self.timestamp_start.isoformat())
+    db_state = CharField(default='job-created')
 
+    @property
+    def state(self):
+        return self.State(self.db_state)
 
-    def _check_set_end_timestamp(self):
-        if self.state in Job.State.STABLE:
-            self.timestamp_end = timezone.now()
-            log.debug('%s: Recording %s as end time', self.id, self.timestamp_end.isoformat())
+    @property
+    def failed(self):
+        return self.state == self.State.failed
+
+    @property
+    def done(self):
+        return self.state == self.State.done
 
     def update_state(self, previous, to):
         with transaction.atomic():
@@ -224,14 +172,6 @@ class Job(models.Model):
         self.save()
         return True
 
-    def set_failure_cause(self, kind, **kwargs):
-        self.force_state(Job.State.failed)
-        self.data['failure_cause'] = {
-            'kind': kind,
-        }
-        self.data['failure_cause'].update(kwargs)
-        self.save()
-
     def log_path(self):
         short_timestamp = self.created.replace(microsecond=0).isoformat()
         logs_path = Path(settings.SERVER_LOGS_DIR) / str(self.created.year)
@@ -251,3 +191,70 @@ class Job(models.Model):
 
     class Meta:
         ordering = ['-created']
+
+
+class BackupJob(Job):
+    @enum.unique
+    class State(enum.Enum):
+        job_created = 'job-created'
+        done = 'done'
+        failed = 'failed'
+
+        # Cache is uploaded to client
+        client_preparing = 'client-preparing'
+        # Cache upload done, borg-create will be started
+        client_prepared = 'client-prepared'
+        # borg-create has connected to reverse proxy
+        client_in_progress = 'client-in-progress'
+        # borg-create is done
+        client_done = 'client-done'
+        # Cache is removed from client
+        client_cleanup = 'client-cleanup'
+
+    State.STABLE = (State.job_created, State.done, State.failed)
+
+    State.job_created.verbose_name = _('Job created')
+    State.done.verbose_name = _('Finished')
+    State.failed.verbose_name = _('Failed')
+    State.client_preparing.verbose_name = _('Preparing client')
+    State.client_prepared.verbose_name = _('Prepared client')
+    State.client_in_progress.verbose_name =_('In progress')
+    State.client_done.verbose_name = _('Client is done')
+    State.client_cleanup.verbose_name = _('Client is cleaned up')
+
+    repository = models.ForeignKey(Repository, related_name='jobs')
+    client = models.ForeignKey(Client, related_name='jobs')
+    archive = models.OneToOneField(Archive, blank=True, null=True)
+    config = models.ForeignKey(JobConfig, blank=True, null=True)
+
+    data = JSONField()
+
+    @property
+    def archive_name(self):
+        return self.client.hostname + '-' + str(self.id)
+
+    def _check_set_start_timestamp(self, from_state):
+        if from_state == BackupJob.State.job_created:
+            self.timestamp_start = timezone.now()
+            log.debug('%s: Recording %s as start time', self.id, self.timestamp_start.isoformat())
+
+
+    def _check_set_end_timestamp(self):
+        if self.state in BackupJob.State.STABLE:
+            self.timestamp_end = timezone.now()
+            log.debug('%s: Recording %s as end time', self.id, self.timestamp_end.isoformat())
+
+    def set_failure_cause(self, kind, **kwargs):
+        self.force_state(BackupJob.State.failed)
+        self.data['failure_cause'] = {
+            'kind': kind,
+        }
+        self.data['failure_cause'].update(kwargs)
+        self.save()
+
+
+class ScheduleItem(models.Model):
+    py_class = models.CharField(max_length=100)
+    py_args = JSONField()
+
+    name = CharField()

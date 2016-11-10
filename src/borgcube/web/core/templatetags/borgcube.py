@@ -27,7 +27,7 @@ def help_text(model_instance, field):
 @register.filter
 def get_url(model_instance):
     obj = model_instance
-    if isinstance(obj, models.Job):
+    if isinstance(obj, models.BackupJob):
         return reverse(views.job_view, args=(obj.client.pk, obj.pk))
     elif isinstance(obj, models.Client):
         return reverse(views.client_view, args=(obj.pk,))
@@ -53,7 +53,7 @@ def summarize_archive(archive):
 
 @register.filter
 def job_outcome(job):
-    assert isinstance(job, models.Job)
+    assert isinstance(job, models.BackupJob)
     if job.failed:
         failure_cause = job.data.get('failure_cause')
         if failure_cause:
