@@ -61,28 +61,35 @@ class BaseServer:
             while time.perf_counter() < last_idle + 1:
                 if self.socket.poll(timeout=500):
                     request = self.socket.recv_json()
-                    reply = self.handle_request(request)
+                    reply = self._handle_request(request)
                     self.socket.send_json(reply)
             self.idle()
         self.close()
         log.info('Exorcism successful. Have a nice day.')
 
-    def handle_request(self, request):
+    def _handle_request(self, request):
         """Handle *request*, return reply."""
         if not isinstance(request, dict):
             return self.error('invalid request: a dictionary is required.')
         command = request.get('command')
-        if command not in self.commands:
+        if not command:
             log.error('invalid request was %r', request)
-            return self.error('invalid request: no or invalid command.')
+            return self.error('invalid request: no command.')
         try:
-            return self.commands[command](self, request)
+            reply = self.handle_request(request)
+            if reply is None:
+                log.error('invalid request was %r', request)
+                return self.error('invalid request: not handled')
+            return reply
         except Exception as exc:
             log.exception('Error during request processing. Request was %r', request)
             if not isinstance(exc, zmq.ZMQError) and self.socket:
                 # Probably need to send a reply
                 return self.error('Uncaught exception during processing')
             sys.exit(1)
+
+    def handle_request(self, request):
+        pass
 
     def idle(self):
         pass
@@ -94,6 +101,9 @@ class BaseServer:
         signal.signal(signal.SIGTERM, signal.SIG_DFL)
 
     def error(self, message, *parameters):
+        """
+        Log error *message* formatted (%) with *parameters*. Return response dictionary.
+        """
         log.error('Request failed: ' + message, *parameters)
         return {
             'success': False,
@@ -110,8 +120,6 @@ class BaseServer:
             exit_by_exception()
         return pid
 
-    commands = {}
-
 
 class APIServer(BaseServer):
     def __init__(self, address, context=None):
@@ -127,6 +135,12 @@ class APIServer(BaseServer):
         for job in BackupJob.objects.filter(db_state=BackupJob.State.job_created.value):
             self.queue_job(job)
 
+    def handle_request(self, request):
+        command = request['command']
+        if command in self.commands:
+            return self.commands[command](self, request)
+        return hook.borgcubed_handle_request(apiserver=self, request=request)
+
     def idle(self):
         self.check_schedule()
         self.check_children()
@@ -140,29 +154,10 @@ class APIServer(BaseServer):
         while self.children:
             self.check_children()
 
-    def cmd_initiate_backup_job(self, request):
-        try:
-            client_hostname = request['client']
-            jobconfig_id = request['job_config']
-        except KeyError as ke:
-            return self.error('Missing parameter %r', ke.args[0])
-        try:
-            job_config = JobConfig.objects.get(client=client_hostname, id=jobconfig_id)
-        except ObjectDoesNotExist:
-            return self.error('No such JobConfig')
-        job = BackupJob.objects.create(
-            repository=job_config.repository,
-            config=job_config,
-            client=job_config.client
-        )
-        log.info('Created job %s for client %s, job config %d', job.id, job_config.client.hostname, job_config.id)
-        self.queue_job(job)
-        return {
-            'success': True,
-            'job': str(job.id),
-        }
-
     def queue_job(self, job):
+        """
+        Enqueue *job* instance for execution.
+        """
         job_id = str(job.id)
         executor_class = hook.borgcubed_job_executor(job_id=job_id)
         if not executor_class:
@@ -228,7 +223,6 @@ class APIServer(BaseServer):
         }
 
     commands = {
-        'initiate-backup-job': cmd_initiate_backup_job,
         'cancel-job': cmd_cancel_job,
         'log': cmd_log,
     }

@@ -13,9 +13,10 @@ from borg.key import PlaintextKey
 from borg.repository import Repository
 from borg.locking import LockTimeout, LockFailed, LockError, LockErrorT
 
-from borgcube.core.models import BackupJob
+from borgcube.core.models import BackupJob, JobConfig
 from borgcube.keymgt import synthesize_client_key, SyntheticManifest
 from borgcube.utils import open_repository, tee_job_logs
+from django.core.exceptions import ObjectDoesNotExist
 
 from .hookspec import JobExecutor
 
@@ -25,6 +26,31 @@ log = logging.getLogger('borgcubed.backupjob')
 def borgcubed_job_executor(job_id):
     if BackupJob.objects.filter(id=job_id).exists():
         return BackupJobExecutor
+
+
+def borgcubed_handle_request(apiserver, request):
+    if request['command'] != 'initiate-backup-job':
+        return
+    try:
+        client_hostname = request['client']
+        jobconfig_id = request['job_config']
+    except KeyError as ke:
+        return apiserver.error('Missing parameter %r', ke.args[0])
+    try:
+        job_config = JobConfig.objects.get(client=client_hostname, id=jobconfig_id)
+    except ObjectDoesNotExist:
+        return apiserver.error('No such JobConfig')
+    job = BackupJob.objects.create(
+        repository=job_config.repository,
+        config=job_config,
+        client=job_config.client
+    )
+    log.info('Created job %s for client %s, job config %d', job.id, job_config.client.hostname, job_config.id)
+    apiserver.queue_job(job)
+    return {
+        'success': True,
+        'job': str(job.id),
+    }
 
 
 def cpe_means_connection_failure(called_process_error):
