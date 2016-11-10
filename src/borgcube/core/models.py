@@ -14,6 +14,8 @@ from jsonfield.fields import TypedJSONField, JSONField
 
 from borg.helpers import Location
 
+import borgcube
+
 log = logging.getLogger(__name__)
 
 
@@ -157,11 +159,13 @@ class Job(models.Model):
             if self.db_state != previous.value:
                 raise ValueError('Cannot transition job state from %r to %r, because current state is %r'
                                  % (previous.value, to.value, self.db_state))
+            borgcube.utils.hook.borgcube_job_pre_state_update(job=self, current_state=previous, target_state=to)
             self.db_state = to.value
             self._check_set_start_timestamp(previous)
             self._check_set_end_timestamp()
             self.save()
             log.debug('%s: phase %s -> %s', self.id, previous.value, to.value)
+            borgcube.utils.hook.borgcube_job_post_state_update(job=self, prior_state=previous, current_state=to)
 
     def force_state(self, state):
         self.refresh_from_db()
@@ -172,7 +176,11 @@ class Job(models.Model):
         self.db_state = state.value
         self._check_set_end_timestamp()
         self.save()
+        borgcube.utils.hook.borgcube_job_post_force_state(job=self, forced_state=state)
         return True
+
+    def set_failure_cause(self, kind, **kwargs):
+        borgcube.utils.hook.borgcube_job_failure_cause(job=self, kind=kind, kwargs=kwargs)
 
     def log_path(self):
         short_timestamp = self.created.replace(microsecond=0).isoformat()
@@ -182,6 +190,7 @@ class Job(models.Model):
         return logs_path / file
 
     def delete(self, using=None, keep_parents=False):
+        borgcube.utils.hook.borgcube_job_pre_delete(job=self)
         super().delete(using, keep_parents)
         try:
             self.log_path().unlink()
@@ -246,6 +255,7 @@ class BackupJob(Job):
             log.debug('%s: Recording %s as end time', self.id, self.timestamp_end.isoformat())
 
     def set_failure_cause(self, kind, **kwargs):
+        super().set_failure_cause(kind, **kwargs)
         self.force_state(BackupJob.State.failed)
         self.data['failure_cause'] = {
             'kind': kind,
