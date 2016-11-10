@@ -6,3 +6,4 @@ __pycache__
 !.gitignore
 !.gitattributes
 *.egg-info
+/db.sqlite3
