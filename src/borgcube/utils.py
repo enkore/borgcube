@@ -107,8 +107,16 @@ def tee_job_logs(job):
             logger = logging.getLogger(name)
         logger.addHandler(handler)
 
+
+class LazyHook:
+    def __getattr__(self, item):
+        global hook
+        if hook is self:
+            raise AttributeError('Cannot call hook %r, configure_plugins() not called' % item)
+        return getattr(hook, item)
+
 pm = None
-hook = None
+hook = LazyHook()
 
 
 def configure_plugins():
