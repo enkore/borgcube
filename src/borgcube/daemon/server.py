@@ -9,7 +9,7 @@ import zmq
 
 from django.core.exceptions import ObjectDoesNotExist
 
-from ..core.models import BackupJob, Job, JobConfig
+from ..core.models import Job
 from ..utils import set_process_name, hook
 
 log = logging.getLogger('borgcubed')
@@ -129,11 +129,7 @@ class APIServer(BaseServer):
         self.children = {}
         self.queue = []
         set_process_name('borgcubed [main process]')
-        # TODO move to backupjob
-        for job in BackupJob.objects.exclude(db_state__in=[s.value for s in BackupJob.State.STABLE]):
-            job.set_failure_cause('borgcubed-restart')
-        for job in BackupJob.objects.filter(db_state=BackupJob.State.job_created.value):
-            self.queue_job(job)
+        hook.borgcubed_startup(apiserver=self)
 
     def handle_request(self, request):
         command = request['command']
@@ -238,8 +234,8 @@ class APIServer(BaseServer):
                 if oe.errno == errno.ECHILD:
                     # Uh-oh
                     log.error('waitpid(2) failed with ECHILD, but we thought we had children')
-                    for pid, (command, args) in self.children.items():
-                        log.error('I am missing child %d, command %s %r', pid, command, args)
+                    for pid, (command, job_id) in self.children.items():
+                        log.error('I am missing child %d, command %s %s', pid, command, job_id)
             if not pid:
                 break
             signo = waitres & 0xFF
@@ -250,11 +246,9 @@ class APIServer(BaseServer):
                 logger('Child %d exited with code %d on signal %d', pid, code, signo)
             else:
                 logger('Child %d exited with code %d', pid, code)
-            command, *params = self.children.pop(pid)
-            logger('Command was: %s %r', command, params)
-            if failure and command == 'run_job':
-                job = BackupJob.objects.get(id=params[0])
-                job.force_state(BackupJob.State.failed)
+            command, job_id = self.children.pop(pid)
+            logger('Command was: %s %r', command, job_id)
+            hook.borgcubed_job_exit(apiserver=self, job_id=job_id, exit_code=code, signo=signo)
         self.exit |= self.shutdown and not self.children
 
     def check_queue(self):

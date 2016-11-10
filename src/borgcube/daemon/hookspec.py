@@ -3,12 +3,10 @@ from borgcube.vendor import pluggy
 hookspec = pluggy.HookspecMarker('borgcube')
 
 
-@hookspec(firstresult=True)
-def borgcubed_handle_request(apiserver, request):
+@hookspec
+def borgcubed_startup(apiserver):
     """
-    Handle *request* and return a response dictionary.
-
-    request['command'] is the command string. If this is not for you, return None.
+    Called after borgcubed has fully started up.
 
     *apiserver* is the daemon.APIServer instance handling this. Interesting APIs are:
 
@@ -21,9 +19,29 @@ def borgcubed_handle_request(apiserver, request):
 
 
 @hookspec(firstresult=True)
+def borgcubed_handle_request(apiserver, request):
+    """
+    Handle *request* and return a response dictionary.
+
+    request['command'] is the command string. If this is not for you, return None.
+    """
+
+
+@hookspec(firstresult=True)
 def borgcubed_job_executor(job_id):
     """
     Return JobExecutor class for *job_id* (str) or None.
+    """
+
+
+@hookspec
+def borgcubed_job_exit(apiserver, job_id, exit_code, signo):
+    """
+    Called when a job child process is reaped.
+
+    *job_id* specifies the job, while *exit_code* is the exit code of the process.
+    *signo* is the POSIX signal number. If the process did not exit due to a signal,
+    *signo* is zero.
     """
 
 

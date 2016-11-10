@@ -23,9 +23,25 @@ from .hookspec import JobExecutor
 log = logging.getLogger('borgcubed.backupjob')
 
 
+def borgcubed_startup(apiserver):
+    for job in BackupJob.objects.exclude(db_state__in=[s.value for s in BackupJob.State.STABLE]):
+        job.set_failure_cause('borgcubed-restart')
+    for job in BackupJob.objects.filter(db_state=BackupJob.State.job_created.value):
+        apiserver.queue_job(job)
+
+
 def borgcubed_job_executor(job_id):
     if BackupJob.objects.filter(id=job_id).exists():
         return BackupJobExecutor
+
+
+def borgcubed_job_exit(apiserver, job_id, exit_code, signo):
+    try:
+        job = BackupJob.objects.get(id=job_id)
+    except ObjectDoesNotExist:
+        return
+    if exit_code or signo:
+        job.force_state(BackupJob.State.failed)
 
 
 def borgcubed_handle_request(apiserver, request):
