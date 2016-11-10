@@ -17,30 +17,33 @@ django.setup()
 
 os.environ.setdefault('BORG_HOSTNAME_IS_UNIQUE', 'yes')
 
+from .utils import configure_plugins
+configure_plugins()
+
 
 def daemon():
-    from borgcube.daemon.server import APIServer
-    from .utils import configure_plugins
-    configure_plugins()
+    from .daemon.server import APIServer
+    from .utils import hook
+    hook.borgcube_startup(db=True, process='borgcubed')
     server = APIServer(settings.DAEMON_ADDRESS)
     server.main_loop()
 
 
 def proxy():
-    from borgcube.proxy import ReverseRepositoryProxy
-    from .utils import log_to_daemon, configure_plugins
+    from .proxy import ReverseRepositoryProxy
+    from .utils import log_to_daemon, hook
+    hook.borgcube_startup(db=True, process='proxy')
     with log_to_daemon():
-        configure_plugins()
         proxy = ReverseRepositoryProxy()
         proxy.serve()
 
 
 def manage():
     from django.core.management import execute_from_command_line
+    from .utils import hook
     try:
-        plugins = sys.argv[1] not in ('makemigrations', 'migrate')
+        db = sys.argv[1] not in ('makemigrations', 'migrate')
     except IndexError:
-        plugins = True
-    from .utils import configure_plugins
-    configure_plugins(plugins)
+        db = True
+    hook.borgcube_startup(db=db, process='manage')
     sys.exit(execute_from_command_line())

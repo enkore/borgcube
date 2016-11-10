@@ -6,9 +6,17 @@ hookspec = pluggy.HookspecMarker('borgcube')
 
 
 @hookspec
-def borgcube_startup():
+def borgcube_startup(db, process=None):
     """
     Called after application is configured and all plugins were discovered.
+
+    *db* is True if database access is permitted.
+
+    *process* identifies the process and may be None. Otherwise it can be one of:
+
+    - "borgcubed"
+    - "proxy"
+    - "manage" (this may include running the web frontend)
     """
 
 

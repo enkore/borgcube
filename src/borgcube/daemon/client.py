@@ -28,17 +28,17 @@ class APIClient:
         self.socket.linger = 2000
         self.socket.connect(address)
 
-    def initiate_job(self, client, job_config):
+    def initiate_backup_job(self, client, job_config):
         self.socket.send_json({
-            'command': 'initiate-job',
+            'command': 'initiate-backup-job',
             'client': client.hostname,
             'job_config': job_config.id,
         })
         reply = self.socket.recv_json()
         if not reply['success']:
-            log.error('APIClient.initiate_job(%r, %d) failed: %s', client.hostname, job_config.id, reply['message'])
+            log.error('APIClient.initiate_backup_job(%r, %d) failed: %s', client.hostname, job_config.id, reply['message'])
             raise APIError(reply['message'])
-        log.info('Initiated job %s', reply['job'])
+        log.info('Initiated backup job %s', reply['job'])
         return BackupJob.objects.get(id=reply['job'])
 
     def cancel_job(self, job):

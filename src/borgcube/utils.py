@@ -111,18 +111,18 @@ pm = None
 hook = None
 
 
-def configure_plugins(startup=True):
+def configure_plugins():
     global pm
     global hook
     import borgcube.core.hookspec
     import borgcube.web.core.hookspec
+    import borgcube.daemon.hookspec
 
     pm = pluggy.PluginManager('borgcube', 'borgcube')
     pm.add_hookspecs(borgcube.core.hookspec)
     pm.add_hookspecs(borgcube.web.core.hookspec)
+    pm.add_hookspecs(borgcube.daemon.hookspec)
     pm.load_setuptools_entrypoints('borgcube0')
     hook = pm.hook
 
     log.debug('Loaded plugins: %s', ', '.join(name for name, plugin in pm.list_name_plugin()))
-    if startup:
-        hook.borgcube_startup()

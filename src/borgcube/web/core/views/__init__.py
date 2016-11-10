@@ -227,7 +227,7 @@ def job_config_trigger(request, client_id, config_id):
     client = get_object_or_404(Client, pk=client_id)
     config = get_object_or_404(JobConfig, client=client_id, id=config_id)
     daemon = APIClient()
-    job = daemon.initiate_job(client, config)
+    job = daemon.initiate_backup_job(client, config)
     return redirect(client_view, client_id)
 
 
