@@ -12,7 +12,7 @@ from django.utils import timezone
 
 from jsonfield.fields import TypedJSONField, JSONField
 
-from borg.helpers import Location, bin_to_hex
+from borg.helpers import Location
 
 log = logging.getLogger(__name__)
 
@@ -128,6 +128,8 @@ class Job(models.Model):
     timestamp_start = models.DateTimeField(blank=True, null=True)
     timestamp_end = models.DateTimeField(blank=True, null=True)
 
+    repository = models.ForeignKey(Repository, related_name='jobs', blank=True, null=True)
+
     @property
     def duration(self):
         if self.timestamp_end and self.timestamp_start:
@@ -222,7 +224,6 @@ class BackupJob(Job):
     State.client_done.verbose_name = _('Client is done')
     State.client_cleanup.verbose_name = _('Client is cleaned up')
 
-    repository = models.ForeignKey(Repository, related_name='jobs')
     client = models.ForeignKey(Client, related_name='jobs')
     archive = models.OneToOneField(Archive, blank=True, null=True)
     config = models.ForeignKey(JobConfig, blank=True, null=True)
