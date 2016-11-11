@@ -12,6 +12,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
+        ('contenttypes', '0002_remove_content_type_name'),
     ]
 
     operations = [
@@ -26,6 +27,16 @@ class Migration(migrations.Migration):
                 ('compressed_size', models.BigIntegerField()),
                 ('deduplicated_size', models.BigIntegerField()),
                 ('duration', models.DurationField()),
+            ],
+        ),
+        migrations.CreateModel(
+            name='CheckConfig',
+            fields=[
+                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('check_repository', models.BooleanField(default=True)),
+                ('verify_data', models.BooleanField(default=False, help_text='Verify all data cryptographically (slow)')),
+                ('check_archives', models.BooleanField(default=True)),
+                ('check_only_new_archives', models.BooleanField(default=False, help_text='Check only archives added since the last check')),
             ],
         ),
         migrations.CreateModel(
@@ -55,7 +66,8 @@ class Migration(migrations.Migration):
                 ('created', models.DateTimeField(auto_now_add=True, db_index=True)),
                 ('timestamp_start', models.DateTimeField(blank=True, null=True)),
                 ('timestamp_end', models.DateTimeField(blank=True, null=True)),
-                ('db_state', models.CharField(default='job-created', max_length=200)),
+                ('state', models.CharField(default='job_created', max_length=200)),
+                ('data', jsonfield.fields.JSONField(default=dict)),
             ],
             options={
                 'ordering': ['-created'],
@@ -93,8 +105,21 @@ class Migration(migrations.Migration):
             name='BackupJob',
             fields=[
                 ('job_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True, primary_key=True, serialize=False, to='core.Job')),
-                ('data', jsonfield.fields.JSONField(default=dict)),
+                ('config', jsonfield.fields.JSONField(default=dict)),
             ],
+            options={
+                'abstract': False,
+            },
+            bases=('core.job',),
+        ),
+        migrations.CreateModel(
+            name='CheckJob',
+            fields=[
+                ('job_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True, primary_key=True, serialize=False, to='core.Job')),
+            ],
+            options={
+                'abstract': False,
+            },
             bases=('core.job',),
         ),
         migrations.AddField(
@@ -103,14 +128,34 @@ class Migration(migrations.Migration):
             field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='job_configs', to='core.Repository'),
         ),
         migrations.AddField(
+            model_name='job',
+            name='_concrete_model',
+            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='contenttypes.ContentType'),
+        ),
+        migrations.AddField(
+            model_name='job',
+            name='repository',
+            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='jobs', to='core.Repository'),
+        ),
+        migrations.AddField(
             model_name='client',
             name='connection',
             field=models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, to='core.ClientConnection'),
         ),
         migrations.AddField(
+            model_name='checkconfig',
+            name='repository',
+            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='check_configs', to='core.Repository'),
+        ),
+        migrations.AddField(
             model_name='archive',
             name='repository',
             field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='core.Repository'),
+        ),
+        migrations.AddField(
+            model_name='checkjob',
+            name='config',
+            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to='core.CheckConfig'),
         ),
         migrations.AddField(
             model_name='backupjob',
@@ -121,15 +166,5 @@ class Migration(migrations.Migration):
             model_name='backupjob',
             name='client',
             field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='jobs', to='core.Client'),
-        ),
-        migrations.AddField(
-            model_name='backupjob',
-            name='config',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to='core.JobConfig'),
-        ),
-        migrations.AddField(
-            model_name='backupjob',
-            name='repository',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='jobs', to='core.Repository'),
         ),
     ]
