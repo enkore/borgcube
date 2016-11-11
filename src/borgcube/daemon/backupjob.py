@@ -40,13 +40,7 @@ def borgcubed_handle_request(apiserver, request):
         job_config = JobConfig.objects.get(client=client_hostname, id=jobconfig_id)
     except ObjectDoesNotExist:
         return apiserver.error('No such JobConfig')
-    config = dict(job_config.config)
-    config['id'] = job_config.id
-    job = BackupJob(
-        repository=job_config.repository,
-        config=config,
-        client=job_config.client
-    )
+    job = BackupJob.from_config(job_config)
     job.save()
     log.info('Created job %s for client %s, job config %d', job.id, job_config.client.hostname, job_config.id)
     apiserver.queue_job(job)

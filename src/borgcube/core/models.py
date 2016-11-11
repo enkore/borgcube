@@ -324,6 +324,16 @@ class BackupJob(Job):
     def archive_name(self):
         return self.client.hostname + '-' + str(self.id)
 
+    @classmethod
+    def from_config(cls, job_config):
+        config = dict(job_config)
+        config['id'] = job_config.id
+        return cls(
+            client=job_config.client,
+            repository=job_config.repository,
+            config=config,
+        )
+
 
 class CheckConfig(models.Model):
     repository = models.ForeignKey(Repository, related_name='check_configs')
