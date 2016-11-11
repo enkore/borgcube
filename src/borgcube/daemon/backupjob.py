@@ -40,9 +40,11 @@ def borgcubed_handle_request(apiserver, request):
         job_config = JobConfig.objects.get(client=client_hostname, id=jobconfig_id)
     except ObjectDoesNotExist:
         return apiserver.error('No such JobConfig')
+    config = dict(job_config.config)
+    config['id'] = job_config.id
     job = BackupJob.objects.create(
         repository=job_config.repository,
-        config=job_config,
+        config=config,
         client=job_config.client
     )
     log.info('Created job %s for client %s, job config %d', job.id, job_config.client.hostname, job_config.id)
@@ -223,7 +225,7 @@ class BackupJobExecutor(JobExecutor):
         if settings.SERVER_PROXY_PATH:
             command_line += '--remote-path', settings.SERVER_PROXY_PATH
 
-        config = self.job.config.config
+        config = self.job.config
         assert config['version'] == 1, 'Unknown JobConfig version: %r' % config['version']
         for path in config['paths']:
             command_line.append(shlex.quote(path))

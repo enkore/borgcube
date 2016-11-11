@@ -28,6 +28,8 @@ def help_text(model_instance, field):
 @register.filter
 def get_url(model_instance):
     obj = model_instance
+    if not obj:
+        return ''
     if isinstance(obj, models.Job):
         return reverse(views.job_view, args=(obj.pk,))
     elif isinstance(obj, models.Client):

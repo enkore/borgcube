@@ -279,7 +279,14 @@ class BackupJob(Job):
 
     client = models.ForeignKey(Client, related_name='jobs')
     archive = models.OneToOneField(Archive, blank=True, null=True)
-    config = models.ForeignKey(JobConfig, blank=True, null=True)
+    config = JSONField()
+
+    @property
+    def get_jobconfig(self):
+        try:
+            return JobConfig.objects.get(id=self.config.get('id'))
+        except JobConfig.DoesNotExist:
+            return
 
     @property
     def archive_name(self):
