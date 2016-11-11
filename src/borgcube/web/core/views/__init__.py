@@ -11,7 +11,7 @@ from ..models import OverviewMetric
 from ..metrics import Metric
 
 from borgcube.core.models import Client, ClientConnection, Repository
-from borgcube.core.models import BackupJob, JobConfig
+from borgcube.core.models import Job, JobConfig
 from borgcube.daemon.client import APIClient
 
 log = logging.getLogger(__name__)
@@ -39,7 +39,7 @@ def fetch_metrics():
 def dashboard(request):
     return TemplateResponse(request, 'core/dashboard.html', {
         'metrics': fetch_metrics(),
-        'recent_jobs': BackupJob.objects.all()[:20],
+        'recent_jobs': Job.objects.all()[:20],
     })
 
 
@@ -107,12 +107,12 @@ def client_edit(request, client_id):
     })
 
 
-def job_view(request, client_id, job_id):
-    job = get_object_or_404(BackupJob, client=client_id, id=job_id)
+def job_view(request, job_id):
+    job = get_object_or_404(Job, id=job_id)
 
 
-def job_cancel(request, client_id, job_id):
-    job = get_object_or_404(BackupJob, client=client_id, id=job_id)
+def job_cancel(request, job_id):
+    job = get_object_or_404(Job, id=job_id)
     daemon = APIClient()
     daemon.cancel_job(job)
     return redirect(client_view, job.client.pk)

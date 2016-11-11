@@ -5,8 +5,10 @@ import uuid
 from pathlib import Path
 
 from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
 from django.core import validators
 from django.db import models, transaction
+from django.db.models import QuerySet
 from django.utils.translation import ugettext_lazy as _
 from django.utils import timezone
 
@@ -124,6 +126,31 @@ class ModelEnum(enum.Enum):
         return [(e.value, e.name) for e in cls.__members__.values()]
 
 
+class DowncastQuerySet(QuerySet):
+    def iterator(self):
+        for obj in super().iterator():
+            yield obj._downcast()
+
+
+DowncastManager = models.manager.BaseManager.from_queryset(DowncastQuerySet)
+
+
+class DowncastModel(models.Model):
+    objects = DowncastManager()
+    _concrete_model = models.ForeignKey(ContentType)
+
+    def save(self, *args, **kwargs):
+        if self._state.adding:
+            self._concrete_model = ContentType.objects.get_for_model(type(self))
+        super().save(*args, **kwargs)
+
+    def _downcast(self):
+        return self._concrete_model.get_object_for_this_type(pk=self.pk)
+
+    class Meta:
+        abstract = True
+
+
 class s(str):
     def __new__(cls, str, translation):
         obj = super().__new__(cls, str)
@@ -131,7 +158,7 @@ class s(str):
         return obj
 
 
-class Job(models.Model):
+class Job(DowncastModel):
     """
     Core job model.
 
@@ -149,7 +176,7 @@ class Job(models.Model):
     5. Other relevant hooks: borgcube_job_blocked, borgcubed_job_exit.
     """
     class State:
-        job_created = s('job-created', _('Job created'))
+        job_created = s('job_created', _('Job created'))
         done = s('done', _('Finished'))
         failed = s('failed', _('Failed'))
 
@@ -267,15 +294,15 @@ class Job(models.Model):
 class BackupJob(Job):
     class State(Job.State):
         # Cache is uploaded to client
-        client_preparing = s('client-preparing', _('Preparing client'))
+        client_preparing = s('client_preparing', _('Preparing client'))
         # Cache upload done, borg-create will be started
-        client_prepared = s('client-prepared', _('Prepared client'))
+        client_prepared = s('client_prepared', _('Prepared client'))
         # borg-create has connected to reverse proxy
-        client_in_progress = s('client-in-progress', _('In progress'))
+        client_in_progress = s('client_in_progress', _('In progress'))
         # borg-create is done
-        client_done = s('client-done', _('Client is done'))
+        client_done = s('client_done', _('Client is done'))
         # Cache is removed from client
-        client_cleanup = s('client-cleanup', _('Client is cleaned up'))
+        client_cleanup = s('client_cleanup', _('Client is cleaned up'))
 
     client = models.ForeignKey(Client, related_name='jobs')
     archive = models.OneToOneField(Archive, blank=True, null=True)

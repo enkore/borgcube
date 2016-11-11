@@ -30,7 +30,7 @@ Options:
     {% if client_column %}
     <td><a href='{{ job|default:job.client|get_url }}'>{{ job.client.hostname }}</a>
       {% if job.config %}
-        ({{ job.config.config.label }})
+        ({{ job.config.label }})
       {% endif %}
     </td>
     {% endif %}
@@ -47,7 +47,7 @@ Options:
     <td></td>
     {% else %}
     <td><em>{{ job.duration|format_timedelta }}</em></td>
-    <td><a href='{% url 'core.job_cancel' client.pk job.pk %}'>C</a></td>
+    <td><a href='{% url 'core.job_cancel' job.pk %}'>C</a></td>
     {% endif %}
     </tr>
   {% endfor %}

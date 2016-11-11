@@ -42,11 +42,12 @@ def borgcubed_handle_request(apiserver, request):
         return apiserver.error('No such JobConfig')
     config = dict(job_config.config)
     config['id'] = job_config.id
-    job = BackupJob.objects.create(
+    job = BackupJob(
         repository=job_config.repository,
         config=config,
         client=job_config.client
     )
+    job.save()
     log.info('Created job %s for client %s, job config %d', job.id, job_config.client.hostname, job_config.id)
     apiserver.queue_job(job)
     return {
