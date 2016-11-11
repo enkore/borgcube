@@ -175,6 +175,8 @@ class APIServer(BaseServer):
         except ObjectDoesNotExist:
             return self.error('No such JobConfig')
         log.info('Cancelling job %s', job_id)
+        if job.state not in job.State.STABLE:
+            job.force_state(job.State.cancelled)
         for i, (ec, item_job_id) in enumerate(self.queue[:]):
             if item_job_id == job_id:
                 del self.queue[i]
@@ -251,7 +253,8 @@ class APIServer(BaseServer):
             logger('Command was: %s %r', command, job_id)
             if code or signo:
                 job = Job.objects.get(id=job_id)
-                job.force_state(Job.State.failed)
+                if job.state not in job.State.STABLE or job.state == job.State.job_created:
+                    job.force_state(job.State.failed)
             hook.borgcubed_job_exit(apiserver=self, job_id=job_id, exit_code=code, signo=signo)
         self.exit |= self.shutdown and not self.children
 

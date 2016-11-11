@@ -179,8 +179,9 @@ class Job(DowncastModel):
         job_created = s('job_created', _('Job created'))
         done = s('done', _('Finished'))
         failed = s('failed', _('Failed'))
+        cancelled = s('cancelled', _('Cancelled'))
 
-        STABLE = (job_created, done, failed)
+        STABLE = (job_created, done, failed, cancelled)
 
         @classmethod
         def verbose_name(cls, name):
@@ -211,6 +212,10 @@ class Job(DowncastModel):
     @property
     def done(self):
         return self.state == self.State.done
+
+    @property
+    def stable(self):
+        return self.state in self.State.STABLE
 
     def is_blocked(self):
         if self.repository:

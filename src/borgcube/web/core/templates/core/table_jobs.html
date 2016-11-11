@@ -42,7 +42,7 @@ Options:
     {% endif %}
     {% endif %}
     <td>{{ job|job_outcome }}</td>
-    {% if job.done or job.failed %}
+    {% if job.stable %}
     <td>{{ job.duration|format_timedelta }}</td>
     <td></td>
     {% else %}
