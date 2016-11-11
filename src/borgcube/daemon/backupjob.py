@@ -85,12 +85,16 @@ class BackupJobExecutor(JobExecutor):
         self.job = job
         self.client = job.client
         self.repository = job.repository
+
         self.remote_cache_dir = self.find_remote_cache_dir()
+        self.cache_path = Path(get_cache_dir()) / self.repository.repository_id
+        log.debug('local cache is %s', self.cache_path)
 
     def execute(self):
         try:
-            self.synthesize_crypto()
-            self.transfer_cache()
+            self.synthesize_crypto(self.job)
+            job_cache_path = self.create_job_cache(self.cache_path)
+            self.transfer_cache(job_cache_path)
             self.job.update_state(BackupJob.State.client_preparing, BackupJob.State.client_prepared)
 
             self.remote_create()
@@ -143,28 +147,24 @@ class BackupJobExecutor(JobExecutor):
             return True
         return False
 
-    def synthesize_crypto(self):
-        with open_repository(self.repository) as repository:
-            if bin_to_hex(repository.id) != self.repository.repository_id:
-                raise RepositoryIDMismatch(bin_to_hex(repository.id), self.repository.repository_id)
+    @staticmethod
+    def synthesize_crypto(job):
+        with open_repository(job.repository) as repository:
+            if bin_to_hex(repository.id) != job.repository.repository_id:
+                raise RepositoryIDMismatch(bin_to_hex(repository.id), job.repository.repository_id)
             manifest, key = Manifest.load(repository)
             client_key = synthesize_client_key(key, repository)
             if not isinstance(client_key, PlaintextKey):
-                self.job.data['client_key_data'] = client_key.get_key_data()
+                job.data['client_key_data'] = client_key.get_key_data()
 
             client_manifest = SyntheticManifest(client_key)
-            self.job.data['client_manifest_data'] = bin_to_hex(client_manifest.write())
-            self.job.data['client_manifest_id_str'] = client_manifest.id_str
-            self.job.save()
+            job.data['client_manifest_data'] = bin_to_hex(client_manifest.write())
+            job.data['client_manifest_id_str'] = client_manifest.id_str
+            job.save()
 
-    def transfer_cache(self):
-        cache_path = Path(get_cache_dir()) / self.repository.repository_id
-        log.debug('transfer_cache: local cache is %r', cache_path)
-        job_cache_path = self.create_job_cache(cache_path)
-
+    def transfer_cache(self, job_cache_path):
         # TODO per-client files cache, on the client or on the server?
         # TODO rsh, rsh_options
-
         remote_dir = self.remote_cache_dir + self.repository.repository_id + '/'
         connstr = self.client.connection.remote + ':' + remote_dir
         rsync = ('rsync', '-rI', '--delete', '--exclude', '/files')
@@ -176,7 +176,7 @@ class BackupJobExecutor(JobExecutor):
         finally:
             shutil.rmtree(str(job_cache_path))
         log.debug('transfer_cache: chunks cache')
-        chunks_cache = cache_path / 'chunks'
+        chunks_cache = self.cache_path / 'chunks'
         check_call(rsync + (str(chunks_cache), connstr))
         check_call(('ssh', self.client.connection.remote, 'touch', remote_dir + 'files'))
         log.debug('transfer_cache: done')
@@ -267,7 +267,7 @@ class BackupJobExecutor(JobExecutor):
         # TODO perhaps a per-client setting, to limit space usage on the client with multiple repositories.
 
     def check_archive_chunks_cache(self):
-        archives = Path(get_cache_dir()) / self.repository.repository_id / 'chunks.archive.d'
+        archives = self.cache_path / 'chunks.archive.d'
         if archives.is_dir():
             log.info('Disabling archive chunks cache of %s', archives.parent)
             shutil.rmtree(str(archives))

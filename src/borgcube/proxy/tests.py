@@ -7,19 +7,22 @@ from borg.logger import setup_logging
 
 from . import ReverseRepositoryProxy
 from ..core.models import BackupJob
-from ..core.tests import job, repository, client, client_connection, borg_repo, borg_passphrase
+from ..core.tests import backup_job, repository, client, client_connection, borg_repo, borg_passphrase
 
+from ..daemon.backupjob import BackupJobExecutor
 
 setup_logging()
 
 
 @pytest.fixture
-def rrp(job, monkeypatch, borg_passphrase):
+def rrp(backup_job, monkeypatch, borg_passphrase):
     rrp = ReverseRepositoryProxy()
 
     monkeypatch.setenv(*list(borg_passphrase.items())[0])
-    job.update_state('job-created', 'client-prepared')
-    rrp.open(job.id)
+    BackupJobExecutor.synthesize_crypto(backup_job)
+    monkeypatch.setenv(*list(borg_passphrase.items())[0])
+    backup_job.force_state(backup_job.State.client_prepared)
+    rrp.open(str(backup_job.id).encode())
     return rrp
 
 

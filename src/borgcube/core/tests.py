@@ -1,9 +1,10 @@
 
+from pathlib import Path
 from subprocess import check_call
 
 import pytest
 
-from .models import Client, ClientConnection, BackupJob, Repository
+from .models import Client, ClientConnection, BackupJob, Repository, Job
 
 
 @pytest.fixture
@@ -27,63 +28,65 @@ def borg_passphrase():
 
 @pytest.fixture
 def borg_repo(tmpdir, borg_passphrase):
-    path = str(tmpdir.join('repository'))
-    check_call(('borg', 'init', '-e=repokey', path,), env=borg_passphrase)
-    return path
+    dir = str(tmpdir.join('repository'))
+    check_call(('borg', 'init', '-e=repokey', dir,), env=borg_passphrase)
+    return Path(dir)
 
 
 @pytest.fixture
 def repository(db, borg_repo):
+    with (borg_repo / 'config').open() as fd:
+        for line in fd:
+            if line.startswith('id = '):
+                repository_id = line.split('id =')[1].strip()
+                break
     return Repository.objects.create(
-        id=b'1' * 32,  # TODO Repository create_from_existing or so
         name='testrepo',
-        url=borg_repo,
+        repository_id=repository_id,
+        url=str(borg_repo),
     )
 
 
 @pytest.fixture
-def job(client, repository):
+def backup_job(client, repository):
     return BackupJob.objects.create(
         repository=repository,
         client=client,
     )
 
 
+@pytest.fixture
+def job(db):
+    return Job.objects.create()
+
+
 def test_job_state(job):
-    assert job.state == BackupJob.State.job_created
-    assert job.db_state == 'job-created'
+    assert job.state == Job.State.job_created == 'job-created'
     assert not job.failed
 
 
 def test_job_update_state(job):
-    assert job.state == BackupJob.State.job_created
-    job.update_state(BackupJob.State.job_created, BackupJob.State.failed)
-    assert job.state == BackupJob.State.failed
+    assert job.state == Job.State.job_created
+    job.update_state(Job.State.job_created, Job.State.failed)
+    assert job.state == Job.State.failed
     assert job.failed
-
-
-def test_job_update_state_str(job):
-    with pytest.raises(Exception):
-        job.update_state(job.state, 'something')
-    with pytest.raises(Exception):
-        job.update_state('something', job.state)
 
 
 def test_job_update_state_fail(job):
     with pytest.raises(ValueError):
-        job.update_state(BackupJob.State.client_done, BackupJob.State.failed)
-    assert job.state == BackupJob.State.job_created
+        job.update_state(Job.State.done, Job.State.failed)
+    assert job.state == Job.State.job_created
 
 
 def test_job_force_state(job):
     assert not job.force_state(job.state)
-    assert job.force_state(BackupJob.State.failed)
-    assert job.state == BackupJob.State.failed
+    assert job.force_state(Job.State.failed)
+    assert job.state == Job.State.failed
 
 
-def test_job_archive_name(job):
-    assert job.archive_name == 'testhost-%s' % job.id
-    assert 'UUID' not in job.archive_name
+def test_backup_job_archive_name(backup_job):
+    assert backup_job.archive_name == 'testhost-%s' % backup_job.id
+    assert 'UUID' not in backup_job.archive_name
 
 
 def test_job_data(job):

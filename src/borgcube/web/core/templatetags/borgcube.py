@@ -6,6 +6,7 @@ from django.utils.translation import ugettext_lazy as _
 from borg.helpers import format_file_size
 
 from borgcube.core import models
+from borgcube.utils import hook
 from .. import views
 
 register = template.Library()
@@ -54,6 +55,9 @@ def summarize_archive(archive):
 @register.filter
 def job_outcome(job):
     assert isinstance(job, models.Job)
+    outcome = hook.borgcube_web_job_outcome(job=job)
+    if outcome:
+        return outcome
     if job.failed:
         failure_cause = job.data.get('failure_cause')
         if failure_cause:
