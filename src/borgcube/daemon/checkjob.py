@@ -16,15 +16,6 @@ def borgcubed_job_executor(job_id):
         return CheckJobExecutor
 
 
-def borgcubed_job_exit(apiserver, job_id, exit_code, signo):
-    try:
-        job = CheckJob.objects.get(id=job_id)
-    except ObjectDoesNotExist:
-        return
-    if exit_code or signo:
-        job.force_state(CheckJob.State.failed)
-
-
 class CheckJobExecutor(JobExecutor):
     name = 'check-job'
 
