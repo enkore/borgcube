@@ -175,6 +175,8 @@ class Job(DowncastModel):
        your job for execution (unless it always runs off a schedule).
     5. Other relevant hooks: borgcube_job_blocked, borgcubed_job_exit.
     """
+    short_name = 'job'
+
     class State:
         job_created = s('job_created', _('Job created'))
         done = s('done', _('Finished'))
@@ -267,9 +269,12 @@ class Job(DowncastModel):
     def log_path(self):
         short_timestamp = self.created.replace(microsecond=0).isoformat()
         logs_path = Path(settings.SERVER_LOGS_DIR) / str(self.created.year)
-        file = short_timestamp + '-' + self.client.hostname  + '-' + str(self.id)
+        file = self._log_file_name(short_timestamp)
         logs_path.mkdir(parents=True, exist_ok=True)
         return logs_path / file
+
+    def _log_file_name(self, timestamp):
+        return '%s-%s-%s' % (timestamp, self.short_name, self.id)
 
     def delete(self, using=None, keep_parents=False):
         borgcube.utils.hook.borgcube_job_pre_delete(job=self)
@@ -297,6 +302,8 @@ class Job(DowncastModel):
 
 
 class BackupJob(Job):
+    short_name = 'backup'
+
     class State(Job.State):
         # Cache is uploaded to client
         client_preparing = s('client_preparing', _('Preparing client'))
@@ -326,13 +333,16 @@ class BackupJob(Job):
 
     @classmethod
     def from_config(cls, job_config):
-        config = dict(job_config)
+        config = dict(job_config.config)
         config['id'] = job_config.id
         return cls(
             client=job_config.client,
             repository=job_config.repository,
             config=config,
         )
+
+    def _log_file_name(self, timestamp):
+        return '%s-%s-%s-%s' % (timestamp, self.short_name, self.client.hostname, self.id)
 
 
 class CheckConfig(models.Model):
@@ -344,18 +354,33 @@ class CheckConfig(models.Model):
 
     check_only_new_archives = models.BooleanField(default=False, help_text=_('Check only archives added since the last check'))
 
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'check_repository': self.check_repository,
+            'verify_data': self.verify_data,
+            'check_archives': self.check_archives,
+            'check_only_new_archives': self.check_only_new_archives,
+        }
+
 
 class CheckJob(Job):
+    short_name = 'check'
+
     class State(Job.State):
-        job_created = 'job-created'
-        done = 'done'
-        failed = 'failed'
+        repository_check = s('repository_check', _('Checking repository'))
+        verify_data = s('verify_data', _('Verifying data'))
+        archives_check = s('archives_check', _('Checking archives'))
 
-        repository_check = s('repository-check', _('Checking repository'))
-        verify_data = s('verify-data', _('Verifying data'))
-        archives_check = s('archives-check', _('Checking archives'))
+    config = JSONField()
 
-    config = models.ForeignKey(CheckConfig, blank=True, null=True)
+    @classmethod
+    def from_config(cls, check_config):
+        config = check_config.to_dict()
+        return cls(
+            repository=check_config.repository,
+            config=check_config.to_dict()
+        )
 
 
 class ScheduleItem(models.Model):
