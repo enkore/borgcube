@@ -90,10 +90,9 @@ def job_outcome(job):
                 return failure_kind
         else:
             return _('Unknown error - see logs')
-    #TODO
-    #elif job.archive:
-    #    return _('{statename} ({archive_summary})').format(
-    #        statename=job.state.verbose_name, archive_summary=summarize_archive(job.archive))
+    elif isinstance(job, models.BackupJob) and job.archive:
+        return _('{statename} ({archive_summary})').format(
+            statename=job.State.verbose_name(job.state), archive_summary=summarize_archive(job.archive))
     else:
         return job.State.verbose_name(job.state)
 
