@@ -24,7 +24,7 @@
       {% else %}
       <td colspan='2'>{% trans 'No job on file' %}</td>
       {% endif %}
-      <td>{{ repository.url }}</td>
+      <td style='max-width: 350px; word-wrap: break-word;'>{{ repository.url }}</td>
     </tr>
     {% endwith %}
 

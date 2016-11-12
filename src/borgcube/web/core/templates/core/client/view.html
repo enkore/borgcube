@@ -106,5 +106,5 @@
 
   <h2>{% trans 'Jobs' context 'core/client/view heading' %}</h2>
 
-  {% include 'core/table_jobs.html' with jobs=client.jobs.all client_column=0 config_column=1 %}
+  {% include 'core/table_jobs.html' with jobs=client.jobs.all repository_column=1 client_column=0 config_column=1 %}
 {% endblock %}
