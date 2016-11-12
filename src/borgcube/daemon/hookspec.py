@@ -54,6 +54,24 @@ def borgcubed_job_exit(apiserver, job_id, exit_code, signo):
     """
 
 
+@hookspec(firstresult=True)
+def borgcubed_client_call(apiclient, call):
+    """
+    Called if an unknown APIClient method *call* (str) is invoked.
+
+    Return a client function that should handle the call.
+
+    Return None if you don't care about it.
+
+    You are likely interested in this *apiclient* API::
+
+    def do_request(self, request_dict):
+        Send *request_dict* to the borgcube daemon and return the response dictionary.
+
+    Don't forget to raise the appropiate APIError if the daemon returns an error.
+    """
+
+
 class JobExecutor:
     name = 'job-executor'
 

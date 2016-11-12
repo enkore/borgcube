@@ -9,7 +9,6 @@ from borg.repository import Repository
 from borg.remote import RemoteRepository
 from borg.constants import UMASK_DEFAULT
 
-from borgcube.daemon.client import APIError
 from .vendor import pluggy
 
 log = logging.getLogger(__name__)
@@ -70,7 +69,7 @@ class DaemonLogHandler(logging.Handler):
         self.socket.send_json(request)
         reply = self.socket.recv_json()
         if not reply['success']:
-            raise APIError(reply['message'])
+            raise RuntimeError('Error sending log message to borgcubed: %s' % reply['message'])
 
 
 class log_to_daemon:

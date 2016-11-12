@@ -6,6 +6,7 @@ from django.conf import settings
 import zmq
 
 from ..core.models import BackupJob
+from ..utils import hook
 
 log = logging.getLogger(__name__)
 
@@ -27,6 +28,19 @@ class APIClient:
         self.socket.sndtimeo = 2000
         self.socket.linger = 2000
         self.socket.connect(address)
+
+    def __getattr__(self, item):
+        handler = hook.borgcubed_client_call(apiclient=self, call=item)
+        if not handler:
+            raise AttributeError('No such API: %r' % item)
+        return handler
+
+    def do_request(self, request_dict):
+        """
+        Send *request_dict* to the borgcube daemon and return the response dictionary.
+        """
+        self.socket.send_json(request_dict)
+        return self.socket.recv_json()
 
     def initiate_backup_job(self, client, job_config):
         self.socket.send_json({
