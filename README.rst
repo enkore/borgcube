@@ -23,21 +23,18 @@ Scope
   - They don't get encryption keys
   - They can't read backups (of other clients and also themselves)
   - They don't need to maintain a Borg cache
+  - They don't have to encrypt (if any of the BLAKE2 key types are used)
 
 - Deduplication is still done on the clients, saving time and
   bandwidth. Inadvertedly this means that all clients know about the hash / MAC of all
   chunks in the underlying repository.
 
-- The server is responsible for encryption (note: due to current
-  internal limitations in Borg it's not possible to avoid encrypting
-  on the clients also if the repository is encrypted**), cache
+- The server is responsible for encryption, cache
   maintenance and storage and logging/error reporting.
 
 - Clients don't need Borg installed; BorgCube can deploy an appropriate binary on the fly.
 
 - Multiple backups into the same repository at once
-
-\** to make this happen we need two modes in Borg which share the *same* keyed MAC for the chunk ID.
 
 Inner workings
 --------------
