@@ -1,5 +1,6 @@
 import logging
 
+from borg.helpers import Manifest
 from django.core.exceptions import ObjectDoesNotExist
 
 from borg.archive import ArchiveChecker
@@ -80,14 +81,50 @@ class CheckJobExecutor(JobExecutor):
         log.debug('Beginning check job on repository %r', self.repository.url)
         with open_repository(self.repository) as repository:
             if self.config['check_repository']:
-                log.debug('Beginning repository check')
-                if not repository.check():
-                    log.error('Repository check reported|repaired errors in %s (%r)', self.repository.name, self.repository.url)
-                    self.job.force_state(CheckJob.State.failed)
-                    return
-                log.debug('Repository check complete (success)')
-            self.job.update_state(CheckJob.State.repository_check, CheckJob.State.verify_data)
-            self.job.update_state(CheckJob.State.verify_data, CheckJob.State.archives_check)
-            self.job.update_state(CheckJob.State.archives_check, CheckJob.State.done)
-            # archive_checker = ArchiveChecker
+                self.check_repository(repository)
+            if self.config['verify_data'] or self.config['check_archives']:
+                self.job.update_state(CheckJob.State.repository_check, CheckJob.State.verify_data)
+                archive_checker = self.get_archive_checker(repository)
+                if self.config['verify_data']:
+                    self.verify_data(repository, archive_checker)
+                self.job.update_state(CheckJob.State.verify_data, CheckJob.State.archives_check)
+                if self.config['check_archives']:
+                    self.check_archives(repository, archive_checker)
+            else:
+                self.job.update_state(CheckJob.State.verify_data, CheckJob.State.archives_check)
+        self.job.update_state(CheckJob.State.archives_check, CheckJob.State.done)
+
+    def get_archive_checker(self, repository):
+        log.debug('Initialising archive checker')
+        check = ArchiveChecker()
+        check.repository = repository
+        check.repair = False
+        check.check_all = True
+        check.init_chunks()
+        log.debug('Initialised repository chunks')
+        check.key = check.identify_key(repository)
+        log.debug('Identified key: %s', type(check.key).__name__)
+        return check
+
+    def check_repository(self, repository):
+        log.debug('Beginning repository check')
+        if not repository.check():
+            log.error('Repository check reported|repaired errors in %s (%r)', self.repository.name,
+                      self.repository.url)
+            self.job.force_state(CheckJob.State.failed)
+            return
+        log.debug('Repository check complete (success)')
+
+    def verify_data(self, repository, archive_checker):
+        archive_checker.verify_data()
+
+    def check_archives(self, repository, check):
+        if Manifest.MANIFEST_ID not in check.chunks:
+            log.error('Repository manifest not found!')
+            check.manifest = check.rebuild_manifest()
+        else:
+            check.manifest, _ = Manifest.load(repository, key=check.key)
+        check.rebuild_refcounts(sort_by='ts')
+        check.orphan_chunks_check()
+        check.finish()
 
