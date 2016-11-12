@@ -10,7 +10,7 @@ from django.utils.translation import ugettext_lazy as _
 from ..models import OverviewMetric
 from ..metrics import Metric
 
-from borgcube.core.models import Client, ClientConnection, Repository
+from borgcube.core.models import Client, ClientConnection, Repository, CheckConfig
 from borgcube.core.models import Job, JobConfig
 from borgcube.daemon.client import APIClient
 
@@ -274,3 +274,50 @@ def repository_add(request):
     return TemplateResponse(request, 'core/repository/add.html', {
         'repository_form': repository_form,
     })
+
+
+class CheckConfigForm(forms.ModelForm):
+    class Meta:
+        model = CheckConfig
+        fields = '__all__'
+        exclude =('repository',)
+
+
+def repository_check_config_add(request, id):
+    repository = get_object_or_404(Repository, pk=id)
+    data = request.POST or None
+    config_form = CheckConfigForm(data)
+    if data and config_form.is_valid():
+        check_config = config_form.save(commit=False)
+        check_config.repository = repository
+        check_config.save()
+        return redirect(repository_view, repository.pk)
+    return TemplateResponse(request, 'core/repository/config_add.html', {
+        'form': config_form,
+    })
+
+
+def repository_check_config_edit(request, id, config_id):
+    check_config = get_object_or_404(CheckConfig, repository=id, pk=config_id)
+    data = request.POST or None
+    config_form = CheckConfigForm(data, instance=check_config)
+    if data and config_form.is_valid():
+        config_form.save()
+        return redirect(repository_view, id)
+    return TemplateResponse(request, 'core/repository/config_edit.html', {
+        'form': config_form,
+    })
+
+
+def repository_check_config_delete(request, id, config_id):
+    config = get_object_or_404(CheckConfig, repository=id, id=config_id)
+    if request.method == 'POST':
+        config.delete()
+    return redirect(repository_view, id)
+
+
+def repository_check_config_trigger(request, id, config_id):
+    config = get_object_or_404(CheckConfig, repository=id, id=config_id)
+    daemon = APIClient()
+    job = daemon.initiate_check_job(config)
+    return redirect(repository_view, id)

@@ -15,7 +15,7 @@ register = template.Library()
 @register.filter
 def field_name(model_instance, field):
     name = model_instance._meta.get_field(field).verbose_name
-    if name == field:
+    if name == field.replace('_', ' '):
         return name.title()
     return name
 
@@ -111,3 +111,12 @@ def format_timedelta(td):
         return _('%d minutes %d seconds') % (m, s)
     else:
         return _('%d seconds') % s
+
+
+@register.filter
+def get(obj, attr):
+    """Look value of an object up through a variable (instead of a fixed name as in obj.a)"""
+    try:
+        return obj.get(attr)
+    except AttributeError:
+        return getattr(obj, attr)

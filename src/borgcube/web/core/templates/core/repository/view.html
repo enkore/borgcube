@@ -28,6 +28,33 @@
       </tr>
   </table>
 
+  <h2>{% trans 'Job configurations' %}
+    <small>(<a href='{% url 'core.repository_check_config_add' repository.pk %}'>{% trans 'add' %}</a>)</small></h2>
+
+    {% for check_config in repository.check_configs.all %}
+
+    <section class='check-config' id='check-config-{{ check_config.id }}'>
+      <h3>{{ check_config.label }} <small>
+        (<a href='{% url 'core.repository_check_config_trigger' repository.pk check_config.id %}'>{% trans 'run now' %}</a>)
+        (<a href='{% url 'core.repository_check_config_edit' repository.pk check_config.id %}'>{% trans 'edit' %}</a>)
+      </small></h3>
+
+
+        <table class='plist'>
+        {% with 'check_repository verify_data check_archives check_only_new_archives' as fields %}
+        {% for field in fields.split %}
+          <tr>
+            <th>{{ check_config|field_name:field }}</th>
+            <td>{{ check_config|get:field|yesno }}</td>
+          </tr>
+        {% endfor %}
+        {% endwith %}
+        </table>
+    </section>
+
+  {% endfor %}
+
+
   <h2>{% trans 'Jobs' %}</h2>
 
   {% include 'core/table_jobs.html' with jobs=repository.jobs.all config_column=0 client_column=1 %}

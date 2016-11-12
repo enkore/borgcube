@@ -31,6 +31,10 @@ client_urls = [
 repo_urls = [
     url(r'^$', core_views.repository_view, name='core.repository_view'),
     url(r'^edit/$', core_views.repository_edit, name='core.repository_edit'),
+    url(r'^add-config/$', core_views.repository_check_config_add, name='core.repository_check_config_add'),
+    url(r'^config/(?P<config_id>\d+)/edit/$', core_views.repository_check_config_edit, name='core.repository_check_config_edit'),
+    url(r'^config/(?P<config_id>\d+)/delete/$', core_views.repository_check_config_delete, name='core.repository_check_config_delete'),
+    url(r'^config/(?P<config_id>\d+)/trigger/$', core_views.repository_check_config_trigger, name='core.repository_check_config_trigger'),
 ]
 
 job_urls = [

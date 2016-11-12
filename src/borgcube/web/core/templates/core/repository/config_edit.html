@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block title %}{% blocktrans with label=check_config.label %}Edit job configuration {{ label }}{% endblocktrans %}{% endblock %}
+
+{% block content %}
+  <h1>{% blocktrans with label=check_config.label %}Edit job configuration {{ label }}{% endblocktrans %}</h1>
+
+  <form method='POST'>
+    <table>
+      {% block form %}
+        {% csrf_token %}
+        {{ form }}
+      {% endblock %}
+
+      <tr>
+        <td></td>
+        <td><input type='submit' value='{% trans 'Save changes' context 'submit' %}'/></td>
+      </tr>
+    </table>
+  </form>
+{% endblock %}
