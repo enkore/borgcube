@@ -208,6 +208,10 @@ class Job(DowncastModel):
     data = JSONField()
 
     @property
+    def verbose_name(self):
+        return self._meta.verbose_name
+
+    @property
     def failed(self):
         return self.state == self.State.failed
 

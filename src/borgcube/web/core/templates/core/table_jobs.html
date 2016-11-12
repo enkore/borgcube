@@ -28,11 +28,15 @@ Options:
     <tr {% if job.failed %}class='failed'{% elif job.data.borg_warning %}class='warning'{% endif %}>
     <td><a href='{{ job|get_url }}'>{{ job.timestamp_start|default:job.created }}</a></td>
     {% if client_column %}
-    <td><a href='{{ job|default:job.client|get_url }}'>{{ job.client.hostname }}</a>
-      {% if job.config %}
-        ({{ job.config.label }})
+      {% if job.client %}
+      <td><a href='{{ job|default:job.client|get_url }}'>{{ job.client.hostname }}</a>
+        {% if job.config %}
+          ({{ job.config.label }})
+        {% endif %}
+      </td>
+      {% else %}
+      <td>({{ job.verbose_name }})</td>
       {% endif %}
-    </td>
     {% endif %}
     {% if config_column %}
     {% if job.config %}
