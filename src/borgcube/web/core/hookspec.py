@@ -23,3 +23,10 @@ def borgcube_web_job_outcome(job):
     """
     Return human-compatible outcome description of *job* or None.
     """
+
+
+@hookspec(firstresult=True)
+def borgcube_web_get_url(obj):
+    """
+    Return URL for *obj* or None.
+    """

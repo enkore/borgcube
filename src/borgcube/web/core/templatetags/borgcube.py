@@ -38,8 +38,10 @@ def get_url(model_instance):
         return reverse(views.client_view, args=(obj.client.pk,)) + '#job-config-%d' % obj.pk
     elif isinstance(obj, models.Repository):
         return reverse(views.repository_view, args=(obj.pk,))
-    else:
-        raise ValueError('Can\'t generate URL for %r (type %r)' % (obj, type(obj)))
+    url = hook.borgcube_web_get_url(obj=obj)
+    if not url:
+        raise ValueError('Don\'t know how to make URL for %r (type %r)' % (obj, type(obj)))
+    return url
 
 
 @register.filter
