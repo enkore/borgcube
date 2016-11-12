@@ -268,7 +268,13 @@ class APIServer(BaseServer):
             if not executor_class.can_run(job_id):
                 nope.append((executor_class, job_id))
                 continue
-            executor_class.prefork(job_id)
+            try:
+                executor_class.prefork(job_id)
+            except Exception:
+                log.exception('Unhandled exception in %s.prefork(%s)', executor_class.__name__, job_id)
+                job = Job.objects.get(id=job_id)
+                job.force_state(job.State.failed)
+                continue
             pid = self.fork()
             if pid:
                 # Parent, gotta watch the kids
