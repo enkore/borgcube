@@ -350,6 +350,7 @@ class BackupJob(Job):
 
 
 class CheckConfig(models.Model):
+    label = CharField()
     repository = models.ForeignKey(Repository, related_name='check_configs')
 
     check_repository = models.BooleanField(default=True)
