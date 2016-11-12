@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/1.10/ref/settings/
 
 import os
 from pathlib import Path
+from pkg_resources import iter_entry_points
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -38,10 +39,15 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-
-    'borgcube.core',
-    'borgcube.web.core',
 ]
+
+for entry_point in iter_entry_points('borgcube0_apps'):
+    INSTALLED_APPS.append(entry_point.module_name)
+    if os.environ.get('BORGCUBE_DEBUG_APP_LOADING'):
+        # This is so early in the startup process that logging won't be configured.
+        print('Discovered Django application through distribution %s: %s (%s)' % (
+            entry_point.dist, entry_point.name, entry_point.module_name,
+        ))
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

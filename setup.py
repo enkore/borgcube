@@ -61,6 +61,10 @@ setup(
             'borgcubed_backupjob = borgcube.daemon.backupjob',
             'borgcubed_checkjob  = borgcube.daemon.checkjob',
             'borgcubed_scheduler = borgcube.daemon.scheduler',
+        ],
+        'borgcube0_apps': [
+            'core      = borgcube.core',
+            'web_core  = borgcube.web.core',
         ]
     }
 )
