@@ -21,6 +21,22 @@ import os
 import sys
 sys.path.insert(0, os.path.abspath('.'))
 
+import unittest.mock
+
+MOCK_MODULES = [
+    'borg.chunker',
+    'borg.compress',
+    'borg.crypto',
+    'borg.hashindex',
+    'borg.platform.posix',
+    'borg.platform.linux',
+    'borg.platform.darwin',
+    'borg.platform.freebsd',
+]
+
+for mod_name in MOCK_MODULES:
+    sys.modules[mod_name] = unittest.mock.Mock()
+
 import borgcube.entrypoints
 
 # -- General configuration ------------------------------------------------
