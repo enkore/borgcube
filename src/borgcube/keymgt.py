@@ -1,11 +1,12 @@
 
 import os
-from binascii import unhexlify
+import logging
 
-from borg.helpers import Manifest, bin_to_hex
-from borg.key import PlaintextKey, RepoKey, KeyfileKey, Passphrase
+from borg.helpers import Manifest
+from borg.key import PlaintextKey, RepoKey, Blake2RepoKey, Blake2KeyfileKey, AuthenticatedKey, KeyfileKey, Passphrase
 
-from borg.repository import Repository
+log = logging.getLogger(__name__)
+
 
 class FakeRepository:
     # We isolate this, so that we can't miss anything in Borg's key logic.
@@ -21,7 +22,7 @@ class FakeRepository:
         pass
 
 
-class SyntheticRepoKey(RepoKey):
+class SyntheticRepoKeyMixin:
     def get_key_data(self) -> str:
         return self._save(Passphrase(''))
 
@@ -43,14 +44,38 @@ class SyntheticRepoKey(RepoKey):
         return key
 
 
+class SyntheticRepoKey(SyntheticRepoKeyMixin, RepoKey):
+    synthetic_type = 'synthetic-repokey'
+
+
+class SyntheticBlake2RepoKey(SyntheticRepoKeyMixin, AuthenticatedKey):
+    # Any BLAKE2 repository key gets converted into an AuthenticatedKey for the client; the client
+    # doesn't do any encryption in this case.
+    synthetic_type = 'synthetic-authenticated-blake2'
+
+
+def synthetic_key_from_data(data, type, repository):
+    if type == SyntheticRepoKey.synthetic_type:
+        return SyntheticRepoKey.from_data(data, repository)
+    elif type == SyntheticBlake2RepoKey.synthetic_type:
+        return SyntheticBlake2RepoKey.from_data(data, repository)
+    else:
+        raise ValueError('Invalid synthetic key type: %r' % type)
+
+
 def synthesize_client_key(id_key_from, repository):
     if isinstance(id_key_from, PlaintextKey):
         return PlaintextKey(repository)
 
-    assert isinstance(id_key_from, (RepoKey, KeyfileKey)), 'Unknown key type %s' % type(id_key_from).__name__
+    assert id_key_from.TYPE in (RepoKey.TYPE, KeyfileKey.TYPE, Blake2RepoKey.TYPE, Blake2KeyfileKey.TYPE, AuthenticatedKey.TYPE), \
+        'Unknown key type %s' % type(id_key_from).__name__
 
     os.environ['BORG_PASSPHRASE'] = ''
-    synthetic_key = SyntheticRepoKey.create(FakeRepository(repository), None)
+    if id_key_from.TYPE in (RepoKey.TYPE, KeyfileKey.TYPE):
+        SyntheticClass = SyntheticRepoKey
+    else:
+        SyntheticClass = SyntheticBlake2RepoKey
+    synthetic_key = SyntheticClass.create(FakeRepository(repository), None)
     del os.environ['BORG_PASSPHRASE']
     synthetic_key.coerce_chunk_ids(id_key_from)
     return synthetic_key

@@ -153,6 +153,7 @@ class BackupJobExecutor(JobExecutor):
             client_key = synthesize_client_key(key, repository)
             if not isinstance(client_key, PlaintextKey):
                 job.data['client_key_data'] = client_key.get_key_data()
+                job.data['client_key_type'] = client_key.synthetic_type
 
             client_manifest = SyntheticManifest(client_key)
             job.data['client_manifest_data'] = bin_to_hex(client_manifest.write())

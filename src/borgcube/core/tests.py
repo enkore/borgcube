@@ -61,7 +61,7 @@ def job(db):
 
 
 def test_job_state(job):
-    assert job.state == Job.State.job_created == 'job-created'
+    assert job.state == Job.State.job_created == 'job_created'
     assert not job.failed
 
 

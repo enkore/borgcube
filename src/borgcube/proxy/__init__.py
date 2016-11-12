@@ -13,7 +13,7 @@ from borg.cache import Cache
 from borg.item import ArchiveItem
 
 from ..core.models import BackupJob, Archive
-from ..keymgt import SyntheticRepoKey, synthesize_client_key, SyntheticManifest
+from ..keymgt import synthetic_key_from_data, synthesize_client_key, SyntheticManifest
 from ..utils import set_process_name, open_repository
 
 log = logging.getLogger(__name__)
@@ -121,8 +121,9 @@ class ReverseRepositoryProxy(RepositoryServer):
             log.debug('No synthesized client key found - it\'s PlaintextKey')
             self._client_key = synthesize_client_key(self._repository_key, self.repository)
         else:
-            log.debug('Loading synthesized client key')
-            self._client_key = SyntheticRepoKey.from_data(key_data, self.repository)
+            synthetic_type = self.job.data['client_key_type']
+            log.debug('Loading synthesized client key (%s)', synthetic_type)
+            self._client_key = synthetic_key_from_data(key_data, synthetic_type, self.repository)
         self._client_manifest = SyntheticManifest.load(unhexlify(self.job.data['client_manifest_data']), self._client_key)
         self._first_manifest_read = True
         assert self._client_manifest.id_str == self.job.data['client_manifest_id_str']
