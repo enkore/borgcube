@@ -6,7 +6,6 @@ Subpackages
 
 .. toctree::
 
-    borgcube.web.core.migrations
     borgcube.web.core.templatetags
     borgcube.web.core.views
 

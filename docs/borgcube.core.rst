@@ -1,13 +1,6 @@
 borgcube.core package
 =====================
 
-Subpackages
------------
-
-.. toctree::
-
-    borgcube.core.migrations
-
 Submodules
 ----------
 
