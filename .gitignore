@@ -7,3 +7,4 @@ __pycache__
 !.gitattributes
 *.egg-info
 /db.sqlite3
+src/borgcube/_version.py

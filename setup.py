@@ -17,6 +17,7 @@ setup(
     name='borgcube',
     description='A backup system built on Borg.',
     license='GPLv2',
+    use_scm_version=True,
     long_description='%s\n%s' % (
         re.compile('^.. start-badges.*^.. end-badges', re.M | re.S).sub('', read('README.rst')),
         re.sub(':[a-z]+:`~?(.*?)`', r'``\1``', read('CHANGELOG.rst'))
@@ -39,6 +40,7 @@ setup(
     ],
     keywords=[
     ],
+    setup_requires=['setuptools_scm>=1.7'],
     install_requires=[
         'borgbackup',
         'django>=1.10,<1.11',
