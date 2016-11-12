@@ -20,10 +20,18 @@ def borgcube_startup(db, process=None):
     """
 
 
-@hookspec(firstresult=True)
-def borgcube_job_blocked(job):
+@hookspec
+def borgcube_job_blocked(job, blocking_jobs):
     """
-    Return True if *job* is blocked by other jobs (and log a DEBUG diagnostic), or None if it is not blocked.
+    Called to sort out whether *job* is blocked by any *blocking_jobs*.
+
+    *blocking_jobs* is a list of jobs that are aimed at the same repository as *job* and whose state
+    is not in Job.State.STABLE.
+
+    Remove any false positives from *blocking_jobs* that might be there because of special snowflake semantics
+    with your jobs.
+
+    If any *blocking_jobs* remain, *job* is considered blocked.
     """
 
 

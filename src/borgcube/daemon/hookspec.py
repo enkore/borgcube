@@ -1,7 +1,10 @@
+import logging
+
 from borgcube.vendor import pluggy
 from borgcube.core.models import Job
 from borgcube.utils import hook
 
+log = logging.getLogger('borgcubed')
 hookspec = pluggy.HookspecMarker('borgcube')
 
 
@@ -78,7 +81,12 @@ class JobExecutor:
     @classmethod
     def can_run(cls, job_id):
         job = Job.objects.get(id=job_id)
-        return not hook.borgcube_job_blocked(job=job)
+        blocking_jobs = list(Job.objects.filter(repository=job.repository).exclude(state__in=Job.State.STABLE))
+        hook.borgcube_job_blocked(job=job, blocking_jobs=blocking_jobs)
+        if blocking_jobs:
+            log.debug('Job %s blocked by running backup jobs: %s',
+                      job.id, ' '.join('{} ({})'.format(job.id, job.state) for job in blocking_jobs))
+        return not blocking_jobs
 
     @classmethod
     def prefork(cls, job_id):
