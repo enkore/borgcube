@@ -1,7 +1,9 @@
 import configparser
+import collections
 import logging
 import shlex
 import shutil
+import subprocess
 from pathlib import Path
 from subprocess import check_call, CalledProcessError
 
@@ -142,6 +144,10 @@ class BackupJobExecutor(JobExecutor):
             self.job.set_failure_cause('client-connection-failed', command=called_process_error.cmd, exit_code=called_process_error.returncode)
             log.error('Job %s failed due to client connection failure', self.job.id)
             return True
+        if 'A newer version is required to access this repository.' in called_process_error.output and called_process_error.returncode == 2:
+            self.job.set_failure_cause('client-borg-outdated', output=called_process_error.output)
+            log.error('Job %s failed because the Borg on the client is too old', self.job)
+            return True
         return False
 
     @staticmethod
@@ -204,6 +210,35 @@ class BackupJobExecutor(JobExecutor):
     def job_location(self):
         return settings.SERVER_LOGIN + ':' + str(self.job.id)
 
+    def callx(self, log_name, command_line):
+        def exit():
+            exit_code = p.wait()
+            if exit_code:
+                raise CalledProcessError(exit_code, command_line,
+                                         output='\n'.join(stdout_tail),
+                                         stderr='\n'.join(stderr_tail))
+
+        stderr_tail = collections.deque(maxlen=100)
+        stdout_tail = collections.deque(maxlen=100)
+        with subprocess.Popen(command_line, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True) as p:
+            try:
+                stderr, stdout = p.communicate()
+                if not stderr and not stdout:
+                    return exit()
+                if stderr:
+                    for line in stderr.splitlines():
+                        log.info('[%s] %s', log_name, line)
+                        stderr_tail.append(line)
+                if stdout:
+                    for line in stdout.splitlines():
+                        log.info('[%s] %s', log_name, line)
+                        stdout_tail.append(line)
+                exit()
+            except:
+                p.kill()
+                p.wait()
+                raise
+
     def remote_create(self):
         connection = self.client.connection
 
@@ -242,7 +277,7 @@ class BackupJobExecutor(JobExecutor):
         log.debug('Built command line: %r', command_line)
         log.debug('%s', ' '.join(command_line))
         try:
-            check_call(command_line)
+            self.callx('create', command_line)
         except CalledProcessError as cpe:
             if cpe.returncode == 1:
                 log.debug('remote create finished (warning)')
