@@ -31,7 +31,7 @@
 
 {% block extrajs %}
   <script>
-    onload = function () {
+    window.addEventListener('load', function () {
       function update_if_derived(field, new_value) {
         if (!field.value.length || new_value.startsWith(field.value) ||
                 (new_value.length && field.value.startsWith(new_value))) {
@@ -52,6 +52,6 @@
 
       id.addEventListener('input', id_changed);
       id.addEventListener('propertychange', id_changed);
-    };
+    });
   </script>
 {% endblock %}
