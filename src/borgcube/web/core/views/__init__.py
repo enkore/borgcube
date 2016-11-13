@@ -226,8 +226,9 @@ def job_config_delete(request, client_id, config_id):
 def job_config_trigger(request, client_id, config_id):
     client = get_object_or_404(Client, pk=client_id)
     config = get_object_or_404(JobConfig, client=client_id, id=config_id)
-    daemon = APIClient()
-    job = daemon.initiate_backup_job(client, config)
+    if request.method == 'POST':
+        daemon = APIClient()
+        job = daemon.initiate_backup_job(client, config)
     return redirect(client_view, client_id)
 
 
@@ -318,6 +319,7 @@ def repository_check_config_delete(request, id, config_id):
 
 def repository_check_config_trigger(request, id, config_id):
     config = get_object_or_404(CheckConfig, repository=id, id=config_id)
-    daemon = APIClient()
-    job = daemon.initiate_check_job(config)
+    if request.method == 'POST':
+        daemon = APIClient()
+        job = daemon.initiate_check_job(config)
     return redirect(repository_view, id)
