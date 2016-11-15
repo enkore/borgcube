@@ -96,6 +96,12 @@ class ReverseRepositoryProxy(RepositoryServer):
         log.debug('Repository ID is %r', self.job.repository.repository_id)
         return unhexlify(self.job.repository.repository_id)
 
+    def get_free_nonce(self):
+        return 0
+
+    def commit_nonce_reservation(self, next_unreserved, start_nonce):
+        pass
+
     @property
     def _checkpoint_archives(self):
         return self.job.data.setdefault('checkpoint-archives', [])
