@@ -143,7 +143,9 @@ class ReverseRepositoryProxy(RepositoryServer):
 
     def load_key(self):
         log.debug('Client requested repokey')
-        return self._client_key.get_key_data()
+        # Note: the .encode() is technically not necessary as msgpack would turn it into ASCII-bytes anyway,
+        #       but it makes testing easier, since it doesn't need to rely on that implementation detail.
+        return self._client_key.get_key_data().encode('ascii')
 
     def _repo_to_client(self, id, repo_data):
         if id == Manifest.MANIFEST_ID:
