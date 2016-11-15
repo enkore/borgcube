@@ -89,7 +89,7 @@ class ReverseRepositoryProxy(RepositoryServer):
         location = self.job.repository.location
         self._real_open(location)
         self._load_repository_key()
-        self._load_client_key()
+        self._load_client_key(self.job.data)
         self._load_cache()
         self._got_archive = False
         self._final_archive = False
@@ -119,20 +119,20 @@ class ReverseRepositoryProxy(RepositoryServer):
     def _load_repository_key(self):
         self._manifest, self._repository_key = Manifest.load(self.repository)
 
-    def _load_client_key(self):
+    def _load_client_key(self, job_data):
         try:
-            key_data = self.job.data['client_key_data']
+            key_data = job_data['client_key_data']
         except KeyError:
             # Plaintext key
             log.debug('No synthesized client key found - it\'s PlaintextKey')
             self._client_key = synthesize_client_key(self._repository_key, self.repository)
         else:
-            synthetic_type = self.job.data['client_key_type']
+            synthetic_type = job_data['client_key_type']
             log.debug('Loading synthesized client key (%s)', synthetic_type)
             self._client_key = synthetic_key_from_data(key_data, synthetic_type, self.repository)
-        self._client_manifest = SyntheticManifest.load(unhexlify(self.job.data['client_manifest_data']), self._client_key)
+        self._client_manifest = SyntheticManifest.load(unhexlify(job_data['client_manifest_data']), self._client_key)
         self._first_manifest_read = True
-        assert self._client_manifest.id_str == self.job.data['client_manifest_id_str']
+        assert self._client_manifest.id_str == job_data['client_manifest_id_str']
         log.debug('Loaded client key and manifest')
 
     def _load_cache(self):
