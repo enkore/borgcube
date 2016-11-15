@@ -260,7 +260,7 @@ class ReverseRepositoryProxy(RepositoryServer):
     def _process_client_archive_info(self, archive_info):
         if not archive_info.name.startswith(self.job.archive_name):
             log.error('Client tried to push invalid archive %r (id=%s) to repository. Aborting.', archive_info.name, bin_to_hex(archive_info.id))
-            raise ValueError('BorgCube: illegal archive push %r', archive_info.name)
+            raise ValueError('BorgCube: illegal archive push %r' % archive_info.name)
 
         log.debug('Adding archive %r (id %s)', archive_info.name, bin_to_hex(archive_info.id))
 
