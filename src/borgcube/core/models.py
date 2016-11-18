@@ -186,7 +186,7 @@ class Job(DowncastModel):
         failed = s('failed', _('Failed'))
         cancelled = s('cancelled', _('Cancelled'))
 
-        STABLE = (job_created, done, failed, cancelled)
+        STABLE = {job_created, done, failed, cancelled}
 
         @classmethod
         def verbose_name(cls, name):
@@ -336,7 +336,6 @@ class BackupJob(Job):
     def reverse_location(self):
         return settings.SERVER_LOGIN + ':' + self.reverse_path
 
-    @property
     def get_jobconfig(self):
         try:
             return JobConfig.objects.get(id=self.config.get('id'))

@@ -61,10 +61,17 @@ def make_backup_job(apiserver, job_config):
 
 
 def run_from_schedule(apiserver, args):
+    id = args['job_config']
     try:
-        job_config = JobConfig.objects.get(id=args['job_config'])
+        job_config = JobConfig.objects.get(id=id)
     except ObjectDoesNotExist:
-        log.error('run_from_schedule: job config with id %d not found', args['job_config'])
+        log.error('run_from_schedule: job config with id %d not found', id)
+        return
+    for job in BackupJob.objects.exclude(state__in=BackupJob.State.STABLE - {BackupJob.State.job_created}):
+        if job.get_jobconfig() == job_config:
+            log.warning('run_from_schedule: not triggering a new job for config %d, since job %d is queued or running',
+                        job_config.id, job.id)
+            return
     make_backup_job(apiserver, job_config)
 
 
