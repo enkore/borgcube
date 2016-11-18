@@ -4,174 +4,175 @@
     <meta charset="utf8">
     <title>{% block fulltitle %}{% block title %}{% endblock %} - BorgCube{% endblock %}</title>
     <style type="text/css">
-     /* http://colorschemedesigner.com/csd-3.5/#3.31Tw0w0w0w0 */
-     /* 0C5AA6        26527C        04396C        408AD2        679ED2 */
-     /* FFC300        BF9E30        A67F00        FFD240        FFDE73 */
-     /* FF5300        BF5E30        A63600        FF7E40        FFA073 */
+      /* http://colorschemedesigner.com/csd-3.5/#3.31Tw0w0w0w0 */
+      /* 0C5AA6        26527C        04396C        408AD2        679ED2 */
+      /* FFC300        BF9E30        A67F00        FFD240        FFDE73 */
+      /* FF5300        BF5E30        A63600        FF7E40        FFA073 */
 
-     /*
-      * The main face color is #0C5AA6, used for the top-bar, links, generic borders etc.
-      * #04396C is the intense variant of it to highlight things, like active links.
-      * #679ED2 is a slightly brighter variant of the main color,
-      * used to off-set chrome from a background with the main color.
-      * #FFC300 is the chosen complement to the main color.
-      */
+      /*
+       * The main face color is #0C5AA6, used for the top-bar, links, generic borders etc.
+       * #04396C is the intense variant of it to highlight things, like active links.
+       * #679ED2 is a slightly brighter variant of the main color,
+       * used to off-set chrome from a background with the main color.
+       * #FFC300 is the chosen complement to the main color.
+       */
 
-     /* The basics: no unnecessary margins, and the preferred sans-serif font of the user, please */
-     html, body {
-       margin: 0;
-       padding: 0;
-       font-family: sans-serif;
-     }
+      /* The basics: no unnecessary margins, and the preferred sans-serif font of the user, please */
+      html, body {
+        margin: 0;
+        padding: 0;
+        font-family: sans-serif;
+      }
 
-     html {
-       position: relative;
-       min-height: 100%;
-     }
+      html {
+        position: relative;
+        min-height: 100%;
+      }
 
-     body {
-       margin-bottom: 1em;
-     }
+      body {
+        margin-bottom: 1em;
+      }
 
-     a,
-     a:visited {
-       color: #0C5AA6;
-     }
+      a,
+      a:visited {
+        color: #0C5AA6;
+      }
 
-     a:active,
-     a.active,
-     a:hover {
-       color: #04396C;
-     }
+      a:active,
+      a.active,
+      a:hover {
+        color: #04396C;
+      }
 
-     /* The header is a top navigation bar. */
-     header {
-       margin: 0;
-       padding: 0;
-       width: 100%;
-       overflow: hidden;
-       background-color: #0C5AA6;
-     }
+      /* The header is a top navigation bar. */
+      header {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        overflow: hidden;
+        background-color: #0C5AA6;
+      }
 
-     /* As usual for navigation bars the unordered list is a fake list that doesn't look like a list :) */
-     header ul {
-       margin: 0;
-     }
+      /* As usual for navigation bars the unordered list is a fake list that doesn't look like a list :) */
+      header ul {
+        margin: 0;
+      }
 
-     header li {
-       display: block;
-       float: left;
-     }
+      header li {
+        display: block;
+        float: left;
+      }
 
-     header a,
-     header a:visited {
-       display: block;
-       padding: 0.77em;
-       color: white;
-       text-decoration: none;
-       text-transform: capitalize;
-       font-size: 1.3em;
-       /* These aren't *real* small caps, it looks like at least Firefox emulates them by changing the font size.
-        * Well, they're kinda unusual nowadays. Anyway, I like em. And this will be the only place I use em.
-        * Promise.
-        */
-       font-variant: small-caps;
-     }
+      header a,
+      header a:visited {
+        display: block;
+        padding: 0.77em;
+        color: white;
+        text-decoration: none;
+        text-transform: capitalize;
+        font-size: 1.3em;
+        /* These aren't *real* small caps, it looks like at least Firefox emulates them by changing the font size.
+         * Well, they're kinda unusual nowadays. Anyway, I like em. And this will be the only place I use em.
+         * Promise.
+         */
+        font-variant: small-caps;
+      }
 
-     header a:active,
-     header a.active,
-     header a:hover {
-       color: #FFC300;
-       background-color: #04396C;
+      header a:active,
+      header a.active,
+      header a:hover {
+        color: #FFC300;
+        background-color: #04396C;
 
-       border-left: 1px solid #679ED2;
-       border-right: 1px solid #679ED2;
-       /* The negative margin keeps the effective width of the element the same, so that adjacent
-        * menu elements don't move around when the user hovers over different elements.
-        */
-       margin-left: -1px;
-       margin-right: -1px;
-     }
+        border-left: 1px solid #679ED2;
+        border-right: 1px solid #679ED2;
+        /* The negative margin keeps the effective width of the element the same, so that adjacent
+         * menu elements don't move around when the user hovers over different elements.
+         */
+        margin-left: -1px;
+        margin-right: -1px;
+      }
 
-     /* Align the link that goes to the project page into the right top corner */
-     header #project-link {
-       float: right;
-     }
+      /* Align the link that goes to the project page into the right top corner */
+      header #project-link {
+        float: right;
+      }
 
-     /* The footer has no content. It's a subtle pattern at the bottom of the page/screen. */
-     footer {
-       position: absolute;
-       bottom: 0;
-       left: 0;
-       right: 0;
-       /* This matches the height of /static/seigaiha.png */
-       height: 400px;
-       /* z-index = -1 so that it is behind the page */
-       z-index: -1;
+      /* The footer has no content. It's a subtle pattern at the bottom of the page/screen. */
+      footer {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        /* This matches the height of /static/seigaiha.png */
+        height: 400px;
+        /* z-index = -1 so that it is behind the page */
+        z-index: -1;
 
-       /* Awesome Seigaha background pattern by Olga Libby (via subtlepatterns.com),
-        * slight modifications by me
-        */
-       background-image: url('/static/seigaiha.png');
-       background-repeat: repeat-x;
-     }
+        /* Awesome Seigaha background pattern by Olga Libby (via subtlepatterns.com),
+         * slight modifications by me
+         */
+        background-image: url('/static/seigaiha.png');
+        background-repeat: repeat-x;
+      }
 
-     /* Onwards to the main content layout.
-      * We have a simple layout with a fixed sidebar and a fixed content block.
-      * Overall width is 1200px.
-      */
-     #sidebar {
-       width: 200px;
-       float: left;
-       margin-left: 1em;
-     }
+      /* Onwards to the main content layout.
+       * We have a simple layout with a fixed sidebar and a fixed content block.
+       * Overall width is 1200px.
+       */
+      #sidebar {
+        width: 200px;
+        float: left;
+        margin-left: 1em;
+      }
 
-     #sidebar h2 {
-       /* Lighten sidebar headings slightly so that they don't draw as much attention -
-        * they're not the main content.
-        */
-       color: #333;
-     }
+      #sidebar h2 {
+        /* Lighten sidebar headings slightly so that they don't draw as much attention -
+         * they're not the main content.
+         */
+        color: #333;
+      }
 
-     #content {
-       float: left;
-       position: relative;
-       width: 1000px;
-     }
+      #content {
+        float: left;
+        position: relative;
+        width: 1000px;
+      }
 
-     .plist th,
-     form table th {
-       text-align: right;
-       font-weight: normal;
-       padding-right: 1em;
-     }
+      .plist th,
+      form table th {
+        text-align: right;
+        font-weight: normal;
+        padding-right: 1em;
+      }
 
-     .plist pre {
-       margin: 0;
-     }
+      .plist pre {
+        margin: 0;
+      }
 
-     section {
-       margin-left: 0.5em;
-       padding-left: 0.5em;
-       border-left: 4px solid #04396C;
-     }
+      section {
+        margin-left: 0.5em;
+        padding-left: 0.5em;
+        border-left: 4px solid #04396C;
+      }
 
-     section section {
-       border-left: 4px solid #679ED2;
-     }
+      section section {
+        border-left: 4px solid #679ED2;
+      }
 
-     .jobs {
-       border-collapse: collapse;
-       width: 100%;
-     }
+      .jobs {
+        border-collapse: collapse;
+        width: 100%;
+      }
 
-     .jobs th {
-       text-align: left;
-     }
+      .jobs th {
+        text-align: left;
+      }
 
-     .jobs .failed  {
-       background-color: #FFA073;
-     }
+      .jobs .failed {
+        background-color: #FFA073;
+      }
+
       .message-warning {
         position: relative;
         padding: 0.5em;
