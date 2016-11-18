@@ -191,7 +191,6 @@ class Job(DowncastModel):
         def verbose_name(cls, name):
             return getattr(cls, name).verbose_name
 
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     created = models.DateTimeField(auto_now_add=True, db_index=True)
     timestamp_start = models.DateTimeField(blank=True, null=True)
     timestamp_end = models.DateTimeField(blank=True, null=True)

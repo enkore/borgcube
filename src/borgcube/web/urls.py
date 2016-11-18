@@ -38,8 +38,8 @@ repo_urls = [
 ]
 
 job_urls = [
-    url(r'^(?P<job_id>[-\w]+)/$', core_views.job_view, name='core.job_view'),
-    url(r'^(?P<job_id>[-\w]+)/cancel/$', core_views.job_cancel, name='core.job_cancel'),
+    url(r'^(?P<job_id>\d+)/$', core_views.job_view, name='core.job_view'),
+    url(r'^(?P<job_id>\d+)/cancel/$', core_views.job_cancel, name='core.job_cancel'),
 ]
 
 urlpatterns = [
