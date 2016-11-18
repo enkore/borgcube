@@ -172,6 +172,32 @@
      .jobs .failed  {
        background-color: #FFA073;
      }
+      .message-warning {
+        position: relative;
+        padding: 0.5em;
+        margin: 0.5em;
+        background-color: #FFA073;
+      }
+
+      .message-warning .symbol {
+        vertical-align: text-top;
+        font-family: monospace;
+        font-size: 2.5em;
+        font-weight: bold;
+        letter-spacing: -0.1em;
+      }
+
+      .message-warning .body {
+        padding-left: 0.75em;
+      }
+
+      .message-warning .body p:first-child {
+        margin-top: 0;
+      }
+
+      .message-warning .body p:last-child {
+        margin-bottom: 0;
+      }
     </style>
     {% block extracss %}
     {% endblock %}

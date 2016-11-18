@@ -45,6 +45,7 @@ setup(
         'borgbackup',
         'django>=1.10,<1.11',
         'django-jsonfield',
+        'django-recurrence',
         'pyzmq',
     ],
     extras_require={
@@ -63,8 +64,10 @@ setup(
             'borgcubed_scheduler = borgcube.daemon.scheduler',
         ],
         'borgcube0_apps': [
-            'core      = borgcube.core',
-            'web_core  = borgcube.web.core',
+            # core dependency
+            'recurrence = recurrence',
+            'core       = borgcube.core',
+            'web_core   = borgcube.web.core',
         ]
     }
 )

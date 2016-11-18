@@ -46,14 +46,26 @@ def borgcubed_handle_request(apiserver, request):
         job_config = JobConfig.objects.get(client=client_hostname, id=jobconfig_id)
     except ObjectDoesNotExist:
         return apiserver.error('No such JobConfig')
-    job = BackupJob.from_config(job_config)
-    job.save()
-    log.info('Created job %s for client %s, job config %d', job.id, job_config.client.hostname, job_config.id)
-    apiserver.queue_job(job)
+    job = make_backup_job(apiserver, job_config)
     return {
         'success': True,
         'job': str(job.id),
     }
+
+
+def make_backup_job(apiserver, job_config):
+    job = BackupJob.from_config(job_config)
+    job.save()
+    log.info('Created job %s for client %s, job config %d', job.id, job_config.client.hostname, job_config.id)
+    apiserver.queue_job(job)
+
+
+def run_from_schedule(apiserver, args):
+    try:
+        job_config = JobConfig.objects.get(id=args['job_config'])
+    except ObjectDoesNotExist:
+        log.error('run_from_schedule: job config with id %d not found', args['job_config'])
+    make_backup_job(apiserver, job_config)
 
 
 def cpe_means_connection_failure(called_process_error):

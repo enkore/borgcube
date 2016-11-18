@@ -2,7 +2,6 @@ import enum
 import hmac
 import logging
 import re
-import uuid
 from hashlib import sha224
 from pathlib import Path
 
@@ -15,6 +14,8 @@ from django.utils.translation import ugettext_lazy as _
 from django.utils import timezone
 
 from jsonfield.fields import TypedJSONField, JSONField
+
+from recurrence.fields import RecurrenceField
 
 from borg.helpers import Location
 
@@ -404,3 +405,7 @@ class ScheduleItem(models.Model):
     py_args = JSONField()
 
     name = CharField()
+    description = models.TextField(blank=True)
+
+    recurrence_start = models.DateTimeField(default=timezone.now)
+    recurrence = RecurrenceField()

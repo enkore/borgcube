@@ -12,6 +12,7 @@ from ..metrics import Metric
 
 from borgcube.core.models import Client, ClientConnection, Repository, CheckConfig
 from borgcube.core.models import Job, JobConfig
+from borgcube.core.models import ScheduleItem
 from borgcube.daemon.client import APIClient
 
 log = logging.getLogger(__name__)
@@ -323,3 +324,20 @@ def repository_check_config_trigger(request, id, config_id):
         daemon = APIClient()
         job = daemon.initiate_check_job(config)
     return redirect(repository_view, id)
+
+
+class ScheduleItemForm(forms.ModelForm):
+    class Meta:
+        model = ScheduleItem
+        fields = '__all__'
+
+
+def schedule_add(request):
+    data = request.POST or None
+    form = ScheduleItemForm(data)
+    if data and form.is_valid():
+        si = form.save()
+        return redirect('/')
+    return TemplateResponse(request, 'core/schedule/add.html', {
+        'form': form,
+    })

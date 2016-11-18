@@ -15,6 +15,7 @@ Including another URLconf
 """
 from django.conf.urls import url, include
 from django.contrib import admin
+import django.views.i18n
 
 from .core import views as core_views
 from borgcube.utils import hook
@@ -42,6 +43,14 @@ job_urls = [
     url(r'^(?P<job_id>\d+)/cancel/$', core_views.job_cancel, name='core.job_cancel'),
 ]
 
+schedule_urls = [
+    url(r'^add/$', core_views.schedule_add, name='core.schedule_add'),
+]
+
+js_info_dict = {
+    'packages': ('recurrence', ),
+}
+
 urlpatterns = [
     url(r'^$', core_views.dashboard, name='core.dashboard'),
     url(r'^clients/$', core_views.clients, name='core.clients'),
@@ -54,7 +63,10 @@ urlpatterns = [
 
     url(r'^job/', include(job_urls)),
 
+    url(r'^schedule/', include(schedule_urls)),
+
     url(r'^admin/', admin.site.urls),
+    url(r'^javascript-i18n/$', django.views.i18n.javascript_catalog, js_info_dict),
 ]
 
-hook.borgcube_web_urlpatterns(urlpatterns=urlpatterns)
+hook.borgcube_web_urlpatterns(urlpatterns=urlpatterns, js_info_dict=js_info_dict)
