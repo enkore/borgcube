@@ -35,7 +35,7 @@
 
     <section class='check-config' id='check-config-{{ check_config.id }}'>
       <h3>{{ check_config.label }} <small>
-        {% url 'core.repository_check_config_trigger' client.pk check_config.id as url %}
+        {% url 'core.repository_check_config_trigger' repository.pk check_config.id as url %}
         {% trans 'run now' as label %}
         ({% include 'core/post_link.html' with url=url label=label %})
         (<a href='{% url 'core.repository_check_config_edit' repository.pk check_config.id %}'>{% trans 'edit' %}</a>)
