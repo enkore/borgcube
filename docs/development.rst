@@ -72,4 +72,39 @@ passed like keyword-arguments, just that arguments you don't use won't raise an 
     def borgcube_startup(process):
         print("Hello World, I'm in process", process)
 
-.. pluggy: https://github.com/pytest-dev/pluggy
+If you save that into a file named *hello_plugin.py* and create an accompanying *setup.py*::
+
+    from setuptools import setup
+
+    setup(
+        name='borgcube-hello-plugin',
+        description='A plugin that says Hello World',
+        py_modules=['hello_plugin'],
+        install_requires=[
+            'borgcube',
+        ],
+        entry_points={
+            'borgcube0': [
+                'hello_plugin = hello_plugin',
+            ]
+        }
+    )
+
+Then you already have a functioning plugin. Just `pip install path/to/the/directory` it and you can try it
+
+.. code-block:: console
+
+    $ ls
+    hello_plugin.py setup.py
+    $ pip install .
+    (Some relatively verbose output)
+    $ borgcube-manage
+    [2016-11-18 23:49:39,890] 13624 DEBUG    borgcube.utils: Loaded plugins: ..., hello_plugin, ...
+    Hello World, I'm in process manage
+
+    ...
+
+    $ # To remove it again, type
+    $ pip uninstall .
+
+.. _pluggy: https://github.com/pytest-dev/pluggy

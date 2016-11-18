@@ -6,7 +6,7 @@ hookspec = pluggy.HookspecMarker('borgcube')
 
 
 @hookspec
-def borgcube_startup(db, process=None):
+def borgcube_startup(db, process):
     """
     Called after application is configured and all plugins were discovered.
 
