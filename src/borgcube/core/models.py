@@ -1,7 +1,9 @@
 import enum
+import hmac
 import logging
 import re
 import uuid
+from hashlib import sha224
 from pathlib import Path
 
 from django.conf import settings
@@ -323,6 +325,16 @@ class BackupJob(Job):
     client = models.ForeignKey(Client, related_name='jobs')
     archive = models.OneToOneField(Archive, blank=True, null=True)
     config = JSONField()
+
+    @property
+    def reverse_path(self):
+        return hmac.HMAC((settings.SECRET_KEY + 'BackupJob-revloc').encode(),
+                         str(self.id).encode(),
+                         sha224).hexdigest()
+
+    @property
+    def reverse_location(self):
+        return settings.SERVER_LOGIN + ':' + self.reverse_path
 
     @property
     def get_jobconfig(self):

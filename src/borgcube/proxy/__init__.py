@@ -78,8 +78,15 @@ class ReverseRepositoryProxy(RepositoryServer):
         log.debug('ReverseRepositoryProxy lock_wait=%s, lock=%s, exclusive=%s, append_only=%s, path=%r',
                   lock_wait, lock, exclusive, append_only, path)
         try:
-            self.job = BackupJob.objects.get(pk=path.decode())
-        except (BackupJob.DoesNotExist, ValueError):
+            path = path.decode()
+        except ValueError:
+            raise PathNotAllowed(path)
+
+        for job in BackupJob.objects.filter(state=BackupJob.State.client_prepared):
+            if job.reverse_path == path:
+                self.job = job
+                break
+        else:
             raise PathNotAllowed(path)
 
         self.job.update_state(previous=BackupJob.State.client_prepared, to=BackupJob.State.client_in_progress)

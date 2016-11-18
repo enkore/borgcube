@@ -100,7 +100,7 @@ class BackupJobExecutor(JobExecutor):
             self.transfer_cache(job_cache_path)
             self.job.update_state(BackupJob.State.client_preparing, BackupJob.State.client_prepared)
 
-            self.remote_create()
+            self.remote_create(self.create_command_line())
             self.client_cleanup()
             self.job.update_state(BackupJob.State.client_cleanup, BackupJob.State.done)
             log.info('Job %s completed successfully', self.job.id)
@@ -204,15 +204,11 @@ class BackupJobExecutor(JobExecutor):
         config.set('cache', 'repository', self.repository.repository_id)
         config.set('cache', 'manifest',  self.job.data['client_manifest_id_str'])
         # TODO: path canoniciialailaition thing
-        config.set('cache', 'previous_location', Location(self.job_location).canonical_path().replace('/./', '/~/'))
+        config.set('cache', 'previous_location', Location(self.job.reverse_location).canonical_path().replace('/./', '/~/'))
         with (job_cache_path / 'config').open('w') as fd:
             config.write(fd)
 
         return job_cache_path
-
-    @property
-    def job_location(self):
-        return settings.SERVER_LOGIN + ':' + str(self.job.id)
 
     def callx(self, log_name, command_line):
         def exit():
@@ -243,7 +239,7 @@ class BackupJobExecutor(JobExecutor):
                 p.wait()
                 raise
 
-    def remote_create(self):
+    def create_command_line(self):
         connection = self.client.connection
 
         command_line = [connection.rsh]
@@ -255,7 +251,7 @@ class BackupJobExecutor(JobExecutor):
         command_line.append('BORG_CACHE_DIR=' + self.remote_cache_dir)
         command_line.append(connection.remote_borg)
         command_line.append('create')
-        command_line.append(self.job_location + '::' + self.job.archive_name)
+        command_line.append(self.job.reverse_location + '::' + self.job.archive_name)
 
         if settings.SERVER_PROXY_PATH:
             command_line += '--remote-path', settings.SERVER_PROXY_PATH
@@ -280,6 +276,9 @@ class BackupJobExecutor(JobExecutor):
 
         log.debug('Built command line: %r', command_line)
         log.debug('%s', ' '.join(command_line))
+        return command_line
+
+    def remote_create(self, command_line):
         try:
             self.callx('create', command_line)
         except CalledProcessError as cpe:
