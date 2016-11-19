@@ -125,7 +125,7 @@ def configure_plugins():
     import borgcube.web.core.hookspec
     import borgcube.daemon.hookspec
 
-    pm = pluggy.PluginManager('borgcube', 'borgcube')
+    pm = pluggy.PluginManager(project_name='borgcube', implprefix='borgcube')
     pm.add_hookspecs(borgcube.core.hookspec)
     pm.add_hookspecs(borgcube.web.core.hookspec)
     pm.add_hookspecs(borgcube.daemon.hookspec)
