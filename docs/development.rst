@@ -90,7 +90,7 @@ If you save that into a file named *hello_plugin.py* and create an accompanying 
         }
     )
 
-Then you already have a functioning plugin. Just `pip install path/to/the/directory` it and you can try it
+This is already a working plugin. You can *pip install path/to/the/directory* it and see it in action:
 
 .. code-block:: console
 
@@ -106,5 +106,14 @@ Then you already have a functioning plugin. Just `pip install path/to/the/direct
 
     $ # To remove it again, type
     $ pip uninstall .
+
+
+.. seealso::
+
+    The *hookspec* modules specify the hooks used:
+
+    - `borgcube.core.hookspec`
+    - `borgcube.daemon.hookspec`
+    - `borgcube.web.core.hookspec`
 
 .. _pluggy: https://github.com/pytest-dev/pluggy
