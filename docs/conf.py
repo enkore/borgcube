@@ -28,6 +28,7 @@ MOCK_MODULES = [
     'borg.compress',
     'borg.crypto',
     'borg.hashindex',
+    'borg.platform',
     'borg.platform.posix',
     'borg.platform.linux',
     'borg.platform.darwin',
@@ -36,6 +37,15 @@ MOCK_MODULES = [
 
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = unittest.mock.Mock()
+
+import borg
+import borg.platform
+for mod_name in MOCK_MODULES:
+    if 'platform.' not in mod_name:
+        print(mod_name.split('.')[-1])
+        setattr(borg, mod_name.split('.')[-1], unittest.mock.Mock())
+    else:
+        setattr(borg.platform, mod_name.split('.')[-1], unittest.mock.Mock())
 
 import borgcube.entrypoints
 

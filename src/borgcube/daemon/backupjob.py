@@ -26,7 +26,8 @@ log = logging.getLogger('borgcubed.backupjob')
 
 
 def check_call(*popenargs, **kwargs):
-    return subprocess.check_call(*popenargs, **kwargs, stdin=subprocess.DEVNULL)
+    kwargs['stdin'] = subprocess.DEVNULL
+    return subprocess.check_call(*popenargs, **kwargs)
 
 
 def borgcubed_job_executor(job_id):
