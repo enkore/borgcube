@@ -5,6 +5,7 @@ from django.shortcuts import redirect, get_object_or_404
 from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.module_loading import import_string
+from django.utils.timezone import now
 from django.utils.translation import ugettext_lazy as _
 
 from ..models import OverviewMetric
@@ -332,12 +333,40 @@ class ScheduleItemForm(forms.ModelForm):
         fields = '__all__'
 
 
+from dateutil.relativedelta import relativedelta
+
+
+def schedule(request):
+    this_month = now().replace(day=1, hour=0, minute=0, second=0)
+    end_of_this_month = this_month + relativedelta(months=1)
+
+    items = []
+    for si in ScheduleItem.objects.all():
+        si.occurences = si.recurrence.between(this_month, end_of_this_month, dtstart=si.recurrence_start)
+        items += si,
+    return TemplateResponse(request, 'core/schedule/schedule.html', {
+        'items': items,
+    })
+
+
 def schedule_add(request):
     data = request.POST or None
     form = ScheduleItemForm(data)
     if data and form.is_valid():
         si = form.save()
-        return redirect('/')
+        return redirect(schedule)
     return TemplateResponse(request, 'core/schedule/add.html', {
+        'form': form,
+    })
+
+
+def schedule_edit(request, item_id):
+    item = get_object_or_404(ScheduleItem, id=item_id)
+    data = request.POST or None
+    form = ScheduleItemForm(data, instance=item)
+    if data and form.is_valid():
+        si = form.save()
+        return redirect(schedule)
+    return TemplateResponse(request, 'core/schedule/edit.html', {
         'form': form,
     })

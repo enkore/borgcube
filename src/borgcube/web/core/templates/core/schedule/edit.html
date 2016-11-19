@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans 'Edit scheduled job' %}{% endblock %}
+
+{% block content %}
+  <h1>{% trans 'Edit scheduled job' %}</h1>
+
+  <form method='POST'>
+    <table>
+      {% block form %}
+        {% csrf_token %}
+        {{ form.media }}
+        {{ form }}
+      {% endblock %}
+
+      <tr>
+        <td></td>
+        <td>
+          <table class='message-warning'>
+          <tr>
+            <td class='symbol'>[!]</td>
+            <td class='body'>
+            {% blocktrans %}
+              <p>While the above widget allows you to specify very complicated recurrence rules, I
+              (as in the developer of this thing) suggest to not do that.</p>
+
+              <p>They <em>practically never</em> mean what you think. Stick to the basics -
+              daily, every other day, weekly etc., avoid exclusions - otherwise it becomes confusing <em>fast</em>.
+              </p>{% endblocktrans %}
+            </td>
+          </tr>
+          </table>
+        </td>
+      </tr>
+
+      <tr>
+        <td></td>
+        <td><input type='submit' value='{% trans 'Save changes' %}'/></td>
+      </tr>
+    </table>
+  </form>
+{% endblock %}

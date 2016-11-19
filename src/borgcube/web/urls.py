@@ -44,7 +44,9 @@ job_urls = [
 ]
 
 schedule_urls = [
+    url(r'^$', core_views.schedule, name='core.schedule'),
     url(r'^add/$', core_views.schedule_add, name='core.schedule_add'),
+    url(r'^(?P<item_id>\d+)/edit/$', core_views.schedule_edit, name='core.schedule_edit'),
 ]
 
 js_info_dict = {
