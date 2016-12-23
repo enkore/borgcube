@@ -167,9 +167,9 @@ class ReverseRepositoryProxy(RepositoryServer):
         return client_data
 
     @doom_on_exception()
-    def get(self, id_):
-        repo_data = self.repository.get(id_)
-        client_data = self._repo_to_client(id_, repo_data)
+    def get(self, id):
+        repo_data = self.repository.get(id)
+        client_data = self._repo_to_client(id, repo_data)
         return client_data
 
     @doom_on_exception()
@@ -178,7 +178,8 @@ class ReverseRepositoryProxy(RepositoryServer):
             yield self._repo_to_client(id, repo_data)
 
     @doom_on_exception()
-    def put(self, id, client_data, wait=True):
+    def put(self, id, data, wait=True):
+        client_data = data
         is_manifest = id == Manifest.MANIFEST_ID
         try:
             if is_manifest:
