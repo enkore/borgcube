@@ -12,27 +12,28 @@
         {% csrf_token %}
         {{ form.media }}
         {{ form }}
+
+        <tr>
+          <td></td>
+          <td>
+            <table class='message-warning'>
+              <tr>
+                <td class='symbol'>[!]</td>
+                <td class='body'>
+                  {% blocktrans %}
+                    <p>While the above widget allows you to specify very complicated recurrence rules,
+                      I (as in the developer of this thing) suggest to not do that.</p>
+
+                    <p>They <em>practically never</em> mean what you think. Stick to the basics - daily,
+                      every other day, weekly etc., avoid exclusions - otherwise it becomes confusing
+                      <em>fast</em>.
+                    </p>{% endblocktrans %}
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
       {% endblock %}
-
-      <tr>
-        <td></td>
-        <td>
-          <table class='message-warning'>
-          <tr>
-            <td class='symbol'>[!]</td>
-            <td class='body'>
-            {% blocktrans %}
-              <p>While the above widget allows you to specify very complicated recurrence rules, I
-              (as in the developer of this thing) suggest to not do that.</p>
-
-              <p>They <em>practically never</em> mean what you think. Stick to the basics -
-              daily, every other day, weekly etc., avoid exclusions - otherwise it becomes confusing <em>fast</em>.
-              </p>{% endblocktrans %}
-            </td>
-          </tr>
-          </table>
-        </td>
-      </tr>
 
       <tr>
         <td></td>
