@@ -83,8 +83,9 @@ def synthesize_client_key(id_key_from, repository):
 
 class SyntheticManifest(Manifest):
     class ManifestRepository:
-        def __init__(self, data=None):
+        def __init__(self, data=None, repository_id=None):
             self.data = data
+            self.id = repository_id
 
         def get(self, id_):
             assert id_ == Manifest.MANIFEST_ID
@@ -94,14 +95,14 @@ class SyntheticManifest(Manifest):
             assert id_ == Manifest.MANIFEST_ID
             self.data = data
 
-    def __init__(self, key, repository=None, item_keys=None):
-        super().__init__(key, repository or self.ManifestRepository(), item_keys)
+    def __init__(self, key, repository_id, item_keys=None):
+        super().__init__(key, self.ManifestRepository(repository_id=repository_id), item_keys)
 
     def write(self):
         super().write()
         return self.repository.data
 
     @classmethod
-    def load(cls, data, key):
-        repository = cls.ManifestRepository(data)
+    def load(cls, data, key, repository_id):
+        repository = cls.ManifestRepository(data, repository_id)
         return super().load(repository, key)[0]

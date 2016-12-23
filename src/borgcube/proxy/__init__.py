@@ -137,7 +137,7 @@ class ReverseRepositoryProxy(RepositoryServer):
             synthetic_type = job_data['client_key_type']
             log.debug('Loading synthesized client key (%s)', synthetic_type)
             self._client_key = synthetic_key_from_data(key_data, synthetic_type, self.repository)
-        self._client_manifest = SyntheticManifest.load(unhexlify(job_data['client_manifest_data']), self._client_key)
+        self._client_manifest = SyntheticManifest.load(unhexlify(job_data['client_manifest_data']), self._client_key, self.repository.id)
         self._first_manifest_read = True
         assert self._client_manifest.id_str == job_data['client_manifest_id_str']
         log.debug('Loaded client key and manifest')
@@ -257,7 +257,7 @@ class ReverseRepositoryProxy(RepositoryServer):
 
     def _manifest_client_to_repo(self, data):
         try:
-            client_manifest = SyntheticManifest.load(data, self._client_key)
+            client_manifest = SyntheticManifest.load(data, self._client_key, self.repository.id)
         except Exception as exc:
             log.error('Error on client manifest load: %s', exc)
             raise

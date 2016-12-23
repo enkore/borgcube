@@ -186,7 +186,7 @@ class BackupJobExecutor(JobExecutor):
                 job.data['client_key_data'] = client_key.get_key_data()
                 job.data['client_key_type'] = client_key.synthetic_type
 
-            client_manifest = SyntheticManifest(client_key)
+            client_manifest = SyntheticManifest(client_key, repository.id)
             job.data['client_manifest_data'] = bin_to_hex(client_manifest.write())
             job.data['client_manifest_id_str'] = client_manifest.id_str
             job.save()
