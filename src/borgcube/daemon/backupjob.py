@@ -59,6 +59,7 @@ def make_backup_job(apiserver, job_config):
     job.save()
     log.info('Created job %s for client %s, job config %d', job.id, job_config.client.hostname, job_config.id)
     apiserver.queue_job(job)
+    return job
 
 
 def run_from_schedule(apiserver, args):
