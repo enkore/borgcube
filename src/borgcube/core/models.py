@@ -400,11 +400,37 @@ class CheckJob(Job):
 
 
 class ScheduleItem(models.Model):
-    py_class = models.CharField(max_length=100)
-    py_args = JSONField()
-
     name = CharField()
     description = models.TextField(blank=True)
 
     recurrence_start = models.DateTimeField(default=timezone.now)
     recurrence = RecurrenceField()
+
+
+class DottedPath:
+    @classmethod
+    def dotted_path(cls):
+        return cls.__module__ + '.' + cls.__qualname__
+
+
+class ScheduledAction(models.Model):
+    class SchedulableAction(DottedPath):
+        name = ''
+
+        def __init__(self, apiserver, **py_args):
+            self.apiserver = apiserver
+
+        def __str__(self):
+            pass
+
+        def execute(self):
+            pass
+
+    py_class = models.CharField(max_length=100)
+    py_args = JSONField()
+
+    order = models.IntegerField()
+    item = models.ForeignKey(ScheduleItem, related_name='actions')
+
+    class Meta:
+        ordering = ['order']

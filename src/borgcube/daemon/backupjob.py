@@ -8,6 +8,7 @@ from pathlib import Path
 from subprocess import CalledProcessError
 
 from django.conf import settings
+from django.utils.translation import ugettext_lazy as _
 
 from borg.helpers import get_cache_dir, bin_to_hex, Manifest, Location
 from borg.cache import Cache
@@ -15,7 +16,7 @@ from borg.key import PlaintextKey
 from borg.repository import Repository
 from borg.locking import LockTimeout, LockFailed, LockError, LockErrorT
 
-from borgcube.core.models import BackupJob, JobConfig
+from borgcube.core.models import BackupJob, JobConfig, ScheduledAction
 from borgcube.keymgt import synthesize_client_key, SyntheticManifest
 from borgcube.utils import open_repository, tee_job_logs
 from django.core.exceptions import ObjectDoesNotExist
@@ -62,19 +63,32 @@ def make_backup_job(apiserver, job_config):
     return job
 
 
-def run_from_schedule(apiserver, args):
-    id = args['job_config']
-    try:
-        job_config = JobConfig.objects.get(id=id)
-    except ObjectDoesNotExist:
-        log.error('run_from_schedule: job config with id %d not found', id)
-        return
-    for job in BackupJob.objects.exclude(state__in=BackupJob.State.STABLE - {BackupJob.State.job_created}):
-        if job.get_jobconfig() == job_config:
-            log.warning('run_from_schedule: not triggering a new job for config %d, since job %d is queued or running',
-                        job_config.id, job.id)
+class ScheduledBackup(ScheduledAction.SchedulableAction):
+    name = _('Schedule backup job')
+    job_config = None
+
+    def __init__(self, apiserver, **kwargs):
+        super().__init__(apiserver, **kwargs)
+        try:
+            self.job_config = JobConfig.objects.get(id=kwargs['job_config'])
+        except ObjectDoesNotExist:
+            log.error('ScheduledBackup: job config with id %d not found', id)
             return
-    make_backup_job(apiserver, job_config)
+
+    def __str__(self):
+        return _('Run {}').format(self.job_config)
+
+    def execute(self):
+        if not self.job_config:
+            log.warning('ScheduledBackup: not running due to previous error.')
+            return
+        for job in BackupJob.objects.exclude(state__in=BackupJob.State.STABLE - {BackupJob.State.job_created}):
+            if job.get_jobconfig() == self.job_config:
+                log.warning(
+                    'run_from_schedule: not triggering a new job for config %d, since job %d is queued or running',
+                    self.job_config.id, job.id)
+                return
+        make_backup_job(self.apiserver, self.job_config)
 
 
 def cpe_means_connection_failure(called_process_error):

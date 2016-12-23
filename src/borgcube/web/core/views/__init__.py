@@ -13,7 +13,7 @@ from ..metrics import Metric
 
 from borgcube.core.models import Client, ClientConnection, Repository, CheckConfig
 from borgcube.core.models import Job, JobConfig
-from borgcube.core.models import ScheduleItem
+from borgcube.core.models import ScheduleItem, ScheduledAction
 from borgcube.daemon.client import APIClient
 
 log = logging.getLogger(__name__)
@@ -352,6 +352,11 @@ def schedule(request):
 def schedule_add(request):
     data = request.POST or None
     form = ScheduleItemForm(data)
+
+    # This generally works since pluggy loads plugin modules for us.
+    classes = ScheduledAction.SchedulableAction.__subclasses__()
+    log.debug('Discovered schedulable actions: %s', ', '.join(cls.dotted_path() for cls in classes))
+
     if data and form.is_valid():
         si = form.save()
         return redirect(schedule)
