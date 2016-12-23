@@ -12,6 +12,7 @@ from django.db import models, transaction
 from django.db.models import QuerySet
 from django.utils.translation import ugettext_lazy as _
 from django.utils import timezone
+from django import forms
 
 from jsonfield.fields import TypedJSONField, JSONField
 
@@ -121,6 +122,12 @@ class JobConfig(models.Model):
     ], default={
         'version': 1,
     })
+
+    def __str__(self):
+        return _('{client}: {label}').format(
+            client=self.client.name,
+            label=self.config['label'],
+        )
 
 
 class ModelEnum(enum.Enum):
@@ -416,6 +423,9 @@ class DottedPath:
 class ScheduledAction(models.Model):
     class SchedulableAction(DottedPath):
         name = ''
+
+        class Form(forms.Form):
+            pass
 
         def __init__(self, apiserver, **py_args):
             self.apiserver = apiserver

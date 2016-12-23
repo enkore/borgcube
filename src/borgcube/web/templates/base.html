@@ -160,6 +160,11 @@
         border-left: 4px solid #679ED2;
       }
 
+      hr {
+        border: none;
+        border-bottom: 4px solid #679ED2;
+      }
+
       .jobs {
         border-collapse: collapse;
         width: 100%;
@@ -198,6 +203,18 @@
 
       .message-warning .body p:last-child {
         margin-bottom: 0;
+      }
+
+      textarea.recurrence-widget {
+        /* this way the "please fill this field" pop-over produced by modern browsers
+         * will be in approximately the correct place.
+         */
+        width: 1px;
+        height: 1px;
+        display: inline !important;
+        visibility: hidden;
+        pointer-events: none;
+        tab-index: -1;
       }
     </style>
     {% block extracss %}

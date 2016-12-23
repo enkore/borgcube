@@ -1,6 +1,8 @@
 import logging
 
 from django import forms
+from django.http import HttpResponse
+from django.http import HttpResponseBadRequest
 from django.shortcuts import redirect, get_object_or_404
 from django.template.response import TemplateResponse
 from django.urls import reverse
@@ -362,6 +364,7 @@ def schedule_add(request):
         return redirect(schedule)
     return TemplateResponse(request, 'core/schedule/add.html', {
         'form': form,
+        'classes': {cls.dotted_path(): cls.name for cls in classes},
     })
 
 
@@ -375,3 +378,15 @@ def schedule_edit(request, item_id):
     return TemplateResponse(request, 'core/schedule/edit.html', {
         'form': form,
     })
+
+
+def scheduled_action_form(request, dotted_path):
+    try:
+        cls = import_string(dotted_path)
+    except ImportError:
+        log.error('scheduled_action_form: failed to import %r', dotted_path)
+        return HttpResponseBadRequest()
+    if not issubclass(cls, ScheduledAction.SchedulableAction):
+        log.error('scheduled_action_form request for %r which is not a schedulable action', dotted_path)
+        return HttpResponseBadRequest()
+    return HttpResponse(cls.Form().as_table())

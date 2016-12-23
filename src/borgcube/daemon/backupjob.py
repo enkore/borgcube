@@ -9,6 +9,7 @@ from subprocess import CalledProcessError
 
 from django.conf import settings
 from django.utils.translation import ugettext_lazy as _
+from django import forms
 
 from borg.helpers import get_cache_dir, bin_to_hex, Manifest, Location
 from borg.cache import Cache
@@ -89,6 +90,10 @@ class ScheduledBackup(ScheduledAction.SchedulableAction):
                     self.job_config.id, job.id)
                 return
         make_backup_job(self.apiserver, self.job_config)
+
+    class Form(forms.Form):
+        # TODO: (js-space); drill down, first select client, then config?
+        job_config = forms.ModelChoiceField(JobConfig.objects.all())
 
 
 def cpe_means_connection_failure(called_process_error):

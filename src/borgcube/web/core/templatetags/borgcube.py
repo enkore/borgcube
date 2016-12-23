@@ -1,7 +1,11 @@
 
+from json import dumps
+
 from django import template
 from django.urls import reverse
+from django.utils.safestring import mark_safe
 from django.utils.translation import ugettext_lazy as _
+from django.core.serializers.json import DjangoJSONEncoder
 
 from borg.helpers import format_file_size
 
@@ -122,3 +126,9 @@ def get(obj, attr):
         return obj.get(attr)
     except AttributeError:
         return getattr(obj, attr)
+
+
+@register.filter
+def json(obj):
+    """Return safe JSON serialization of *obj*."""
+    return mark_safe(dumps(obj, cls=DjangoJSONEncoder))
