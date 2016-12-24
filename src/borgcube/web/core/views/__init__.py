@@ -1,6 +1,8 @@
 import logging
+import json
 
 from django import forms
+from django.db import transaction
 from django.http import HttpResponse
 from django.http import HttpResponseBadRequest
 from django.shortcuts import redirect, get_object_or_404
@@ -353,15 +355,57 @@ def schedule(request):
 
 def schedule_add(request):
     data = request.POST or None
+    print(data)
     form = ScheduleItemForm(data)
 
     # This generally works since pluggy loads plugin modules for us.
     classes = ScheduledAction.SchedulableAction.__subclasses__()
     log.debug('Discovered schedulable actions: %s', ', '.join(cls.dotted_path() for cls in classes))
 
-    if data and form.is_valid():
-        si = form.save()
-        return redirect(schedule)
+    class AbortTransaction(Exception):
+        pass
+
+    if data:
+        actions_data = json.loads(data['actions-data'])
+
+        all_valid = form.is_valid()
+
+        try:
+            action_forms = []
+
+            with transaction.atomic():
+                # A bit of transaction-control-flow magic to ensure that this also works if
+                # any of the SchedulableAction.Forms modify the DB in the background for whatever reason.
+                if all_valid:
+                    schedule_item = form.save()
+
+                for serialized_action in actions_data:
+                    dotted_path = serialized_action.pop('class')
+                    if not any(cls.dotted_path() == dotted_path for cls in classes):
+                        log.error('invalid/unknown schedulable action %r, ignoring', dotted_path)
+                        continue
+                    action_form = import_string(dotted_path).Form(serialized_action)
+                    valid = action_form.is_valid()
+                    all_valid &= valid
+                    if all_valid:
+                        if hasattr(action_form, 'save'):
+                            action_form.save()
+                        scheduled_action = ScheduledAction(
+                            py_class=dotted_path,
+                            py_args=action_form.cleaned_data,
+                            order=len(action_forms),
+                            item=schedule_item,
+                        )
+                        scheduled_action.save()
+
+                    action_forms.append(action_form)
+
+                if not all_valid:
+                    raise AbortTransaction
+
+                return redirect(schedule)
+        except AbortTransaction:
+            pass
     return TemplateResponse(request, 'core/schedule/add.html', {
         'form': form,
         'classes': {cls.dotted_path(): cls.name for cls in classes},

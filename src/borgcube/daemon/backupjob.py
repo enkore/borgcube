@@ -95,6 +95,9 @@ class ScheduledBackup(ScheduledAction.SchedulableAction):
         # TODO: (js-space); drill down, first select client, then config?
         job_config = forms.ModelChoiceField(JobConfig.objects.all())
 
+        def save(self):
+            self.cleaned_data['job_config'] = self.cleaned_data['job_config'].pk
+
 
 def cpe_means_connection_failure(called_process_error):
     command = called_process_error.cmd[0]

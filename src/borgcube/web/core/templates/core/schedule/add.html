@@ -213,6 +213,7 @@
               });
 
               header_row.className += ' ' + action_cls;
+              header_row.dataset.class = selected_action.value;
               before_actions = insert_element_after(before_actions, header_row);
 
               var dom_elements = html_to_dom(xhr.responseText);
@@ -244,6 +245,8 @@
             for (var j = 0; j < rows.length; j++) {
               form_part_props(action_data, rows[j]);
             }
+
+            action_data['class'] = rows[0].dataset.class;
 
             console.log(action_data);
             data.push(action_data);
