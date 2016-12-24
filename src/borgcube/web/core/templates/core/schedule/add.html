@@ -67,7 +67,7 @@
 
       <tr>
         <td></td>
-        <td><input type='submit' id='submit-button' onsubmit='event.preventDefault();' value='{% trans 'Add scheduled job' %}'/></td>
+        <td><input type='submit' id='submit-button' value='{% trans 'Add scheduled job' %}'/></td>
       </tr>
     </table>
 
@@ -229,7 +229,9 @@
           xhr.send();
         });
 
-        document.getElementById('submit-button').addEventListener('submit', function () {
+        document.getElementById('form').addEventListener('submit', function (event) {
+          event.preventDefault();
+
           var data = [];
           for (var i = 0; i < actions_index; i++) {
             var rows = document.getElementsByClassName('action-' + i);
