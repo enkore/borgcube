@@ -411,7 +411,12 @@ class ScheduleItem(models.Model):
     name = CharField()
     description = models.TextField(blank=True)
 
-    recurrence_start = models.DateTimeField(default=timezone.now)
+    recurrence_start = models.DateTimeField(
+        default=timezone.now,
+        help_text=_('The recurrence defined below is applied from this date and time onwards.<br/>'
+                    'Eg. for daily recurrence the actions would be scheduled for the time set here.<br/>'
+                    'The set time zone is %s.') % settings.TIME_ZONE
+    )
     recurrence = RecurrenceField()
 
 
