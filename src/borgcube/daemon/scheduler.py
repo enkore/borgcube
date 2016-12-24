@@ -6,7 +6,7 @@ from functools import partial
 from django.utils.module_loading import import_string
 from django.utils.timezone import now
 
-from borgcube.core.models import ScheduleItem
+from borgcube.core.models import ScheduleItem, ScheduledAction
 
 log = logging.getLogger('borgcubed.scheduler')
 
@@ -32,11 +32,15 @@ def borgcubed_idle(apiserver):
             execute(apiserver, si)
 
 
-def execute(apiserver, schedule_item):
-    log.debug('Executing si %s', schedule_item)
-    callable = import_string(schedule_item.py_class)
-    callable(apiserver, schedule_item.py_args)
-
+def execute(apiserver, schedule):
+    log.debug('Executing schedule %s', schedule)
+    for action in schedule.actions.all():
+        if not any(cls.dotted_path() == action.py_class for cls in ScheduledAction.SchedulableAction.__subclasses__()):
+            log.error('schedule %s, action %s: unknown/invalid scheduled action %r, skipping', schedule, action.pk, action.py_class)
+            continue
+        log.debug('Importing action %r', action.py_class)
+        executable_action = import_string(action.py_class)(apiserver, **action.py_args)
+        executable_action.execute()
 
 
 def seconds_until_next_occurence():
