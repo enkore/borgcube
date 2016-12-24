@@ -61,7 +61,19 @@
 
       <!-- TODO support reordering -->
 
-      <tr>
+      {% for action_form in action_forms %}
+        <tr class='action-header' data-action='{{ forloop.counter0 }}'>
+          <td></td>
+          <td>
+            <h3>{{ action_form.name }}
+              <small>(<a href='javascript:' class='remove-action'>{% trans "remove" %}</a>)</small></h3>
+          </td>
+        </tr>
+
+        {{ action_form }}
+      {% endfor %}
+
+      <tr id='actions-end'>
         <td colspan='2'><hr></td>
       </tr>
 
@@ -172,6 +184,70 @@
         }
       }
 
+      function remove_action () {
+        var rows = document.getElementsByClassName(action_cls);
+        var parent = rows[0].parentNode;
+        /* reverse iteration since *rows* is a live HTMLCollection */
+        for (var i = rows.length - 1; i >= 0; i--) {
+          /* don't forget to back *before_actions* up correctly */
+          if (rows[i] === before_actions) {
+            before_actions = rows[i].previousSibling;
+          }
+          parent.removeChild(rows[i]);
+        }
+      }
+
+      window.addEventListener('load', function () {
+        /* add event listener and row attrs for prerendered rows
+         * mainly because I'm lazy and don't want to modify the form rendering
+         * (though you can do that as well).
+         */
+        var elements = document.getElementsByClassName('action-header');
+        var actions_end = document.getElementById('actions-end');
+
+        function recurse(action, element) {
+          if (element == null) {
+            return;
+          }
+
+          if (typeof(element) !== HTMLElement) {
+            recurse(action, element.nextSibling);
+            return;
+          }
+
+          console.log(element);
+
+          console.log(!('action' in element.dataset));
+          console.log(element != actions_end);
+          console.log(!element.classList.contains('action-header'));
+
+          if (!('action' in element.dataset)
+                  && element != actions_end
+                  && !element.classList.contains('action-header')) {
+            //element.dataset.action = action;
+            element.setAttribute('data-action', action);
+            recurse(action, element.nextSibling);
+            console.log('set!');
+          }
+        }
+
+        var element = document.getElementById('before-actions');
+        while (true) {
+          var next = element.nextSibling;
+          if (next == null || next === actions_end) {
+            break;
+          }
+          if (typeof(next) !== HTMLElement) {
+            continue;
+          }
+          console.log(next);
+          if (next.classList.contains('action-header')) {
+            console.log('init recursion', next);
+            recurse(action, next.nextSibling);
+          }
+        }
+      });
+
       window.addEventListener('load', function () {
         var action_selector = document.getElementById('action-selector');
         var add_action = document.getElementById('add-action');
@@ -189,9 +265,6 @@
 
           xhr.addEventListener('readystatechange', function () {
             if (xhr.readyState == 4) {
-              /* this is the class form rows of this action get */
-              var action_cls = 'action-' + actions_index;
-
               var header_row = node_storage.getElementsByClassName('action-header')[0].cloneNode(true);
 
               /* Modify header row with data + scripting */
@@ -199,27 +272,16 @@
               var save_html = heading.innerHTML;
               heading.textContent = escape_html(selected_action.text);
               heading.innerHTML += save_html;
-              heading.getElementsByClassName('remove-action')[0].addEventListener('click', function () {
-                var rows = document.getElementsByClassName(action_cls);
-                var parent = rows[0].parentNode;
-                /* reverse iteration since *rows* is a live HTMLCollection */
-                for (var i = rows.length - 1; i >= 0; i--) {
-                  /* don't forget to back *before_actions* up correctly */
-                  if (rows[i] === before_actions) {
-                    before_actions = rows[i].previousSibling;
-                  }
-                  parent.removeChild(rows[i]);
-                }
-              });
+              heading.getElementsByClassName('remove-action')[0].addEventListener('click', remove_action);
 
-              header_row.className += ' ' + action_cls;
+              header_row.dataset.action = actions_index;
               header_row.dataset.class = selected_action.value;
               before_actions = insert_element_after(before_actions, header_row);
 
               var dom_elements = html_to_dom(xhr.responseText);
               for (var i = 0; i < dom_elements.length; i++) {
                 var dom_element = dom_elements[i];
-                dom_element.className += ' ' + action_cls;
+                dom_element.dataset.action = actions_index;
               }
               before_actions = insert_elements_after(before_actions, dom_elements);
 
@@ -235,7 +297,7 @@
 
           var data = [];
           for (var i = 0; i < actions_index; i++) {
-            var rows = document.getElementsByClassName('action-' + i);
+            var rwos = document.querySelectorAll("[data-action='" + i + "']");
             var action_data = {};
 
             if (!rows.length) {
@@ -257,7 +319,7 @@
 
           document.getElementById('actions-data').value = JSON.stringify(data);
 
-          document.getElementById('form').submit();
+          // document.getElementById('form').submit();
         });
       });
     </script>

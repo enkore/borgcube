@@ -357,22 +357,22 @@ def schedule_add(request):
     data = request.POST or None
     print(data)
     form = ScheduleItemForm(data)
+    form.as_table()
+    action_forms = []
 
     # This generally works since pluggy loads plugin modules for us.
     classes = ScheduledAction.SchedulableAction.__subclasses__()
     log.debug('Discovered schedulable actions: %s', ', '.join(cls.dotted_path() for cls in classes))
-
-    class AbortTransaction(Exception):
-        pass
 
     if data:
         actions_data = json.loads(data['actions-data'])
 
         all_valid = form.is_valid()
 
-        try:
-            action_forms = []
+        class AbortTransaction(Exception):
+            pass
 
+        try:
             with transaction.atomic():
                 # A bit of transaction-control-flow magic to ensure that this also works if
                 # any of the SchedulableAction.Forms modify the DB in the background for whatever reason.
@@ -384,7 +384,11 @@ def schedule_add(request):
                     if not any(cls.dotted_path() == dotted_path for cls in classes):
                         log.error('invalid/unknown schedulable action %r, ignoring', dotted_path)
                         continue
-                    action_form = import_string(dotted_path).Form(serialized_action)
+                    action = import_string(dotted_path)
+
+                    action_form = action.Form(serialized_action)
+                    action_form.name = action.name
+
                     valid = action_form.is_valid()
                     all_valid &= valid
                     if all_valid:
@@ -409,6 +413,7 @@ def schedule_add(request):
     return TemplateResponse(request, 'core/schedule/add.html', {
         'form': form,
         'classes': {cls.dotted_path(): cls.name for cls in classes},
+        'action_forms': action_forms,
     })
 
 
