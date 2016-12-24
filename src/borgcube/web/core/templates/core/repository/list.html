@@ -5,7 +5,8 @@
 {% block title %}{% trans 'Repositories' %}{% endblock %}
 
 {% block content %}
-  <h1>{% trans 'Repositories' %}</h1>
+  <h1>{% trans 'Repositories' %}
+    <small>(<a href='{% url 'core.repository_add' %}'>{% trans 'add' %}</a>)</small></h1>
 
   <table class='repositories jobs' cellpadding='3px'>
     <tr>

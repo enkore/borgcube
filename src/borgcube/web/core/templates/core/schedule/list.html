@@ -5,7 +5,12 @@
 {% block title %}{% trans 'Schedules' %}{% endblock %}
 
 {% block content %}
-  <h1>{% trans 'Schedules' %} <small>(<a href='{% url 'core.schedule' %}'>{% trans 'calendar' %}</a>)</small></h1>
+  <h1>{% trans 'Schedules' %}
+    <small>
+      (<a href='{% url 'core.schedule' %}'>{% trans 'calendar' %}</a>)
+      (<a href='{% url 'core.schedule_add' %}'>{% trans 'add' %}</a>)
+    </small>
+  </h1>
 
   <table class='schedules' cellpadding='3px'>
     <tr>
