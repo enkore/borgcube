@@ -25,6 +25,9 @@
         {% include 'core/post_link.html' with url=url label=label confirm=confirm %}
       </td>
     </tr>
+    <tr>
+      <td colspan='2'><div style='padding-left: 1em;'>{{ schedule.description|linebreaksbr }}</div></td>
+    </tr>
     {% endfor %}
   </table>
 {% endblock %}
