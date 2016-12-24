@@ -446,6 +446,13 @@ class ScheduledAction(models.Model):
             .save() will be called with no arguments regardless of type, if it exists.
             """
 
+        @classmethod
+        def form(cls, *args, **kwargs):
+            form = cls.Form(*args, **kwargs)
+            form.name = cls.name
+            form.dotted_path = cls.dotted_path()
+            return form
+
         def __init__(self, apiserver, **py_args):
             self.apiserver = apiserver
 

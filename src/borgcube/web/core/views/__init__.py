@@ -368,9 +368,7 @@ def schedule_add_and_edit(request, data, item=None, context=None):
             log.error('args were: %r', scheduled_action.py_args)
             continue
         action = import_string(scheduled_action.py_class)
-        action_form = action.Form(initial=scheduled_action.py_args)
-        action_form.name = action.name
-        action_form.dotted_path = scheduled_action.py_class
+        action_form = action.form(initial=scheduled_action.py_args)
         action_forms.append(action_form)
 
     if data:
@@ -397,9 +395,7 @@ def schedule_add_and_edit(request, data, item=None, context=None):
                         continue
                     action = import_string(dotted_path)
 
-                    action_form = action.Form(serialized_action)
-                    action_form.name = action.name
-                    action_form.dotted_path = dotted_path
+                    action_form = action.form(serialized_action)
 
                     valid = action_form.is_valid()
                     all_valid &= valid
