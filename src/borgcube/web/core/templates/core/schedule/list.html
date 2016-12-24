@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% load borgcube %}
+
+{% block title %}{% trans 'Schedules' %}{% endblock %}
+
+{% block content %}
+  <h1>{% trans 'Schedules' %}</h1>
+
+  <table class='schedules' cellpadding='3px'>
+    <tr>
+      <th>{{ m|field_name:'name' }}</th>
+      <th></th>
+    </tr>
+    {% for schedule in schedules %}
+    <tr>
+      <td>{{ schedule.name }}</td>
+
+      <!-- TODO last execution overall outcome -->
+      <td><a href='{% url 'core.schedule_edit' schedule.pk %}'>edit</a></td>
+    </tr>
+    {% endfor %}
+  </table>
+{% endblock %}

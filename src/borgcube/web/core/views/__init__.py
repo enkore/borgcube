@@ -456,3 +456,10 @@ def scheduled_action_form(request):
         log.error('scheduled_action_form: failed to import %r', dotted_path)
         return HttpResponseBadRequest()
     return HttpResponse(cls.Form().as_table())
+
+
+def schedule_list(request):
+    return TemplateResponse(request, 'core/schedule/list.html', {
+        'm': ScheduleItem,
+        'schedules': ScheduleItem.objects.all(),
+    })
