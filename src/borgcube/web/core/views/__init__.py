@@ -438,11 +438,17 @@ def schedule_add(request):
 def schedule_edit(request, item_id):
     item = get_object_or_404(ScheduleItem, id=item_id)
     data = request.POST or None
-
     return schedule_add_and_edit(request, data, item, context={
         'title': _('Edit schedule {}').format(item.name),
         'submit': _('Save changes'),
+        'schedule': item,
     })
+
+
+def schedule_delete(request, schedule_id):
+    item = get_object_or_404(ScheduleItem, id=schedule_id)
+    item.delete()
+    return redirect(schedule)
 
 
 def scheduled_action_form(request):

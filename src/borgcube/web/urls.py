@@ -49,6 +49,7 @@ schedule_urls = [
     url(r'^add/$', core_views.schedule_add, name='core.schedule_add'),
     url(r'^action-form/$', core_views.scheduled_action_form, name='core.scheduled_action_form'),
     url(r'^(?P<item_id>\d+)/edit/$', core_views.schedule_edit, name='core.schedule_edit'),
+    url(r'^(?P<schedule_id>\d+)/delete/$', core_views.schedule_delete, name='core.schedule_delete'),
 ]
 
 js_info_dict = {

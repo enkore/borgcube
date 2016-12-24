@@ -17,7 +17,12 @@
       <td>{{ schedule.name }}</td>
 
       <!-- TODO last execution overall outcome -->
-      <td><a href='{% url 'core.schedule_edit' schedule.pk %}'>edit</a></td>
+      <td>
+        <a href='{% url 'core.schedule_edit' schedule.pk %}'>edit</a>
+        {% url 'core.schedule_delete' schedule.pk as url %}
+        {% trans 'delete' as label %}
+        {% include 'core/post_link.html' with url=url label=label %}
+      </td>
     </tr>
     {% endfor %}
   </table>

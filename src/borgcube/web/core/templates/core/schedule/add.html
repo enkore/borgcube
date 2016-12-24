@@ -5,7 +5,11 @@
 {% block title %}{{ title }}{% endblock %}
 
 {% block content %}
-  <h1>{{ title }}</h1>
+  <h1>{{ title }} {% if schedule %}
+    {% url 'core.schedule_delete' schedule.pk as url %}
+    {% trans 'delete' as label %}
+    <small>({% include 'core/post_link.html' with url=url label=label %})</small>
+  {% endif %}</h1>
 
   <form method='POST' id='form'>
     <table>
