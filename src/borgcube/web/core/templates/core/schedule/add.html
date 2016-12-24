@@ -61,18 +61,6 @@
 
       <!-- TODO support reordering -->
 
-      {% for action_form in action_forms %}
-        <tr class='action-header' data-action='{{ forloop.counter0 }}'>
-          <td></td>
-          <td>
-            <h3>{{ action_form.name }}
-              <small>(<a href='javascript:' class='remove-action'>{% trans "remove" %}</a>)</small></h3>
-          </td>
-        </tr>
-
-        {{ action_form }}
-      {% endfor %}
-
       <tr id='actions-end'>
         <td colspan='2'><hr></td>
       </tr>
@@ -100,6 +88,21 @@
           </td>
         </tr>
       </table>
+
+
+      {% for action_form in action_forms %}
+      <table class='action-pre-rows' data-action='{{ forloop.counter0 }}'>
+        <tr class='action-header' data-class='{{ action_form.dotted_path }}'>
+          <td></td>
+          <td>
+            <h3>{{ action_form.name }}
+              <small>(<a href='javascript:' class='remove-action'>{% trans "remove" %}</a>)</small></h3>
+          </td>
+        </tr>
+
+        {{ action_form }}
+      </table>
+      {% endfor %}
     </div>
 
     <script type='application/javascript'>
@@ -107,19 +110,6 @@
         var template = document.createElement('template');
         template.innerHTML = html;
         return template.content.childNodes;
-      }
-
-      function insert_element_after(after, to_insert) {
-        return after.parentNode.insertBefore(to_insert, after.nextSibling);
-      }
-
-      function insert_elements_after(after, to_insert) {
-        var last = null;
-        for (var i = 0; i < to_insert.length; i++) {
-          var dom_element = to_insert[i];
-          last = insert_element_after(after, dom_element);
-        }
-        return last;
       }
 
       function escape_html(str) {
@@ -202,59 +192,32 @@
          * mainly because I'm lazy and don't want to modify the form rendering
          * (though you can do that as well).
          */
-        var elements = document.getElementsByClassName('action-header');
-        var actions_end = document.getElementById('actions-end');
+        var prerendered_actions = document.getElementsByClassName('action-pre-rows');
+        var end = document.getElementById('actions-end');
 
-        function recurse(action, element) {
-          if (element == null) {
-            return;
+        for (var i = prerendered_actions.length - 1; i >= 0; i--) {
+          var prerendered_action = prerendered_actions[i];
+          var rows = prerendered_action.getElementsByTagName('tr');
+          var action = prerendered_action.dataset.action;
+          while (rows.length) {
+            var row = rows[0];
+            if (row instanceof HTMLElement) {
+              row.setAttribute('data-action', action);
+              console.log('set');
+            }
+            end.parentNode.insertBefore(row, end);
           }
-
-          if (typeof(element) !== HTMLElement) {
-            recurse(action, element.nextSibling);
-            return;
-          }
-
-          console.log(element);
-
-          console.log(!('action' in element.dataset));
-          console.log(element != actions_end);
-          console.log(!element.classList.contains('action-header'));
-
-          if (!('action' in element.dataset)
-                  && element != actions_end
-                  && !element.classList.contains('action-header')) {
-            //element.dataset.action = action;
-            element.setAttribute('data-action', action);
-            recurse(action, element.nextSibling);
-            console.log('set!');
-          }
-        }
-
-        var element = document.getElementById('before-actions');
-        while (true) {
-          var next = element.nextSibling;
-          if (next == null || next === actions_end) {
-            break;
-          }
-          if (typeof(next) !== HTMLElement) {
-            continue;
-          }
-          console.log(next);
-          if (next.classList.contains('action-header')) {
-            console.log('init recursion', next);
-            recurse(action, next.nextSibling);
-          }
+          prerendered_action.parentNode.removeChild(prerendered_action);
         }
       });
 
       window.addEventListener('load', function () {
         var action_selector = document.getElementById('action-selector');
         var add_action = document.getElementById('add-action');
-        /* the element before the next action */
-        var before_actions = document.getElementById('before-actions');
 
-        var actions_index = 0; /* adjust if pre-gen actions are present */
+        var end = document.getElementById('actions-end');
+
+        var actions_index = {{ action_forms|length }}; /* adjust if pre-gen actions are present */
 
         var node_storage = document.getElementById('node-storage');
 
@@ -276,14 +239,14 @@
 
               header_row.dataset.action = actions_index;
               header_row.dataset.class = selected_action.value;
-              before_actions = insert_element_after(before_actions, header_row);
+              end.parentNode.insertBefore(header_row, end);
 
               var dom_elements = html_to_dom(xhr.responseText);
               for (var i = 0; i < dom_elements.length; i++) {
                 var dom_element = dom_elements[i];
                 dom_element.dataset.action = actions_index;
+                end.parentNode.insertBefore(dom_element, end);
               }
-              before_actions = insert_elements_after(before_actions, dom_elements);
 
               actions_index++;
             }
@@ -297,7 +260,7 @@
 
           var data = [];
           for (var i = 0; i < actions_index; i++) {
-            var rwos = document.querySelectorAll("[data-action='" + i + "']");
+            var rows = document.querySelectorAll("[data-action='" + i + "']");
             var action_data = {};
 
             if (!rows.length) {
@@ -310,16 +273,12 @@
 
             action_data['class'] = rows[0].dataset.class;
 
-            console.log(action_data);
             data.push(action_data);
           }
 
-          console.log(data);
-          console.log(JSON.stringify(data));
-
           document.getElementById('actions-data').value = JSON.stringify(data);
 
-          // document.getElementById('form').submit();
+          document.getElementById('form').submit();
         });
       });
     </script>

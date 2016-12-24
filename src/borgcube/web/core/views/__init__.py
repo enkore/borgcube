@@ -388,6 +388,7 @@ def schedule_add(request):
 
                     action_form = action.Form(serialized_action)
                     action_form.name = action.name
+                    action_form.dotted_path = dotted_path
 
                     valid = action_form.is_valid()
                     all_valid &= valid
