@@ -381,12 +381,12 @@ def schedule_edit(request, item_id):
 
 
 def scheduled_action_form(request, dotted_path):
+    if not any(cls.dotted_path() == dotted_path for cls in ScheduledAction.SchedulableAction.__subclasses__()):
+        log.error('scheduled_action_form request for %r which is not a schedulable action', dotted_path)
+        return HttpResponseBadRequest()
     try:
         cls = import_string(dotted_path)
     except ImportError:
         log.error('scheduled_action_form: failed to import %r', dotted_path)
-        return HttpResponseBadRequest()
-    if not issubclass(cls, ScheduledAction.SchedulableAction):
-        log.error('scheduled_action_form request for %r which is not a schedulable action', dotted_path)
         return HttpResponseBadRequest()
     return HttpResponse(cls.Form().as_table())
