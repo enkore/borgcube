@@ -353,16 +353,25 @@ def schedule(request):
     })
 
 
-def schedule_add(request):
-    data = request.POST or None
-    print(data)
-    form = ScheduleItemForm(data)
-    form.as_table()
+def schedule_add_and_edit(request, data, item=None, context=None):
+    form = ScheduleItemForm(data, instance=item)
     action_forms = []
 
     # This generally works since pluggy loads plugin modules for us.
     classes = ScheduledAction.SchedulableAction.__subclasses__()
     log.debug('Discovered schedulable actions: %s', ', '.join(cls.dotted_path() for cls in classes))
+
+    for scheduled_action in ScheduledAction.objects.filter(item=item):
+        if not any(cls.dotted_path() == scheduled_action.py_class for cls in classes):
+            # If saved, this object will be gone.
+            log.error('cannot edit invalid/unknown schedulable action %r, ignoring', scheduled_action.py_class)
+            log.error('args were: %r', scheduled_action.py_args)
+            continue
+        action = import_string(scheduled_action.py_class)
+        action_form = action.Form(initial=scheduled_action.py_args)
+        action_form.name = action.name
+        action_form.dotted_path = scheduled_action.py_class
+        action_forms.append(action_form)
 
     if data:
         actions_data = json.loads(data['actions-data'])
@@ -377,7 +386,9 @@ def schedule_add(request):
                 # A bit of transaction-control-flow magic to ensure that this also works if
                 # any of the SchedulableAction.Forms modify the DB in the background for whatever reason.
                 if all_valid:
-                    schedule_item = form.save()
+                    if item:
+                        ScheduledAction.objects.filter(item=item).delete()
+                    item = form.save()
 
                 for serialized_action in actions_data:
                     dotted_path = serialized_action.pop('class')
@@ -399,7 +410,7 @@ def schedule_add(request):
                             py_class=dotted_path,
                             py_args=action_form.cleaned_data,
                             order=len(action_forms),
-                            item=schedule_item,
+                            item=item,
                         )
                         scheduled_action.save()
 
@@ -411,26 +422,35 @@ def schedule_add(request):
                 return redirect(schedule)
         except AbortTransaction:
             pass
-    return TemplateResponse(request, 'core/schedule/add.html', {
+    context = dict(context or {})
+    context.update({
         'form': form,
         'classes': {cls.dotted_path(): cls.name for cls in classes},
         'action_forms': action_forms,
+    })
+    return TemplateResponse(request, 'core/schedule/add.html', context)
+
+
+def schedule_add(request):
+    data = request.POST or None
+    return schedule_add_and_edit(request, data, context={
+        'title': _('Add schedule'),
+        'submit': _('Add schedule'),
     })
 
 
 def schedule_edit(request, item_id):
     item = get_object_or_404(ScheduleItem, id=item_id)
     data = request.POST or None
-    form = ScheduleItemForm(data, instance=item)
-    if data and form.is_valid():
-        si = form.save()
-        return redirect(schedule)
-    return TemplateResponse(request, 'core/schedule/edit.html', {
-        'form': form,
+
+    return schedule_add_and_edit(request, data, item, context={
+        'title': _('Edit schedule {}').format(item.name),
+        'submit': _('Save changes'),
     })
 
 
-def scheduled_action_form(request, dotted_path):
+def scheduled_action_form(request):
+    dotted_path = request.GET.get('class')
     if not any(cls.dotted_path() == dotted_path for cls in ScheduledAction.SchedulableAction.__subclasses__()):
         log.error('scheduled_action_form request for %r which is not a schedulable action', dotted_path)
         return HttpResponseBadRequest()

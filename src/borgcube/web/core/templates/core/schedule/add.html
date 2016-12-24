@@ -2,10 +2,10 @@
 {% load i18n %}
 {% load borgcube %}
 
-{% block title %}{% trans 'Add scheduled job' %}{% endblock %}
+{% block title %}{{ title }}{% endblock %}
 
 {% block content %}
-  <h1>{% trans 'Add scheduled job' %}</h1>
+  <h1>{{ title }}</h1>
 
   <form method='POST' id='form'>
     <table>
@@ -67,7 +67,7 @@
 
       <tr>
         <td></td>
-        <td><input type='submit' id='submit-button' value='{% trans 'Add scheduled job' %}'/></td>
+        <td><input type='submit' id='submit-button' value='{{ submit }}'/></td>
       </tr>
     </table>
 
@@ -251,7 +251,8 @@
               actions_index++;
             }
           });
-          xhr.open('GET', 'action-form/' + selected_action.value + '/', true);
+          /* TODO escape selected_action.value and/or %url%? */
+          xhr.open('GET', '{% url 'core.scheduled_action_form' %}' + '?class=' + selected_action.value, true);
           xhr.send();
         });
 
