@@ -422,10 +422,29 @@ class DottedPath:
 
 class ScheduledAction(models.Model):
     class SchedulableAction(DottedPath):
+        """
+        Logic companion to ScheduledAction.
+
+        Implement this to add schedulable actions to the scheduler.
+
+        Make sure that your implementation is imported, since these are implicitly
+        discovered subclasses.
+        """
         name = ''
 
         class Form(forms.Form):
-            pass
+            """
+            The form that should be presented for adding/modifying this action.
+
+            This can be a ModelForm or modify the DB; the transaction is managed for you,
+            and no additional transaction management should be needed.
+
+            The usual form rules apply, however, note that .cleaned_data must be JSON
+            serializable if .is_valid() returns true. This data will be used for instanciating
+            the action class (*py_args*).
+
+            .save() will be called with no arguments regardless of type, if it exists.
+            """
 
         def __init__(self, apiserver, **py_args):
             self.apiserver = apiserver
