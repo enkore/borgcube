@@ -21,7 +21,8 @@
         <a href='{% url 'core.schedule_edit' schedule.pk %}'>edit</a>
         {% url 'core.schedule_delete' schedule.pk as url %}
         {% trans 'delete' as label %}
-        {% include 'core/post_link.html' with url=url label=label %}
+        {% trans 'Are you sure you want to delete this schedule?' as confirm %}
+        {% include 'core/post_link.html' with url=url label=label confirm=confirm %}
       </td>
     </tr>
     {% endfor %}
