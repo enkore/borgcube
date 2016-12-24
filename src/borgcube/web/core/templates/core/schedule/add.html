@@ -215,6 +215,11 @@
         }
       });
 
+      /* note that this is not racy, because event listeners are called in registration order,
+       * hence the below listener can't attach itself to the add-action button until the
+       * prerendered rows were handled above.
+       */
+
       window.addEventListener('load', function () {
         var action_selector = document.getElementById('action-selector');
         var add_action = document.getElementById('add-action');
