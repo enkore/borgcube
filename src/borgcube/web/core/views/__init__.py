@@ -2,6 +2,7 @@ import logging
 import json
 
 from django import forms
+from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.db import transaction
 from django.http import HttpResponse
 from django.http import HttpResponseBadRequest
@@ -73,10 +74,26 @@ def clients(request):
     })
 
 
+def paginate(request, things, num_per_page=40, prefix=''):
+    if prefix:
+        prefix += '_'
+    paginator = Paginator(things, num_per_page)
+    page = request.GET.get(prefix + 'page')
+    try:
+        return paginator.page(page)
+    except PageNotAnInteger:
+        return paginator.page(1)
+    except EmptyPage:
+        return paginator.page(paginator.num_pages)
+
+
 def client_view(request, client_id):
     client = get_object_or_404(Client, pk=client_id)
+    jobs = paginate(request, client.jobs.all(), prefix='jobs')
+
     return TemplateResponse(request, 'core/client/view.html', {
         'client': client,
+        'jobs': jobs,
     })
 
 

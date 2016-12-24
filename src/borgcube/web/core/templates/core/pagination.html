@@ -1,0 +1,35 @@
+{% comment %}
+Expected variables:
+- page: Django Paginator page
+
+Options:
+- prefix: prefix of paginator (trailing underscore will be added). Links to pages
+  will reference the prefix in the hash for correct alignment of the loaded page.
+{% endcomment %}
+
+{% load i18n %}
+<div class='pagination'>
+    <span class='step-links'>
+        {% if page.has_previous %}
+          {% if prefix %}
+            <a href='?{{ prefix }}_page={{ page.previous_page_number }}#{{ prefix }}'>{% trans 'Previous page' %}</a>
+          {% else %}
+            <a href='?page={{ page.previous_page_number }}'>{% trans 'Previous page' %}</a>
+          {% endif %}
+        {% endif %}
+
+        <span class='current'>
+            {% blocktrans with current=page.number total=page.paginator.num_pages %}
+              Page {{ current }} of {{ total }}
+            {% endblocktrans %}
+        </span>
+
+        {% if jobs.has_next %}
+          {% if prefix %}
+            <a href='?{{ prefix }}_page={{ page.next_page_number }}#{{ prefix }}'>{% trans 'Next page' %}</a>
+          {% else %}
+            <a href='?page={{ page.next_page_number }}'>{% trans 'Next page' %}</a>
+          {% endif %}
+        {% endif %}
+    </span>
+</div>
