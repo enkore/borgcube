@@ -362,7 +362,8 @@ def schedule_add_and_edit(request, data, item=None, context=None):
     log.debug('Discovered schedulable actions: %s', ', '.join(cls.dotted_path() for cls in classes))
 
     for scheduled_action in ScheduledAction.objects.filter(item=item):
-        if not any(cls.dotted_path() == scheduled_action.py_class for cls in classes):
+        action = scheduled_action.get_class()
+        if not action:
             # If saved, this object will be gone.
             log.error('cannot edit invalid/unknown schedulable action %r, ignoring', scheduled_action.py_class)
             log.error('args were: %r', scheduled_action.py_args)
@@ -390,7 +391,7 @@ def schedule_add_and_edit(request, data, item=None, context=None):
 
                 for serialized_action in actions_data:
                     dotted_path = serialized_action.pop('class')
-                    if not any(cls.dotted_path() == dotted_path for cls in classes):
+                    if not ScheduledAction.valid_class(dotted_path):
                         log.error('invalid/unknown schedulable action %r, ignoring', dotted_path)
                         continue
                     action = import_string(dotted_path)
@@ -453,7 +454,7 @@ def schedule_delete(request, schedule_id):
 
 def scheduled_action_form(request):
     dotted_path = request.GET.get('class')
-    if not any(cls.dotted_path() == dotted_path for cls in ScheduledAction.SchedulableAction.__subclasses__()):
+    if not ScheduledAction.valid_class(dotted_path):
         log.error('scheduled_action_form request for %r which is not a schedulable action', dotted_path)
         return HttpResponseBadRequest()
     try:

@@ -10,6 +10,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core import validators
 from django.db import models, transaction
 from django.db.models import QuerySet
+from django.utils.module_loading import import_string
 from django.utils.translation import ugettext_lazy as _
 from django.utils import timezone
 from django import forms
@@ -467,6 +468,18 @@ class ScheduledAction(models.Model):
 
     order = models.IntegerField()
     item = models.ForeignKey(ScheduleItem, related_name='actions')
+
+    def get_class(self):
+        """
+        Load and return SchedulableAction from .py_class, or return None if invalid.
+        """
+        if not self.valid_class(self.py_class):
+            return
+        return import_string(self.py_class)
+
+    @classmethod
+    def valid_class(cls, dotted_path):
+        return any(action_class.dotted_path() == dotted_path for action_class in cls.SchedulableAction.__subclasses__())
 
     class Meta:
         ordering = ['order']

@@ -35,11 +35,11 @@ def borgcubed_idle(apiserver):
 def execute(apiserver, schedule):
     log.debug('Executing schedule %s', schedule)
     for action in schedule.actions.all():
-        if not any(cls.dotted_path() == action.py_class for cls in ScheduledAction.SchedulableAction.__subclasses__()):
+        action_class = action.get_class()
+        if not action_class:
             log.error('schedule %s, action %s: unknown/invalid scheduled action %r, skipping', schedule, action.pk, action.py_class)
             continue
-        log.debug('Importing action %r', action.py_class)
-        executable_action = import_string(action.py_class)(apiserver, **action.py_args)
+        executable_action = action_class(apiserver, **action.py_args)
         executable_action.execute()
 
 
