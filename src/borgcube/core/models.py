@@ -1,5 +1,7 @@
+import datetime
 import enum
 import hmac
+import inspect
 import logging
 import re
 from hashlib import sha224
@@ -8,20 +10,26 @@ from pathlib import Path
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core import validators
-from django.db import models, transaction
+from django.db import models
 from django.db.models import QuerySet
 from django.utils.module_loading import import_string
 from django.utils.translation import ugettext_lazy as _
 from django.utils import timezone
 from django import forms
 
-from jsonfield.fields import TypedJSONField, JSONField
+import persistent
+import transaction
+from BTrees.LOBTree import LOBTree as TimestampTree
+from BTrees.LOBTree import LOBTree
+from BTrees.OOBTree import OOBTree
+from persistent.list import PersistentList
 
-from recurrence.fields import RecurrenceField
+from recurrence.forms import RecurrenceField
 
 from borg.helpers import Location
 
 import borgcube
+from borgcube.utils import data_root
 
 log = logging.getLogger(__name__)
 
@@ -39,127 +47,195 @@ slug_validator = validators.RegexValidator(
 )
 
 
-class SlugWithDotField(models.CharField):
-    """
-    A SlugField where dots are allowed.
-
-    This makes it compatible with hostnames and FQDNs.
-    """
-    def __init__(self, *args, **kwargs):
-        kwargs['max_length'] = kwargs.get('max_length', 200)
-        super().__init__(*args, **kwargs)
-
-    default_error_messages = {
-        'invalid': u"Enter a valid 'slug' consisting of letters, numbers, "
-                   u"underscores, dots or hyphens.",
-    }
-    default_validators = [slug_validator]
+def evolve(from_version=1, to_version=None):
+    def decorator(function):
+        try:
+            function._evolves_from = tuple(from_version)
+        except TypeError:
+            function._evolves_from = from_version,
+        function._evolves_to = to_version
+        return function
+    return decorator
 
 
-class Repository(models.Model):
-    name = CharField()
-    description = models.TextField(blank=True)
+class StringObjectID:
+    @property
+    def oid(self):
+        return self._p_oid.hex()
 
-    url = CharField(max_length=1000, help_text=_('For example /data0/reposity or user@storage:/path.'))
-    repository_id = CharField(verbose_name=_('Repository ID'), help_text=_('32 bytes in hex'))
 
-    remote_borg = CharField(default='borg', verbose_name=_('Remote borg binary name (only applies to remote repositories)'))
+class Evolvable(persistent.Persistent, StringObjectID):
+    version = 1
+
+    def __setstate__(self, state):
+        if state['version'] != self.version:
+            def evolves(member):
+                is_method = inspect.ismethod(member)
+                if not is_method:
+                    return False
+                return hasattr(member, '_evolves_from') and hasattr(member, '_evolves_to')
+
+            transitory_sacrifices = list(zip(*inspect.getmembers(self, predicate=evolves)))
+            while state['version'] != self.version:
+                possible_evolution = []
+                for evolve in transitory_sacrifices:
+                    if evolve._evolves_from == state['version']:
+                        possible_evolution.append(evolve)
+                possible_evolution.sort(key=lambda evolve: evolve._evolves_to)
+                evolve = possible_evolution.pop()
+                state = evolve(state)
+                state['version'] = evolve._evolves_to
+
+        try:
+            super().__setstate__(state)
+        except AttributeError:
+            self.__dict__.update(state)
+
+    def __getstate__(self):
+        try:
+            state = super().__getstate__()
+        except AttributeError:
+            state = self.__dict__.copy()
+        state.setdefault('version', self.version)
+        return state
+
+
+class DataRoot(Evolvable):
+    def __init__(self):
+        self.repositories = PersistentList()
+        # binary archive id -> Archive
+        self.archives = OOBTree()
+        # client hostname -> Client
+        self.clients = OOBTree()
+
+        # job timestamp -> Job
+        self.jobs = TimestampTree()
+        # job state (str) -> TimestampTree
+        self.jobs_by_state = OOBTree()
+
+        self.schedules = PersistentList()
+
+
+class Repository(Evolvable):
+    name = ''
+    description = ''
+
+    # For example /data0/reposity or user@storage:/path.
+    url = ''
+
+    # 32 bytes in hex
+    repository_id = ''
+
+    # Remote borg binary name (only applies to remote repositories)
+    remote_borg = 'borg'
+
+    def __init__(self, name, url, description='', repository_id='', remote_borg='borg'):
+        self.name = name
+        self.url = url
+        self.description = description
+        self.repository_id = repository_id
+        self.remote_borg = remote_borg
+        self.jobs = TimestampTree()
+        self.archives = OOBTree()
 
     @property
     def location(self):
         return Location(self.url)
 
     def latest_job(self):
-        return self.jobs.all()[:1].get()
+        #return self.jobs[-1:][0]
+        pass
 
-    def __str__(self):
-        return self.name
-
-
-class Archive(models.Model):
-    id = CharField(primary_key=True)
-    repository = models.ForeignKey(Repository, db_index=True)
-    name = CharField()
-    comment = models.TextField(blank=True)
-
-    nfiles = models.BigIntegerField()
-    original_size = models.BigIntegerField()
-    compressed_size = models.BigIntegerField()
-    deduplicated_size = models.BigIntegerField()
-    duration = models.DurationField()
+    class Form(forms.Form):
+        name = forms.CharField()
+        description = forms.CharField(widget=forms.Textarea, required=False)
+        url = forms.CharField(help_text=_('For example /data0/reposity or user@storage:/path.'))
+        repository_id = forms.CharField(min_length=64, max_length=64)
+        remote_borg = forms.CharField()
 
 
-class ClientConnection(models.Model):
-    remote = CharField(help_text=_('Usually something like root@somehost, but you can also give a .ssh/config host alias, for example.'))
+class Archive(Evolvable):
+    def __init__(self, id, repository, name,
+                 comment='',
+                 nfiles=0, original_size=0, compressed_size=0, deduplicated_size=0,
+                 duration=datetime.timedelta()):
+        self.id = id
+        self.repository = repository
+        self.name = name
+        self.comment = comment
+        self.nfiles = nfiles
+        self.original_size = original_size
+        self.compressed_size = compressed_size
+        self.deduplicated_size = deduplicated_size
+        self.duration = duration
 
-    rsh = CharField(default='ssh', verbose_name=_('RSH'))
-    rsh_options = CharField(default=None, blank=True, null=True, verbose_name=_('RSH options'))
-    ssh_identity_file = CharField(default=None, blank=True, null=True, verbose_name=_('SSH identity file'))
-    remote_borg = CharField(default='borg', verbose_name=_('Remote borg binary name'))
-    remote_cache_dir = CharField(default=None, blank=True, null=True, verbose_name=_('Remote cache directory'),
-                                 help_text=_('If not specified the Borg default will be used (usually ~/.cache/borg/).'))
+
+class RshClientConnection(Evolvable):
+    # 'Usually something like root@somehost, but you can also give a .ssh/config host alias, for example.'
+    remote = ''
+
+    # RSH
+    rsh = 'ssh'
+    # RSH options
+    rsh_options = None
+    # SSH identity file
+    ssh_identity_file = None
+
+    # Remote borg binary name
+    remote_borg = 'borg'
+
+    # Remote cache directory
+    # If not specified the Borg default will be used (usually ~/.cache/borg/).
+    remote_cache_dir = None
+
+    def __init__(self, remote,
+                 rsh='ssh', rsh_options=None, ssh_identity_file=None,
+                 remote_borg='borg', remote_cache_dir=None):
+        self.remote = remote
+        self.rsh = rsh
+        self.rsh_options = rsh_options
+        self.ssh_identity_file = ssh_identity_file
+        self.remote_borg = remote_borg
+        self.remote_cache_dir = remote_cache_dir
+
+    class Form(forms.Form):
+        remote = forms.CharField()
+        rsh = forms.CharField(initial='ssh')
+        rsh_options = forms.CharField(required=False)
+        ssh_identity_file = forms.CharField(required=False)
+        remote_borg = forms.CharField(initial='borg')
+        remote_cache_dir = forms.CharField(required=False)
 
 
-class Client(models.Model):
-    hostname = SlugWithDotField(primary_key=True, verbose_name=_('Hostname'),
-                                help_text=_('Only letters and numbers (A-Z, 0-9), dashes, underscores and dots (._-).'))
-    name = CharField()
-    description = models.TextField(blank=True)
-
-    connection = models.OneToOneField(ClientConnection)
+class Client(Evolvable):
+    def __init__(self, hostname, description='', connection=None):
+        self.hostname = hostname
+        self.description = description
+        self.connection = connection
+        self.jobs = TimestampTree()
+        self.archives = OOBTree()
+        data_root().clients[hostname] = self
 
     def latest_job(self):
-        return self.jobs.all()[:1].get()
+        return self.jobs[-1]
+
+    class Form(forms.Form):
+        hostname = forms.CharField(validators=[slug_validator])
+        description = forms.CharField(widget=forms.Textarea, required=False, initial='')
 
 
-class JobConfig(models.Model):
-    client = models.ForeignKey(Client, related_name='job_configs')
-    repository = models.ForeignKey(Repository, related_name='job_configs')
-
-    config = TypedJSONField(required_fields={
-        'version': int,
-    }, validators=[
-        lambda config: config['version'] == 1,
-    ], default={
-        'version': 1,
-    })
+class JobConfig(Evolvable):
+    # TODO: XXX "config = {}" not needed in ZODB
+    def __init__(self, client, repository, config):
+        self.client = client
+        self.repository = repository
+        self.config = {}
 
     def __str__(self):
         return _('{client}: {label}').format(
             client=self.client.name,
             label=self.config['label'],
         )
-
-
-class ModelEnum(enum.Enum):
-    @classmethod
-    def choices(cls):
-        return [(e.value, e.name) for e in cls.__members__.values()]
-
-
-class DowncastQuerySet(QuerySet):
-    def iterator(self):
-        for obj in super().iterator():
-            yield obj._downcast()
-
-
-DowncastManager = models.manager.BaseManager.from_queryset(DowncastQuerySet)
-
-
-class DowncastModel(models.Model):
-    objects = DowncastManager()
-    _concrete_model = models.ForeignKey(ContentType)
-
-    def save(self, *args, **kwargs):
-        if self._state.adding:
-            self._concrete_model = ContentType.objects.get_for_model(type(self))
-        super().save(*args, **kwargs)
-
-    def _downcast(self):
-        return self._concrete_model.get_object_for_this_type(pk=self.pk)
-
-    class Meta:
-        abstract = True
 
 
 class s(str):
@@ -169,7 +245,7 @@ class s(str):
         return obj
 
 
-class Job(DowncastModel):
+class Job(Evolvable):
     """
     Core job model.
 
@@ -200,11 +276,12 @@ class Job(DowncastModel):
         def verbose_name(cls, name):
             return getattr(cls, name).verbose_name
 
-    created = models.DateTimeField(auto_now_add=True, db_index=True)
-    timestamp_start = models.DateTimeField(blank=True, null=True)
-    timestamp_end = models.DateTimeField(blank=True, null=True)
-
-    repository = models.ForeignKey(Repository, related_name='jobs', blank=True, null=True)
+    def __init__(self, repository=None):
+        self.created = timezone.now()
+        self.repository = repository
+        self.state = self.State.job_created
+        if repository:
+            repository.jobs[self.created.timestamp()] = self
 
     @property
     def duration(self):
@@ -212,10 +289,6 @@ class Job(DowncastModel):
             return self.timestamp_end - self.timestamp_start
         else:
             return timezone.now() - (self.timestamp_start or self.created)
-
-    state = CharField(default=State.job_created)
-
-    data = JSONField()
 
     @property
     def verbose_name(self):
@@ -246,7 +319,7 @@ class Job(DowncastModel):
         return job_is_blocked
 
     def update_state(self, previous, to):
-        with transaction.atomic():
+        with transaction:
             self.refresh_from_db()
             if self.state != previous:
                 raise ValueError('Cannot transition job state from %r to %r, because current state is %r'
@@ -274,10 +347,10 @@ class Job(DowncastModel):
     def set_failure_cause(self, kind, **kwargs):
         borgcube.utils.hook.borgcube_job_failure_cause(job=self, kind=kind, kwargs=kwargs)
         self.force_state(self.State.failed)
-        self.data['failure_cause'] = {
+        self.failure_cause = {
             'kind': kind,
         }
-        self.data['failure_cause'].update(kwargs)
+        self.failure_cause.update(kwargs)
         self.save()
 
     def log_path(self):
@@ -330,9 +403,12 @@ class BackupJob(Job):
         # Cache is removed from client
         client_cleanup = s('client_cleanup', _('Client is cleaned up'))
 
-    client = models.ForeignKey(Client, related_name='jobs')
-    archive = models.OneToOneField(Archive, blank=True, null=True)
-    config = JSONField()
+
+    def __init__(self, repository, client, config):
+        super().__init__(repository)
+        self.client = client
+        client.jobs[self.created.timestamp()] = self
+        self.archive = None
 
     @property
     def reverse_path(self):
@@ -345,47 +421,36 @@ class BackupJob(Job):
         return settings.SERVER_LOGIN + ':' + self.reverse_path
 
     def get_jobconfig(self):
-        try:
-            return JobConfig.objects.get(id=self.config.get('id'))
-        except JobConfig.DoesNotExist:
-            return
+        return
 
     @property
     def archive_name(self):
         return self.client.hostname + '-' + str(self.id)
 
-    @classmethod
-    def from_config(cls, job_config):
-        config = dict(job_config.config)
-        config['id'] = job_config.id
-        return cls(
-            client=job_config.client,
-            repository=job_config.repository,
-            config=config,
-        )
-
     def _log_file_name(self, timestamp):
         return '%s-%s-%s-%s' % (timestamp, self.short_name, self.client.hostname, self.id)
 
 
-class CheckConfig(models.Model):
-    label = CharField()
-    repository = models.ForeignKey(Repository, related_name='check_configs')
+class CheckConfig(Evolvable):
+    def __init__(self, label, repository, check_repository, verify_data, check_archives, check_only_new_archives):
+        self.label = label
+        self.repository = repository
+        self.check_repository = check_repository
+        self.verify_data = verify_data
+        self.check_archives = check_archives
+        self.check_only_new_archives = check_only_new_archives
 
-    check_repository = models.BooleanField(default=True)
-    verify_data = models.BooleanField(default=False, help_text=_('Verify all data cryptographically (slow)'))
-    check_archives = models.BooleanField(default=True)
+    class Form(forms.Form):
+        label = CharField()
+        repository = None  # TODO
 
-    check_only_new_archives = models.BooleanField(default=False, help_text=_('Check only archives added since the last check'))
+        check_repository = forms.BooleanField(initial=True, required=False)
+        verify_data = forms.BooleanField(initial=False, required=False, help_text=_('Verify all data cryptographically (slow)'))
+        check_archives = forms.BooleanField(initial=True, required=False)
 
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'check_repository': self.check_repository,
-            'verify_data': self.verify_data,
-            'check_archives': self.check_archives,
-            'check_only_new_archives': self.check_only_new_archives,
-        }
+        check_only_new_archives = forms.BooleanField(
+            initial=False, required=False,
+            help_text=_('Check only archives added since the last check'))
 
 
 class CheckJob(Job):
@@ -396,28 +461,30 @@ class CheckJob(Job):
         verify_data = s('verify_data', _('Verifying data'))
         archives_check = s('archives_check', _('Checking archives'))
 
-    config = JSONField()
-
-    @classmethod
-    def from_config(cls, check_config):
-        config = check_config.to_dict()
-        return cls(
-            repository=check_config.repository,
-            config=check_config.to_dict()
-        )
+    def __init__(self, repository, config):
+        super().__init__(repository)
+        self.config = config
 
 
-class ScheduleItem(models.Model):
-    name = CharField()
-    description = models.TextField(blank=True)
+class Schedule(Evolvable):
+    def __init__(self, name, recurrence_start, recurrence, description=''):
+        self.name = name
+        self.description = description
 
-    recurrence_start = models.DateTimeField(
-        default=timezone.now,
-        help_text=_('The recurrence defined below is applied from this date and time onwards.<br/>'
-                    'Eg. for daily recurrence the actions would be scheduled for the time set here.<br/>'
-                    'The set time zone is %s.') % settings.TIME_ZONE
-    )
-    recurrence = RecurrenceField()
+        self.recurrence_start = recurrence_start
+        self.recurrence = recurrence
+
+        self.actions = PersistentList()
+
+    class Form(forms.Form):
+        name = forms.CharField()
+        description = forms.CharField()
+
+        recurrence_start = forms.DateTimeField()
+        recurrence = RecurrenceField(
+            help_text=_('The recurrence defined below is applied from this date and time onwards.<br/>'
+                        'Eg. for daily recurrence the actions would be scheduled for the time set here.<br/>'
+                        'The set time zone is %s.') % settings.TIME_ZONE)
 
 
 class DottedPath:
@@ -426,65 +493,63 @@ class DottedPath:
         return cls.__module__ + '.' + cls.__qualname__
 
 
-class ScheduledAction(models.Model):
-    class SchedulableAction(DottedPath):
+class ScheduledAction(Evolvable, DottedPath):
+    """
+    Implement this to add schedulable actions to the scheduler.
+
+    Make sure that your implementation is imported, since these are implicitly
+    discovered subclasses.
+    """
+
+    name = ''
+
+    class Form(forms.Form):
         """
-        Logic companion to ScheduledAction.
+        The form that should be presented for adding/modifying this action.
 
-        Implement this to add schedulable actions to the scheduler.
+        This can be a ModelForm or modify the DB; the transaction is managed for you,
+        and no additional transaction management should be needed.
 
-        Make sure that your implementation is imported, since these are implicitly
-        discovered subclasses.
+        The usual form rules apply, however, note that .cleaned_data must be JSON
+        serializable if .is_valid() returns true. This data will be used for instanciating
+        the action class (*py_args*).
+
+        .save() will be called with no arguments regardless of type, if it exists.
         """
-        name = ''
 
-        class Form(forms.Form):
-            """
-            The form that should be presented for adding/modifying this action.
+    @classmethod
+    def form(cls, *args, **kwargs):
+        form = cls.Form(*args, **kwargs)
+        form.name = cls.name
+        form.dotted_path = cls.dotted_path()
+        return form
 
-            This can be a ModelForm or modify the DB; the transaction is managed for you,
-            and no additional transaction management should be needed.
+    def __init__(self, schedule):
+        self.schedule = schedule
 
-            The usual form rules apply, however, note that .cleaned_data must be JSON
-            serializable if .is_valid() returns true. This data will be used for instanciating
-            the action class (*py_args*).
+    def __str__(self):
+        pass
 
-            .save() will be called with no arguments regardless of type, if it exists.
-            """
-
-        @classmethod
-        def form(cls, *args, **kwargs):
-            form = cls.Form(*args, **kwargs)
-            form.name = cls.name
-            form.dotted_path = cls.dotted_path()
-            return form
-
-        def __init__(self, apiserver, **py_args):
-            self.apiserver = apiserver
-
-        def __str__(self):
-            pass
-
-        def execute(self):
-            pass
-
-    py_class = models.CharField(max_length=100)
-    py_args = JSONField()
-
-    order = models.IntegerField()
-    item = models.ForeignKey(ScheduleItem, related_name='actions')
-
-    def get_class(self):
-        """
-        Load and return SchedulableAction from .py_class, or return None if invalid.
-        """
-        if not self.valid_class(self.py_class):
-            return
-        return import_string(self.py_class)
+    def execute(self, apiserver):
+        pass
 
     @classmethod
     def valid_class(cls, dotted_path):
-        return any(action_class.dotted_path() == dotted_path for action_class in cls.SchedulableAction.__subclasses__())
+        return any(action_class.dotted_path() == dotted_path for action_class in cls.__subclasses__())
 
-    class Meta:
-        ordering = ['order']
+
+class SlugWithDotField(models.CharField):
+    """
+    A SlugField where dots are allowed.
+
+    This makes it compatible with hostnames and FQDNs.
+    """
+    def __init__(self, *args, **kwargs):
+        kwargs['max_length'] = kwargs.get('max_length', 200)
+        super().__init__(*args, **kwargs)
+
+    default_error_messages = {
+        'invalid': u"Enter a valid 'slug' consisting of letters, numbers, "
+                   u"underscores, dots or hyphens.",
+    }
+    default_validators = [slug_validator]

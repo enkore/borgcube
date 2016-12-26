@@ -3,7 +3,7 @@ import json
 
 from django import forms
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
-from django.db import transaction
+from django.http import Http404
 from django.http import HttpResponse
 from django.http import HttpResponseBadRequest
 from django.shortcuts import redirect, get_object_or_404
@@ -13,13 +13,16 @@ from django.utils.module_loading import import_string
 from django.utils.timezone import now
 from django.utils.translation import ugettext_lazy as _
 
+import transaction
+
 from ..models import OverviewMetric
 from ..metrics import Metric
 
-from borgcube.core.models import Client, ClientConnection, Repository, CheckConfig
+from borgcube.core.models import Client, Repository, CheckConfig, RshClientConnection
 from borgcube.core.models import Job, JobConfig
-from borgcube.core.models import ScheduleItem, ScheduledAction
+from borgcube.core.models import ScheduledAction
 from borgcube.daemon.client import APIClient
+from borgcube.utils import data_root
 
 log = logging.getLogger(__name__)
 
@@ -50,19 +53,19 @@ def dashboard(request):
     })
 
 
-class ClientForm(forms.ModelForm):
-    class Meta:
-        model = Client
-        fields = '__all__'
-        exclude =('connection',)
+#class ClientForm(forms.ModelForm):
+#    class Meta:
+#        model = Client
+#        fields = '__all__'
+#        exclude =('connection',)
 
 
-class ClientConnectionForm(forms.ModelForm):
-    prefix = 'connection'
-
-    class Meta:
-        model = ClientConnection
-        fields = '__all__'
+#class ClientConnectionForm(forms.ModelForm):
+#    prefix = 'connection'
+#
+#    class Meta:
+#        model = ClientConnection
+#        fields = '__all__'
 
 
 def clients(request):
@@ -88,8 +91,8 @@ def paginate(request, things, num_per_page=40, prefix=''):
 
 
 def client_view(request, client_id):
-    client = get_object_or_404(Client, pk=client_id)
-    jobs = paginate(request, client.jobs.all(), prefix='jobs')
+    client = data_root().clients[client_id]
+    jobs = paginate(request, client.jobs.values(), prefix='jobs')
 
     return TemplateResponse(request, 'core/client/view.html', {
         'client': client,
@@ -99,14 +102,13 @@ def client_view(request, client_id):
 
 def client_add(request):
     data = request.POST or None
-    client_form = ClientForm(data)
-    connection_form = ClientConnectionForm(data)
+    client_form = Client.Form(data)
+    connection_form = RshClientConnection.Form(data)
     if data and client_form.is_valid() and connection_form.is_valid():
-        connection = connection_form.save()
-        created_client = client_form.save(commit=False)
-        created_client.connection = connection
-        created_client.save()
-        return redirect(client_view, created_client.pk)
+        connection = RshClientConnection(**connection_form.cleaned_data)
+        client = Client(connection=connection, **client_form.cleaned_data)
+        transaction.commit()
+        return redirect(client_view, client.hostname)
     return TemplateResponse(request, 'core/client/add.html', {
         'client_form': client_form,
         'connection_form': connection_form,
@@ -114,15 +116,19 @@ def client_add(request):
 
 
 def client_edit(request, client_id):
-    client = get_object_or_404(Client, pk=client_id)
+    client = data_root().clients[client_id]
     data = request.POST or None
-    client_form = ClientForm(data, instance=client)
+    client.connection._p_activate()
+    client_form = Client.Form(data, initial=client.__dict__)
     del client_form.fields['hostname']
-    connection_form = ClientConnectionForm(data, instance=client.connection)
+    connection_form = RshClientConnection.Form(data, initial=client.connection.__dict__)
     if data and client_form.is_valid() and connection_form.is_valid():
-        connection_form.save()
-        client_form.save()
-        return redirect(client_view, client.pk)
+        client.__dict__.update(client_form.cleaned_data)
+        client._p_changed = True
+        client.connection.__dict__.update(connection_form.cleaned_data)
+        client.connection._p_changed = True
+        transaction.commit()
+        return redirect(client_view, client.hostname)
     return TemplateResponse(request, 'core/client/edit.html', {
         'client': client,
         'client_form': client_form,
@@ -141,6 +147,11 @@ def job_cancel(request, job_id):
     return redirect(client_view, job.client.pk)
 
 
+def repositories_as_choices():
+    for repository in data_root().repositories:
+        yield repository.oid, repository.name
+
+
 class JobConfigForm(forms.Form):
     COMPRESSION_CHOICES = [
         ('none', _('No compression')),
@@ -151,7 +162,7 @@ class JobConfigForm(forms.Form):
 
     label = forms.CharField()
 
-    repository = forms.ModelChoiceField(Repository.objects.all())
+    repository = forms.ChoiceField(choices=repositories_as_choices)
 
     one_file_system = forms.BooleanField(initial=True, required=False,
                                          help_text=_('Don\'t cross over file system boundaries.'))
@@ -185,7 +196,7 @@ class JobConfigForm(forms.Form):
 
 
 def job_config_add(request, client_id):
-    client = get_object_or_404(Client, pk=client_id)
+    client = data_root().clients[client_id]
     data = request.POST or None
     form = JobConfigForm(data=data)
     advanced_form = JobConfigForm.AdvancedForm(data=data)
@@ -255,34 +266,41 @@ def job_config_trigger(request, client_id, config_id):
     return redirect(client_view, client_id)
 
 
-class RepositoryForm(forms.ModelForm):
-    # TODO update repo id during connection check
-    class Meta:
-        model = Repository
-        fields = '__all__'
+#class RepositoryForm(forms.ModelForm):
+#    # TODO update repo id during connection check
+#    class Meta:
+#        model = Repository
+#        fields = '__all__'
 
 
 def repositories(request):
     return TemplateResponse(request, 'core/repository/list.html', {
         'm': Repository,
-        'repositories': Repository.objects.all(),
+        'repositories': data_root().repositories,
     })
 
 
 def repository_view(request, id):
-    repository = get_object_or_404(Repository, id=id)
+    repository = data_root()._p_jar.get(bytes.fromhex(id))
+    if repository not in data_root().repositories:
+        raise Http404
     return TemplateResponse(request, 'core/repository/view.html', {
         'repository': repository,
     })
 
 
 def repository_edit(request, id):
-    repository = get_object_or_404(Repository, pk=id)
+    repository = data_root()._p_jar.get(bytes.fromhex(id))
+    if repository not in data_root().repositories:
+        raise Http404
     data = request.POST or None
-    repository_form = RepositoryForm(data, instance=repository)
+    repository._p_activate()
+    repository_form = Repository.Form(data, initial=repository.__dict__)
     if data and repository_form.is_valid():
-        repository_form.save()
-        return redirect(repository_view, repository.pk)
+        repository.__dict__.update(repository_form.cleaned_data)
+        repository._p_changed = True
+        transaction.commit()
+        return redirect(repository_view, repository.oid)
     return TemplateResponse(request, 'core/repository/edit.html', {
         'repository': repository,
         'repository_form': repository_form,
@@ -291,20 +309,21 @@ def repository_edit(request, id):
 
 def repository_add(request):
     data = request.POST or None
-    repository_form = RepositoryForm(data)
+    repository_form = Repository.Form(data)
     if data and repository_form.is_valid():
-        repository = repository_form.save()
-        return redirect(repository_view, repository.pk)
+        repository = Repository(**repository_form.cleaned_data)
+        data_root().repositories.append(repository)
+        transaction.commit()
+        return redirect(repository_view, repository.oid)
     return TemplateResponse(request, 'core/repository/add.html', {
         'repository_form': repository_form,
     })
 
-
-class CheckConfigForm(forms.ModelForm):
-    class Meta:
-        model = CheckConfig
-        fields = '__all__'
-        exclude =('repository',)
+#class CheckConfigForm(forms.ModelForm):
+#    class Meta:
+#        model = CheckConfig
+#        fields = '__all__'
+#        exclude =('repository',)
 
 
 def repository_check_config_add(request, id):
@@ -348,10 +367,10 @@ def repository_check_config_trigger(request, id, config_id):
     return redirect(repository_view, id)
 
 
-class ScheduleItemForm(forms.ModelForm):
-    class Meta:
-        model = ScheduleItem
-        fields = '__all__'
+#class ScheduleItemForm(forms.ModelForm):
+#    class Meta:
+#        model = ScheduleItem
+#        fields = '__all__'
 
 
 from dateutil.relativedelta import relativedelta

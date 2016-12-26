@@ -47,6 +47,9 @@ setup(
         'django-jsonfield',
         'django-recurrence',
         'pyzmq',
+        'ZODB>=5',
+        'ZEO>=5',
+        'zodburi>=2',
     ],
     extras_require={
         'proctitle': ['setproctitle'],

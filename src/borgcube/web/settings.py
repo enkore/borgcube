@@ -182,3 +182,13 @@ SERVER_PROXY_PATH = None
 SERVER_PROXY_PATH = '/home/mabe/Projekte/_oss/borgcube/_venv/bin/borgcube-proxy'
 
 DAEMON_ADDRESS = 'tcp://127.0.0.1:58123'
+
+# By default borgcubed will run a DB server. If you want to provide the DB server
+# yourself or use eg. RelStorage, turn this off.
+BUILTIN_ZEO = True
+
+SOCKET_PREFIX = '/run/user/{euid}/borgcube'
+
+# zodburi ( http://docs.pylonsproject.org/projects/zodburi/en/latest/ ) of the DB to use
+# note: file:// paths are always absolute.
+DB_URI = 'file:///home/mabe/Projekte/_oss/borgcube/_db/Data.fs'

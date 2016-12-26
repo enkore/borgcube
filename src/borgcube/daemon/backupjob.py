@@ -64,22 +64,17 @@ def make_backup_job(apiserver, job_config):
     return job
 
 
-class ScheduledBackup(ScheduledAction.SchedulableAction):
+class ScheduledBackup(ScheduledAction):
     name = _('Schedule backup job')
     job_config = None
 
-    def __init__(self, apiserver, **kwargs):
-        super().__init__(apiserver, **kwargs)
-        try:
-            self.job_config = JobConfig.objects.get(id=kwargs['job_config'])
-        except ObjectDoesNotExist:
-            log.error('ScheduledBackup: job config with id %d not found', id)
-            return
+    def __init__(self, apiserver):
+        super().__init__(apiserver)
 
     def __str__(self):
         return _('Run {}').format(self.job_config)
 
-    def execute(self):
+    def execute(self, apiserver):
         if not self.job_config:
             log.warning('ScheduledBackup: not running due to previous error.')
             return
@@ -93,10 +88,8 @@ class ScheduledBackup(ScheduledAction.SchedulableAction):
 
     class Form(forms.Form):
         # TODO: (js-space); drill down, first select client, then config?
-        job_config = forms.ModelChoiceField(JobConfig.objects.all())
-
-        def save(self):
-            self.cleaned_data['job_config'] = self.cleaned_data['job_config'].pk
+        # job_config = forms.ModelChoiceField(JobConfig.objects.all())
+        pass
 
 
 def cpe_means_connection_failure(called_process_error):

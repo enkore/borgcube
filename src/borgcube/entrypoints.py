@@ -21,6 +21,16 @@ from .utils import configure_plugins
 configure_plugins()
 
 
+def _set_db_uri():
+    from django.conf import settings
+    if not settings.BUILTIN_ZEO:
+        return
+    from .daemon.client import APIClient
+    client = APIClient()
+    settings.DB_URI = client.zodburi()
+    log.debug('Received DB_URI=%r from daemon', settings.DB_URI)
+
+
 def daemon():
     from .daemon.server import APIServer
     from .utils import hook
@@ -32,6 +42,7 @@ def daemon():
 def proxy():
     from .proxy import ReverseRepositoryProxy
     from .utils import log_to_daemon, hook
+    _set_db_uri()
     hook.borgcube_startup(db=True, process='proxy')
     with log_to_daemon():
         proxy = ReverseRepositoryProxy()
@@ -45,5 +56,6 @@ def manage():
         db = sys.argv[1] not in ('makemigrations', 'migrate')
     except IndexError:
         db = True
+    _set_db_uri()
     hook.borgcube_startup(db=db, process='manage')
     sys.exit(execute_from_command_line())

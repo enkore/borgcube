@@ -6,7 +6,8 @@ from functools import partial
 from django.utils.module_loading import import_string
 from django.utils.timezone import now
 
-from borgcube.core.models import ScheduleItem, ScheduledAction
+from borgcube.core.models import Schedule, ScheduledAction
+from borgcube.utils import data_root
 
 log = logging.getLogger('borgcubed.scheduler')
 
@@ -23,13 +24,13 @@ def borgcubed_idle(apiserver):
 #    log.debug('setting alarm clock to beep in %d seconds', seconds)
 #    signal.alarm(seconds)
     this_very_moment = now()
-    for si in ScheduleItem.objects.all():
-        occurence = si.recurrence.after(this_very_moment, dtstart=si.recurrence_start)
-        if latest_executions.get(si.pk) == occurence:
+    for schedule in data_root().schedules:
+        occurence = schedule.recurrence.after(this_very_moment, dtstart=schedule.recurrence_start)
+        if latest_executions.get(schedule._p_oid) == occurence:
             continue
         if occurence and abs((occurence - this_very_moment).total_seconds()) < 10:
-            latest_executions[si.pk] = occurence
-            execute(apiserver, si)
+            latest_executions[schedule._p_oid] = occurence
+            execute(apiserver, schedule)
 
 
 def execute(apiserver, schedule):

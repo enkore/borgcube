@@ -65,3 +65,10 @@ class APIClient:
             log.error('APIClient.cancel_job(%r) failed: %s', job.id, reply['message'])
             raise APIError(reply['message'])
         log.info('Cancelled job %s', job.id)
+
+    def zodburi(self):
+        self.socket.send_json({
+            'command': 'zodburi',
+        })
+        reply = self.socket.recv_json()
+        return reply['uri']

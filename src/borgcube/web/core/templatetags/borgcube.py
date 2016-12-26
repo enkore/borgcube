@@ -18,10 +18,11 @@ register = template.Library()
 
 @register.filter
 def field_name(model_instance, field):
-    name = model_instance._meta.get_field(field).verbose_name
-    if name == field.replace('_', ' '):
-        return name.title()
-    return name
+    return field
+    #name = model_instance._meta.get_field(field).verbose_name
+    #if name == field.replace('_', ' '):
+    #    return name.title()
+    #return name
 
 
 @register.filter
@@ -35,13 +36,13 @@ def get_url(model_instance):
     if not obj:
         return ''
     if isinstance(obj, models.Job):
-        return reverse(views.job_view, args=(obj.pk,))
+        return reverse(views.job_view, args=(obj.oid,))
     elif isinstance(obj, models.Client):
-        return reverse(views.client_view, args=(obj.pk,))
+        return reverse(views.client_view, args=(obj.oid,))
     elif isinstance(obj, models.JobConfig):
-        return reverse(views.client_view, args=(obj.client.pk,)) + '#job-config-%d' % obj.pk
+        return reverse(views.client_view, args=(obj.client.oid,)) + '#job-config-%d' % obj.oid
     elif isinstance(obj, models.Repository):
-        return reverse(views.repository_view, args=(obj.pk,))
+        return reverse(views.repository_view, args=(obj.oid,))
     url = hook.borgcube_web_get_url(obj=obj)
     if not url:
         raise ValueError('Don\'t know how to make URL for %r (type %r)' % (obj, type(obj)))

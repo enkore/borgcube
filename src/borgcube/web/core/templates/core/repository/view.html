@@ -7,7 +7,7 @@
 {% block content %}
   <h1>{{ repository.name }}
     <small>
-      (<a href='{% url 'core.repository_edit' repository.pk %}'>{% trans 'edit' %}</a>)
+      (<a href='{% url 'core.repository_edit' repository.oid %}'>{% trans 'edit' %}</a>)
     </small>
   </h1>
 
@@ -29,13 +29,13 @@
   </table>
 
   <h2>{% trans 'Job configurations' %}
-    <small>(<a href='{% url 'core.repository_check_config_add' repository.pk %}'>{% trans 'add' %}</a>)</small></h2>
+    <small>(<a href='{% url 'core.repository_check_config_add' repository.oid %}'>{% trans 'add' %}</a>)</small></h2>
 
     {% for check_config in repository.check_configs.all %}
 
     <section class='check-config' id='check-config-{{ check_config.id }}'>
       <h3>{{ check_config.label }} <small>
-        {% url 'core.repository_check_config_trigger' repository.pk check_config.id as url %}
+        {% url 'core.repository_check_config_trigger' repository.oid check_config.id as url %}
         {% trans 'run now' as label %}
         ({% include 'core/post_link.html' with url=url label=label %})
         (<a href='{% url 'core.repository_check_config_edit' repository.pk check_config.id %}'>{% trans 'edit' %}</a>)

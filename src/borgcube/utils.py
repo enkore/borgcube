@@ -1,9 +1,14 @@
 import logging
 import logging.config
+from threading import Lock, local
 
 from django.conf import settings
 
 import zmq
+
+import transaction
+import zodburi
+from ZODB import DB
 
 from borg.repository import Repository
 from borg.remote import RemoteRepository
@@ -12,6 +17,39 @@ from borg.constants import UMASK_DEFAULT
 from .vendor import pluggy
 
 log = logging.getLogger(__name__)
+
+
+_db = None
+_db_local = local()
+_db_lock = Lock()
+
+
+def db():
+    global _db
+    try:
+        return _db.open()
+    except AttributeError:
+        with _db_lock:
+            storage_factory, dbkw = zodburi.resolve_uri(settings.DB_URI)
+            storage = storage_factory()
+            _db = DB(storage, **dbkw)
+        return db()
+
+
+def data_root():
+    try:
+        root = _db_local.db.root
+    except AttributeError:
+        _db_local.db = db()
+        root = _db_local.db.root
+    try:
+        return root.data_root
+    except AttributeError as ae:
+        with transaction.manager:
+            log.info('Initializing new data root.')
+            from borgcube.core.models import DataRoot
+            root.data_root = DataRoot()
+            return root.data_root
 
 
 def open_repository(repository):
