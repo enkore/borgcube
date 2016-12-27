@@ -5,8 +5,7 @@ from django.conf import settings
 
 import zmq
 
-from ..core.models import BackupJob
-from ..utils import hook
+from ..utils import hook, data_root
 
 log = logging.getLogger(__name__)
 
@@ -46,25 +45,25 @@ class APIClient:
         self.socket.send_json({
             'command': 'initiate-backup-job',
             'client': client.hostname,
-            'job_config': job_config.id,
+            'job_config': job_config.oid,
         })
         reply = self.socket.recv_json()
         if not reply['success']:
-            log.error('APIClient.initiate_backup_job(%r, %d) failed: %s', client.hostname, job_config.id, reply['message'])
+            log.error('APIClient.initiate_backup_job(%r, %d) failed: %s', client.hostname, job_config.oid, reply['message'])
             raise APIError(reply['message'])
         log.info('Initiated backup job %s', reply['job'])
-        return BackupJob.objects.get(id=reply['job'])
+        return data_root()._p_jar[bytes.fromhex(reply['job'])]
 
     def cancel_job(self, job):
         self.socket.send_json({
             'command': 'cancel-job',
-            'job_id': str(job.id),
+            'job_id': job.oid,
         })
         reply = self.socket.recv_json()
         if not reply['success']:
-            log.error('APIClient.cancel_job(%r) failed: %s', job.id, reply['message'])
+            log.error('APIClient.cancel_job(%r) failed: %s', job.oid, reply['message'])
             raise APIError(reply['message'])
-        log.info('Cancelled job %s', job.id)
+        log.info('Cancelled job %s', job.oid)
 
     def zodburi(self):
         self.socket.send_json({

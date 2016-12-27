@@ -2,6 +2,7 @@
 from json import dumps
 
 from django import template
+from django.forms.utils import pretty_name
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 from django.utils.translation import ugettext_lazy as _
@@ -17,8 +18,19 @@ register = template.Library()
 
 
 @register.filter
-def field_name(model_instance, field):
-    return field
+def field_name(obj, field):
+    try:
+        name = obj.Form.declared_fields[field].label
+    except AttributeError as ae:
+        print(ae)
+        name = None
+    name = name or field
+    if name == field.replace('_', ' '):
+        return name.title()
+    if name == field:
+        return pretty_name(name)
+    return name
+    # legacy, django orm:
     #name = model_instance._meta.get_field(field).verbose_name
     #if name == field.replace('_', ' '):
     #    return name.title()
@@ -38,11 +50,13 @@ def get_url(model_instance):
     if isinstance(obj, models.Job):
         return reverse(views.job_view, args=(obj.oid,))
     elif isinstance(obj, models.Client):
-        return reverse(views.client_view, args=(obj.oid,))
+        return reverse(views.client_view, args=(obj.hostname,))
     elif isinstance(obj, models.JobConfig):
-        return reverse(views.client_view, args=(obj.client.oid,)) + '#job-config-%d' % obj.oid
+        return reverse(views.client_view, args=(obj.client.hostname,)) + '#job-config-%d' % obj.oid
     elif isinstance(obj, models.Repository):
         return reverse(views.repository_view, args=(obj.oid,))
+    elif isinstance(obj, str):
+        return obj
     url = hook.borgcube_web_get_url(obj=obj)
     if not url:
         raise ValueError('Don\'t know how to make URL for %r (type %r)' % (obj, type(obj)))

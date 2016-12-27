@@ -24,18 +24,18 @@ client_urls = [
     url(r'^$', core_views.client_view, name='core.client_view'),
     url(r'^edit/$', core_views.client_edit, name='core.client_edit'),
     url(r'^add-config/$', core_views.job_config_add, name='core.job_config_add'),
-    url(r'^config/(?P<config_id>\d+)/edit/$', core_views.job_config_edit, name='core.job_config_edit'),
-    url(r'^config/(?P<config_id>\d+)/delete/$', core_views.job_config_delete, name='core.job_config_delete'),
-    url(r'^config/(?P<config_id>\d+)/trigger/$', core_views.job_config_trigger, name='core.job_config_trigger'),
+    url(r'^config/(?P<config_id>[a-f0-9]+)/edit/$', core_views.job_config_edit, name='core.job_config_edit'),
+    url(r'^config/(?P<config_id>[a-f0-9]+)/delete/$', core_views.job_config_delete, name='core.job_config_delete'),
+    url(r'^config/(?P<config_id>[a-f0-9]+)/trigger/$', core_views.job_config_trigger, name='core.job_config_trigger'),
 ]
 
 repo_urls = [
     url(r'^$', core_views.repository_view, name='core.repository_view'),
     url(r'^edit/$', core_views.repository_edit, name='core.repository_edit'),
     url(r'^add-config/$', core_views.repository_check_config_add, name='core.repository_check_config_add'),
-    url(r'^config/(?P<config_id>\d+)/edit/$', core_views.repository_check_config_edit, name='core.repository_check_config_edit'),
-    url(r'^config/(?P<config_id>\d+)/delete/$', core_views.repository_check_config_delete, name='core.repository_check_config_delete'),
-    url(r'^config/(?P<config_id>\d+)/trigger/$', core_views.repository_check_config_trigger, name='core.repository_check_config_trigger'),
+    url(r'^config/(?P<config_id>[a-f0-9]+)/edit/$', core_views.repository_check_config_edit, name='core.repository_check_config_edit'),
+    url(r'^config/(?P<config_id>[a-f0-9]+)/delete/$', core_views.repository_check_config_delete, name='core.repository_check_config_delete'),
+    url(r'^config/(?P<config_id>[a-f0-9]+)/trigger/$', core_views.repository_check_config_trigger, name='core.repository_check_config_trigger'),
 ]
 
 job_urls = [
@@ -48,8 +48,8 @@ schedule_urls = [
     url(r'^list/$', core_views.schedule_list, name='core.schedule_list'),
     url(r'^add/$', core_views.schedule_add, name='core.schedule_add'),
     url(r'^action-form/$', core_views.scheduled_action_form, name='core.scheduled_action_form'),
-    url(r'^(?P<item_id>\d+)/edit/$', core_views.schedule_edit, name='core.schedule_edit'),
-    url(r'^(?P<schedule_id>\d+)/delete/$', core_views.schedule_delete, name='core.schedule_delete'),
+    url(r'^(?P<item_id>[a-f0-9]+)/edit/$', core_views.schedule_edit, name='core.schedule_edit'),
+    url(r'^(?P<schedule_id>[a-f0-9]+)/delete/$', core_views.schedule_delete, name='core.schedule_delete'),
 ]
 
 js_info_dict = {

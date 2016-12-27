@@ -51,17 +51,17 @@
     {% endwith %}
   </table>
 
-  <h2>{% trans 'Job configurations' context 'core/client/view heading' %}</h2>
+  <h2>{% trans 'Job configurations' context 'core/client/view heading' %}
+    <small>(<a href='{% url 'core.job_config_add' client.hostname %}'>add</a>)</small></h2>
 
-  {% for job_config in client.job_configs.all %}
+  {% for job_config in client.job_configs %}
 
     <section class='job-config' id='job-config-{{ job_config.id }}'>
-      {% with config=job_config.config %}
-      <h3>{{ config.label }} <small>
-        {% url 'core.job_config_trigger' client.pk job_config.id as url %}
+      <h3>{{ job_config.label }} <small>
+        {% url 'core.job_config_trigger' client.hostname job_config.oid as url %}
         {% trans 'run now' as label %}
         ({% include 'core/post_link.html' with url=url label=label %})
-        (<a href='{% url 'core.job_config_edit' client.pk job_config.id %}'>{% trans 'edit' %}</a>)
+        (<a href='{% url 'core.job_config_edit' client.hostname job_config.oid %}'>{% trans 'edit' %}</a>)
       </small></h3>
 
 
@@ -72,26 +72,26 @@
           </tr>
           <tr>
             <th>{% trans 'One file system' %}</th>
-            <td>{{ config.one_file_system|yesno }}</td>
+            <td>{{ job_config.one_file_system|yesno }}</td>
           </tr>
           <tr>
             <th>{% trans 'Compression' %}</th>
-            <td>{{ config.compression|compression_name }}</td>
+            <td>{{ job_config.compression|compression_name }}</td>
           </tr>
           <tr>
             <th>{% trans 'Paths' %}</th>
             <td>
-              {% for path in config.paths %}
+              {% for path in job_config.paths %}
                 <pre>{{ path }}</pre>
                 {% if forloop.counter0 %}<br>{% endif %}
               {% endfor %}
             </td>
           </tr>
-          {% if config.excludes %}
+          {% if job_config.excludes %}
           <tr>
             <th>{% trans 'Exclusion patterns' %}</th>
             <td>
-              {% for pattern in config.excludes %}
+              {% for pattern in job_config.excludes %}
                 <pre>{{ pattern }}</pre>
                 {% if forloop.counter0 %}<br>{% endif %}
               {% endfor %}
@@ -99,7 +99,6 @@
           </tr>
           {% endif %}
         </table>
-      {% endwith %}
     </section>
 
   {% endfor %}

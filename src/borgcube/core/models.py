@@ -64,7 +64,13 @@ class StringObjectID:
         return self._p_oid.hex()
 
 
-class Evolvable(persistent.Persistent, StringObjectID):
+class Updateable:
+    def _update(self, d):
+        self.__dict__.update(d)
+        self._p_changed = True
+
+
+class Evolvable(persistent.Persistent, StringObjectID, Updateable):
     version = 1
 
     def __setstate__(self, state):
@@ -75,16 +81,20 @@ class Evolvable(persistent.Persistent, StringObjectID):
                     return False
                 return hasattr(member, '_evolves_from') and hasattr(member, '_evolves_to')
 
-            transitory_sacrifices = list(zip(*inspect.getmembers(self, predicate=evolves)))
+            log.debug('Evolving object %r from version %d to version %d', self, state['version'], self.version)
+            transitory_sacrifices = list(zip(*inspect.getmembers(self, predicate=evolves)))[1]
+            log.debug('Possible evolutionary paths are: %s', ', '.join(f.__name__ for f in transitory_sacrifices))
             while state['version'] != self.version:
                 possible_evolution = []
                 for evolve in transitory_sacrifices:
-                    if evolve._evolves_from == state['version']:
+                    if state['version'] in evolve._evolves_from:
                         possible_evolution.append(evolve)
                 possible_evolution.sort(key=lambda evolve: evolve._evolves_to)
                 evolve = possible_evolution.pop()
+                log.debug('Evolution is at version %d, next mutation is %s', state['version'], evolve.__name__)
                 state = evolve(state)
                 state['version'] = evolve._evolves_to
+            log.debug('Evolution completed.')
 
         try:
             super().__setstate__(state)
@@ -120,13 +130,11 @@ class Repository(Evolvable):
     name = ''
     description = ''
 
-    # For example /data0/reposity or user@storage:/path.
     url = ''
 
     # 32 bytes in hex
     repository_id = ''
 
-    # Remote borg binary name (only applies to remote repositories)
     remote_borg = 'borg'
 
     def __init__(self, name, url, description='', repository_id='', remote_borg='borg'):
@@ -143,15 +151,17 @@ class Repository(Evolvable):
         return Location(self.url)
 
     def latest_job(self):
-        #return self.jobs[-1:][0]
-        pass
+        try:
+            return self.jobs[self.jobs.maxKey()]
+        except ValueError:
+            return
 
     class Form(forms.Form):
         name = forms.CharField()
         description = forms.CharField(widget=forms.Textarea, required=False)
-        url = forms.CharField(help_text=_('For example /data0/reposity or user@storage:/path.'))
+        url = forms.CharField(help_text=_('For example /data0/repository or user@storage:/path.'))
         repository_id = forms.CharField(min_length=64, max_length=64)
-        remote_borg = forms.CharField()
+        remote_borg = forms.CharField(help_text=_('Remote borg binary name (only applies to remote repositories).'))
 
 
 class Archive(Evolvable):
@@ -208,16 +218,27 @@ class RshClientConnection(Evolvable):
 
 
 class Client(Evolvable):
+    version = 2
+
+    @evolve(1, 2)
+    def add_job_configs(self, state):
+        state['job_configs'] = PersistentList()
+        return state
+
     def __init__(self, hostname, description='', connection=None):
         self.hostname = hostname
         self.description = description
         self.connection = connection
         self.jobs = TimestampTree()
         self.archives = OOBTree()
+        self.job_configs = PersistentList()
         data_root().clients[hostname] = self
 
     def latest_job(self):
-        return self.jobs[-1]
+        try:
+            return self.jobs[self.jobs.maxKey()]
+        except ValueError:
+            return
 
     class Form(forms.Form):
         hostname = forms.CharField(validators=[slug_validator])
@@ -225,16 +246,15 @@ class Client(Evolvable):
 
 
 class JobConfig(Evolvable):
-    # TODO: XXX "config = {}" not needed in ZODB
-    def __init__(self, client, repository, config):
+    def __init__(self, client, label, repository):
         self.client = client
+        self.label = label
         self.repository = repository
-        self.config = {}
 
     def __str__(self):
         return _('{client}: {label}').format(
             client=self.client.name,
-            label=self.config['label'],
+            label=self.label,
         )
 
 
@@ -281,7 +301,8 @@ class Job(Evolvable):
         self.repository = repository
         self.state = self.State.job_created
         if repository:
-            repository.jobs[self.created.timestamp()] = self
+            # TODO better (more resolution, unique)
+            repository.jobs[int(self.created.timestamp())] = self
 
     @property
     def duration(self):
@@ -407,8 +428,9 @@ class BackupJob(Job):
     def __init__(self, repository, client, config):
         super().__init__(repository)
         self.client = client
-        client.jobs[self.created.timestamp()] = self
+        client.jobs[int(self.created.timestamp())] = self
         self.archive = None
+        self.config = config
 
     @property
     def reverse_path(self):

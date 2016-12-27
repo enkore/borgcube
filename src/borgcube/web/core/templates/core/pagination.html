@@ -8,6 +8,7 @@ Options:
 {% endcomment %}
 
 {% load i18n %}
+{% if page.paginator.count %}
 <div class='pagination'>
     <span class='step-links'>
         {% if page.has_previous %}
@@ -24,7 +25,7 @@ Options:
             {% endblocktrans %}
         </span>
 
-        {% if jobs.has_next %}
+        {% if page.has_next %}
           {% if prefix %}
             <a href='?{{ prefix }}_page={{ page.next_page_number }}#{{ prefix }}'>{% trans 'Next page' %}</a>
           {% else %}
@@ -33,3 +34,4 @@ Options:
         {% endif %}
     </span>
 </div>
+{% endif %}

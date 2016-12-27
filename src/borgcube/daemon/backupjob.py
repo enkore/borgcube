@@ -11,6 +11,8 @@ from django.conf import settings
 from django.utils.translation import ugettext_lazy as _
 from django import forms
 
+import transaction
+
 from borg.helpers import get_cache_dir, bin_to_hex, Manifest, Location
 from borg.cache import Cache
 from borg.key import PlaintextKey
@@ -19,7 +21,7 @@ from borg.locking import LockTimeout, LockFailed, LockError, LockErrorT
 
 from borgcube.core.models import BackupJob, JobConfig, ScheduledAction
 from borgcube.keymgt import synthesize_client_key, SyntheticManifest
-from borgcube.utils import open_repository, tee_job_logs
+from borgcube.utils import open_repository, tee_job_logs, data_root
 from django.core.exceptions import ObjectDoesNotExist
 
 from .hookspec import JobExecutor
@@ -32,8 +34,8 @@ def check_call(*popenargs, **kwargs):
     return subprocess.check_call(*popenargs, **kwargs)
 
 
-def borgcubed_job_executor(job_id):
-    if BackupJob.objects.filter(id=job_id).exists():
+def borgcubed_job_executor(job):
+    if job.short_name == 'backup':
         return BackupJobExecutor
 
 
@@ -42,24 +44,33 @@ def borgcubed_handle_request(apiserver, request):
         return
     try:
         client_hostname = request['client']
-        jobconfig_id = request['job_config']
+        jobconfig_oid = request['job_config']
     except KeyError as ke:
         return apiserver.error('Missing parameter %r', ke.args[0])
     try:
-        job_config = JobConfig.objects.get(client=client_hostname, id=jobconfig_id)
-    except ObjectDoesNotExist:
+        client = data_root().clients[client_hostname]
+        for config in client.job_configs:
+            if config.oid == jobconfig_oid:
+                break
+        else:
+            raise KeyError
+    except KeyError:
         return apiserver.error('No such JobConfig')
-    job = make_backup_job(apiserver, job_config)
+    job = make_backup_job(apiserver, client, config)
     return {
         'success': True,
-        'job': str(job.id),
+        'job': job.oid,
     }
 
 
-def make_backup_job(apiserver, job_config):
-    job = BackupJob.from_config(job_config)
-    job.save()
-    log.info('Created job %s for client %s, job config %d', job.id, job_config.client.hostname, job_config.id)
+def make_backup_job(apiserver, client, config):
+    job = BackupJob(
+        repository=config.repository,
+        client=client,
+        config=config,
+    )
+    transaction.commit()
+    log.info('Created job %s for client %s, job config %s', job.oid, client.hostname, config.oid)
     apiserver.queue_job(job)
     return job
 
@@ -109,8 +120,7 @@ class BackupJobExecutor(JobExecutor):
     name = 'backup-job'
 
     @classmethod
-    def prefork(cls, job_id):
-        job = BackupJob.objects.get(id=job_id)
+    def prefork(cls, job):
         job.update_state(BackupJob.State.job_created, BackupJob.State.client_preparing)
 
     @classmethod

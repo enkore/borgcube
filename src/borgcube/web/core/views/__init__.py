@@ -69,8 +69,7 @@ def dashboard(request):
 
 
 def clients(request):
-    # TODO this makes one extra query per client due to latest_job
-    clients = Client.objects.all().order_by('hostname')
+    clients = data_root().clients.values()
     return TemplateResponse(request, 'core/client/list.html', {
         'm': Client,
         'clients': clients,
@@ -123,10 +122,8 @@ def client_edit(request, client_id):
     del client_form.fields['hostname']
     connection_form = RshClientConnection.Form(data, initial=client.connection.__dict__)
     if data and client_form.is_valid() and connection_form.is_valid():
-        client.__dict__.update(client_form.cleaned_data)
-        client._p_changed = True
-        client.connection.__dict__.update(connection_form.cleaned_data)
-        client.connection._p_changed = True
+        client._update(client_form.cleaned_data)
+        client.connection._update(connection_form.cleaned_data)
         transaction.commit()
         return redirect(client_view, client.hostname)
     return TemplateResponse(request, 'core/client/edit.html', {
@@ -203,16 +200,26 @@ def job_config_add(request, client_id):
     if data and form.is_valid() and advanced_form.is_valid():
         config = form.cleaned_data
         config.update(advanced_form.cleaned_data)
-        repository = config.pop('repository')
-        config['version'] = 1
+        config['paths'] = config.get('paths', '').split('\n')
+        config['excludes'] = [s for s in config.get('excludes', '').split('\n') if s]
+
+        print(config)
+
+        repository = data_root()._p_jar.get(bytes.fromhex(config.pop('repository')))
+        if repository not in data_root().repositories:
+            raise Http404
+        job_config = JobConfig(client=client, repository=repository, label=config['label'])
+        job_config._update(config)
+        client.job_configs.append(job_config)
+        # client._p_changed = True  # TODO ??? !!!
+        assert client.job_configs._p_changed
+        transaction.commit()
+
         # TODO StringListValidator
         # TODO Pattern validation
         # TODO fancy pattern editor with test area
-        config['paths'] = config.get('paths', '').split('\n')
-        config['excludes'] = [s for s in config.get('excludes', '').split('\n') if s]
-        job_config = JobConfig(client=client, config=config, repository=repository)
-        job_config.save()
-        return redirect(reverse(client_view, args=[client.pk]) + '#jobconfig-%d' % job_config.id)
+
+        return redirect(reverse(client_view, args=[client.hostname]) + '#jobconfig-%s' % job_config.oid)
     return TemplateResponse(request, 'core/client/config_add.html', {
         'form': form,
         'advanced_form': advanced_form,
@@ -220,30 +227,33 @@ def job_config_add(request, client_id):
 
 
 def job_config_edit(request, client_id, config_id):
-    job_config = get_object_or_404(JobConfig, client=client_id, id=config_id)
+    client = data_root().clients[client_id]
+    job_config = data_root()._p_jar.get(bytes.fromhex(config_id))
+    if job_config not in client.job_configs:
+        raise Http404
     data = request.POST or None
-    initial_data = dict(job_config.config)
+    job_config._p_activate()
+    initial_data = dict(job_config.__dict__)
     initial_data['paths'] = '\n'.join(initial_data['paths'])
     initial_data['excludes'] = '\n'.join(initial_data['excludes'])
-    initial_data['repository'] = job_config.repository
     form = JobConfigForm(data=data, initial=initial_data)
     advanced_form = JobConfigForm.AdvancedForm(data=data, initial=initial_data)
     if data and form.is_valid() and advanced_form.is_valid():
         config = form.cleaned_data
         config.update(advanced_form.cleaned_data)
-        repository = config.pop('repository')
-        config['version'] = 1
+        config['paths'] = config.get('paths', '').split('\n')
+        config['excludes'] = [s for s in config.get('excludes', '').split('\n') if s]
+        job_config.repository = data_root()._p_jar.get(bytes.fromhex(config.pop('repository')))
+        if job_config.repository not in data_root().repositories:
+            raise Http404
+        job_config._update(config)
         # TODO StringListValidator
         # TODO Pattern validation
         # TODO fancy pattern editor with test area
-        config['paths'] = config.get('paths', '').split('\n')
-        config['excludes'] = [s for s in config.get('excludes', '').split('\n') if s]
-
-        job_config.repository = repository
-        job_config.config = config
-        job_config.save()
-        return redirect(reverse(client_view, args=[job_config.client.pk]) + '#jobconfig-%d' % job_config.id)
+        transaction.commit()
+        return redirect(reverse(client_view, args=[job_config.client.hostname]) + '#jobconfig-%s' % job_config.oid)
     return TemplateResponse(request, 'core/client/config_edit.html', {
+        'client': client,
         'form': form,
         'advanced_form': advanced_form,
         'job_config': job_config,
@@ -251,15 +261,23 @@ def job_config_edit(request, client_id, config_id):
 
 
 def job_config_delete(request, client_id, config_id):
-    config = get_object_or_404(JobConfig, client=client_id, id=config_id)
+    client = data_root().clients[client_id]
+    job_config = data_root()._p_jar.get(bytes.fromhex(config_id))
+    if job_config not in client.job_configs:
+        raise Http404
     if request.method == 'POST':
-        config.delete()
+        client.job_configs.remove(job_config)
+        transaction.commit()
     return redirect(client_view, client_id)
 
 
 def job_config_trigger(request, client_id, config_id):
-    client = get_object_or_404(Client, pk=client_id)
-    config = get_object_or_404(JobConfig, client=client_id, id=config_id)
+    client = data_root().clients[client_id]
+    for config in client.job_configs:
+        if config.oid == config_id:
+            break
+    else:
+        raise Http404
     if request.method == 'POST':
         daemon = APIClient()
         job = daemon.initiate_backup_job(client, config)
@@ -297,8 +315,7 @@ def repository_edit(request, id):
     repository._p_activate()
     repository_form = Repository.Form(data, initial=repository.__dict__)
     if data and repository_form.is_valid():
-        repository.__dict__.update(repository_form.cleaned_data)
-        repository._p_changed = True
+        repository._update(repository_form.cleaned_data)
         transaction.commit()
         return redirect(repository_view, repository.oid)
     return TemplateResponse(request, 'core/repository/edit.html', {

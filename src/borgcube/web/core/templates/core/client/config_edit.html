@@ -4,7 +4,12 @@
 {% block title %}{% blocktrans with label=job_config.config.label %}Edit job configuration {{ label }}{% endblocktrans %}{% endblock %}
 
 {% block content %}
-  <h1>{% blocktrans with label=job_config.config.label %}Edit job configuration {{ label }}{% endblocktrans %}</h1>
+  <h1>
+    {% blocktrans with label=job_config.label %}Edit job configuration {{ label }}{% endblocktrans %}
+      {% url 'core.job_config_delete' client.hostname job_config.oid as url %}
+      {% trans 'delete' as label %}
+      {% trans 'Are you sure you want to delete this configuration?' as confirm %}
+    <small>({% include 'core/post_link.html' with url=url label=label confirm=confirm %})</small></h1>
 
   <form method='POST'>
     <table>

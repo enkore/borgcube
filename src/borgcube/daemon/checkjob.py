@@ -13,8 +13,8 @@ from .client import APIError
 log = logging.getLogger('borgcubed.checkjob')
 
 
-def borgcubed_job_executor(job_id):
-    if CheckJob.objects.filter(id=job_id).exists():
+def borgcubed_job_executor(job):
+    if job.short_name == 'check':
         return CheckJobExecutor
 
 

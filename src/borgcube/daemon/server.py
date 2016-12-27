@@ -216,10 +216,10 @@ class APIServer(BaseServer):
         """
         executor_class = hook.borgcubed_job_executor(job=job)
         if not executor_class:
-            log.error('Cannot queue job %s: No JobExecutor found', job.id)
+            log.error('Cannot queue job %s: No JobExecutor found', job)
             return
-        self.queue.append((executor_class, job.id))
-        log.debug('Enqueued job %s', job.id)
+        self.queue.append((executor_class, job))
+        log.debug('Enqueued job %s', job.oid)
 
     def cmd_cancel_job(self, request):
         try:
@@ -232,6 +232,7 @@ class APIServer(BaseServer):
         log.info('Cancelling job %s', job_id)
         if job.state not in job.State.STABLE:
             job.force_state(job.State.cancelled)
+        # TODO update
         for i, (ec, item_job_id) in enumerate(self.queue[:]):
             if item_job_id == job_id:
                 del self.queue[i]
@@ -299,8 +300,8 @@ class APIServer(BaseServer):
                 if oe.errno == errno.ECHILD:
                     # Uh-oh
                     log.error('waitpid(2) failed with ECHILD, but we thought we had children')
-                    for pid, (command, job_id) in self.children.items():
-                        log.error('I am missing child %d, command %s %s', pid, command, job_id)
+                    for pid, (command, job) in self.children.items():
+                        log.error('I am missing child %d, command %s %s', pid, command, job.oid)
             if not pid:
                 break
             signo = waitres & 0xFF
@@ -311,13 +312,12 @@ class APIServer(BaseServer):
                 logger('Child %d exited with code %d on signal %d', pid, code, signo)
             else:
                 logger('Child %d exited with code %d', pid, code)
-            command, job_id = self.children.pop(pid)
-            logger('Command was: %s %r', command, job_id)
+            command, job = self.children.pop(pid)
+            logger('Command was: %s %r', command, job.oid)
             if code or signo:
-                job = Job.objects.get(id=job_id)
                 if job.state not in job.State.STABLE or job.state == job.State.job_created:
                     job.force_state(job.State.failed)
-            hook.borgcubed_job_exit(apiserver=self, job_id=job_id, exit_code=code, signo=signo)
+            hook.borgcubed_job_exit(apiserver=self, job=job, exit_code=code, signo=signo)
         self.exit |= self.shutdown and not self.children
 
     def check_queue(self):
