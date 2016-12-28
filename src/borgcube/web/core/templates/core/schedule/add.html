@@ -180,14 +180,12 @@
       }
 
       function remove_action () {
-        var rows = document.getElementsByClassName(action_cls);
+        //           a    small      h3         td         tr[data-action]
+        var action = this.parentNode.parentNode.parentNode.parentNode;
+        var rows = document.querySelectorAll("[data-action='" + action.dataset.action + "']");
         var parent = rows[0].parentNode;
         /* reverse iteration since *rows* is a live HTMLCollection */
         for (var i = rows.length - 1; i >= 0; i--) {
-          /* don't forget to back *before_actions* up correctly */
-          if (rows[i] === before_actions) {
-            before_actions = rows[i].previousSibling;
-          }
           parent.removeChild(rows[i]);
         }
       }
@@ -204,11 +202,12 @@
           var prerendered_action = prerendered_actions[i];
           var rows = prerendered_action.getElementsByTagName('tr');
           var action = prerendered_action.dataset.action;
+
+          prerendered_action.getElementsByClassName('action-header')[0].getElementsByClassName('remove-action')[0].addEventListener('click', remove_action);
           while (rows.length) {
             var row = rows[0];
             if (row instanceof HTMLElement) {
               row.setAttribute('data-action', action);
-              console.log('set');
             }
             end.parentNode.insertBefore(row, end);
           }
