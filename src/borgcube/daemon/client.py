@@ -5,6 +5,8 @@ from django.conf import settings
 
 import zmq
 
+import transaction
+
 from ..utils import hook, data_root
 
 log = logging.getLogger(__name__)
@@ -52,6 +54,7 @@ class APIClient:
             log.error('APIClient.initiate_backup_job(%r, %d) failed: %s', client.hostname, job_config.oid, reply['message'])
             raise APIError(reply['message'])
         log.info('Initiated backup job %s', reply['job'])
+        transaction.begin()
         return data_root()._p_jar[bytes.fromhex(reply['job'])]
 
     def cancel_job(self, job):

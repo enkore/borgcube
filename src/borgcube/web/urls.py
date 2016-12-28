@@ -39,16 +39,16 @@ repo_urls = [
 ]
 
 job_urls = [
-    url(r'^(?P<job_id>\d+)/$', core_views.job_view, name='core.job_view'),
-    url(r'^(?P<job_id>\d+)/cancel/$', core_views.job_cancel, name='core.job_cancel'),
+    url(r'^(?P<job_id>[a-f0-9]+)/$', core_views.job_view, name='core.job_view'),
+    url(r'^(?P<job_id>[a-f0-9]+)/cancel/$', core_views.job_cancel, name='core.job_cancel'),
 ]
 
 schedule_urls = [
-    url(r'^$', core_views.schedule, name='core.schedule'),
+    url(r'^$', core_views.schedules, name='core.schedules'),
     url(r'^list/$', core_views.schedule_list, name='core.schedule_list'),
     url(r'^add/$', core_views.schedule_add, name='core.schedule_add'),
     url(r'^action-form/$', core_views.scheduled_action_form, name='core.scheduled_action_form'),
-    url(r'^(?P<item_id>[a-f0-9]+)/edit/$', core_views.schedule_edit, name='core.schedule_edit'),
+    url(r'^(?P<schedule_id>[a-f0-9]+)/edit/$', core_views.schedule_edit, name='core.schedule_edit'),
     url(r'^(?P<schedule_id>[a-f0-9]+)/delete/$', core_views.schedule_delete, name='core.schedule_delete'),
 ]
 
@@ -68,7 +68,7 @@ urlpatterns = [
 
     url(r'^job/', include(job_urls)),
 
-    url(r'^schedule/', include(schedule_urls)),
+    url(r'^schedules/', include(schedule_urls)),
 
     url(r'^admin/', admin.site.urls),
     url(r'^javascript-i18n/$', django.views.i18n.javascript_catalog, js_info_dict),

@@ -89,7 +89,7 @@ class JobExecutor:
                 hook.borgcube_job_blocked(job=job, blocking_jobs=blocking_jobs)
         if blocking_jobs:
             log.debug('Job %s blocked by running backup jobs: %s',
-                      job.id, ' '.join('{} ({})'.format(job.id, job.state) for job in blocking_jobs))
+                      job.oid, ' '.join('{} ({})'.format(job.oid, job.state) for job in blocking_jobs))
         return not blocking_jobs
 
     @classmethod

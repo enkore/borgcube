@@ -24,6 +24,13 @@ _db_local = local()
 _db_lock = Lock()
 
 
+def reset_db_connection():
+    global _db
+    with _db_lock:
+        _db = None
+        _db_local.__dict__.clear()
+
+
 def db():
     global _db
     try:

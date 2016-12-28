@@ -8,6 +8,7 @@ from django.utils import timezone
 from borg.helpers import format_file_size
 
 from borgcube.core.models import Archive, BackupJob
+from borgcube.utils import data_root
 
 from .models import OverviewMetric
 from .metrics import Metric
@@ -40,7 +41,7 @@ class ArchiveCount(Metric):
     default_label = _('ArchiveCount metric label', 'archives')
 
     def formatted_value(self):
-        return str(Archive.objects.count())
+        return str(len(data_root().archives))
 
 
 class TotalData(Metric):
@@ -48,7 +49,10 @@ class TotalData(Metric):
     default_label = _('TotalData metric label', '(total data)')
 
     def formatted_value(self):
-        return format_file_size(Archive.objects.all().aggregate(Sum('original_size'))['original_size__sum'] or 0)
+        total_size = 0
+        for archive in data_root().archives.values():
+            total_size += archive.original_size
+        return format_file_size(total_size)
 
 
 class BackupsToday(Metric):
@@ -56,5 +60,5 @@ class BackupsToday(Metric):
     default_label = _('BackupsToday metric label', 'backups today')
 
     def formatted_value(self):
-        today_begin = timezone.now().replace(hour=0, minute=0, microsecond=0)
-        return str(BackupJob.objects.filter(timestamp_end__gte=today_begin, state=BackupJob.State.done).count())
+        today_begin = int(timezone.now().replace(hour=0, minute=0, microsecond=0).timestamp())
+        return str(len(list(data_root().jobs_by_state[BackupJob.State.done].keys(min=today_begin))))

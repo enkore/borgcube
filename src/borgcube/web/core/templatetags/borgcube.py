@@ -22,7 +22,6 @@ def field_name(obj, field):
     try:
         name = obj.Form.declared_fields[field].label
     except AttributeError as ae:
-        print(ae)
         name = None
     name = name or field
     if name == field.replace('_', ' '):
@@ -82,7 +81,10 @@ def job_outcome(job):
     if outcome:
         return outcome
     if job.failed:
-        failure_cause = job.data.get('failure_cause')
+        try:
+            failure_cause = job.failure_cause
+        except AttributeError:
+            failure_cause = None
         if failure_cause:
             failure_kind = failure_cause['kind']
             if failure_kind == 'client-connection-failed':

@@ -241,7 +241,7 @@
         <ul>
           {# TODO: real detection of current item ;) #}
           <li><a href='{% url 'core.dashboard' %}' {% if request.path == '/' %}class='active'{% endif %}>{% trans 'Dashboard' %}</a></li>
-          <li><a href='{% url 'core.schedule' %}' {% if '/schedule/' in request.path %}class='active'{% endif %}>{% trans 'Schedule' %}</a></li>
+          <li><a href='{% url 'core.schedules' %}' {% if '/schedules/' in request.path %}class='active'{% endif %}>{% trans 'Schedule' %}</a></li>
           <li><a href='{% url 'core.clients' %}' {% if '/clients/' in request.path %}class='active'{% endif %}>{% trans 'Clients' %}</a></li>
           <li><a href='{% url 'core.repositories' %}' {% if '/repositories/' in request.path %}class='active'{% endif %}>{% trans 'Repositories' %}</a></li>
           <li><a href='/'>Management</a></li>

@@ -22,7 +22,7 @@ from borg.locking import LockTimeout, LockFailed, LockError, LockErrorT
 from borgcube.core.models import BackupJob, JobConfig, ScheduledAction
 from borgcube.keymgt import synthesize_client_key, SyntheticManifest
 from borgcube.utils import open_repository, tee_job_logs, data_root
-from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 
 from .hookspec import JobExecutor
 
@@ -75,32 +75,46 @@ def make_backup_job(apiserver, client, config):
     return job
 
 
+def job_configs_as_choices():
+    for client in data_root().clients.values():
+        for config in client.job_configs:
+            yield config.oid, config
+
+
 class ScheduledBackup(ScheduledAction):
     name = _('Schedule backup job')
     job_config = None
 
-    def __init__(self, apiserver):
-        super().__init__(apiserver)
+    def __init__(self, schedule, job_config):
+        super().__init__(schedule)
+        self.job_config = job_config
 
     def __str__(self):
         return _('Run {}').format(self.job_config)
 
     def execute(self, apiserver):
-        if not self.job_config:
-            log.warning('ScheduledBackup: not running due to previous error.')
-            return
-        for job in BackupJob.objects.exclude(state__in=BackupJob.State.STABLE - {BackupJob.State.job_created}):
-            if job.get_jobconfig() == self.job_config:
-                log.warning(
-                    'run_from_schedule: not triggering a new job for config %d, since job %d is queued or running',
-                    self.job_config.id, job.id)
-                return
-        make_backup_job(self.apiserver, self.job_config)
+        for state, jobs in data_root().jobs_by_state.items():
+            if state in BackupJob.State.STABLE - {BackupJob.State.job_created}:
+                continue
+            for job in jobs.values():
+                if job.config == self.job_config:
+                    log.warning(
+                        'run_from_schedule: not triggering a new job for config %d, since job %d is queued or running',
+                        self.job_config.oid, job.oid)
+                    return
+
+        make_backup_job(apiserver, self.job_config.client, self.job_config)
 
     class Form(forms.Form):
-        # TODO: (js-space); drill down, first select client, then config?
-        # job_config = forms.ModelChoiceField(JobConfig.objects.all())
-        pass
+        job_config = forms.ChoiceField(choices=job_configs_as_choices)
+
+        def clean(self):
+            data = super().clean()
+            o = data_root()._p_jar[bytes.fromhex(data['job_config'])]
+            if not isinstance(o, JobConfig):
+                raise ValidationError('Invalid object reference')
+            data['job_config'] = o
+            return data
 
 
 def cpe_means_connection_failure(called_process_error):
@@ -124,8 +138,7 @@ class BackupJobExecutor(JobExecutor):
         job.update_state(BackupJob.State.job_created, BackupJob.State.client_preparing)
 
     @classmethod
-    def run(cls, job_id):
-        job = BackupJob.objects.get(id=job_id)
+    def run(cls, job):
         executor = cls(job)
         executor.execute()
 
@@ -149,22 +162,21 @@ class BackupJobExecutor(JobExecutor):
             self.remote_create(self.create_command_line())
             self.client_cleanup()
             self.job.update_state(BackupJob.State.client_cleanup, BackupJob.State.done)
-            log.info('Job %s completed successfully', self.job.id)
+            log.info('Job %s completed successfully', self.job.oid)
         except CalledProcessError as cpe:
             self.job.force_state(BackupJob.State.failed)
             if not self.analyse_job_process_error(cpe):
                 raise
-            self.job.save()
         except Repository.DoesNotExist:
             self.job.set_failure_cause('repository-does-not-exist')
-            log.error('Job %s failed because the repository %r does not exist', self.job.id, self.repository.url)
+            log.error('Job %s failed because the repository %r does not exist', self.job.oid, self.repository.url)
         except Repository.CheckNeeded:
             # TODO: schedule check automatically?
             self.job.set_failure_cause('repository-check-needed')
-            log.error('Job %s failed because the repository %r needs a check run', self.job.id, self.repository.url)
+            log.error('Job %s failed because the repository %r needs a check run', self.job.oid, self.repository.url)
         except Repository.InsufficientFreeSpaceError:
             self.job.set_failure_cause('repository-enospc')
-            log.error('Job %s failed because the repository %r had not enough free space', self.job.id, self.repository.url)
+            log.error('Job %s failed because the repository %r had not enough free space', self.job.oid, self.repository.url)
         except LockTimeout as lock_error:
             if get_cache_dir() in lock_error.args[0]:
                 self.job.set_failure_cause('cache-lock-timeout')
@@ -192,7 +204,7 @@ class BackupJobExecutor(JobExecutor):
     def analyse_job_process_error(self, called_process_error):
         if cpe_means_connection_failure(called_process_error):
             self.job.set_failure_cause('client-connection-failed', command=called_process_error.cmd, exit_code=called_process_error.returncode)
-            log.error('Job %s failed due to client connection failure', self.job.id)
+            log.error('Job %s failed due to client connection failure', self.job.oid)
             return True
         if 'A newer version is required to access this repository.' in called_process_error.output and called_process_error.returncode == 2:
             self.job.set_failure_cause('client-borg-outdated', output=called_process_error.output)
@@ -208,13 +220,13 @@ class BackupJobExecutor(JobExecutor):
             manifest, key = Manifest.load(repository)
             client_key = synthesize_client_key(key, repository)
             if not isinstance(client_key, PlaintextKey):
-                job.data['client_key_data'] = client_key.get_key_data()
-                job.data['client_key_type'] = client_key.synthetic_type
+                job.client_key_data = client_key.get_key_data()
+                job.client_key_type = client_key.synthetic_type
 
             client_manifest = SyntheticManifest(client_key, repository.id)
-            job.data['client_manifest_data'] = bin_to_hex(client_manifest.write())
-            job.data['client_manifest_id_str'] = client_manifest.id_str
-            job.save()
+            job.client_manifest_data = bin_to_hex(client_manifest.write())
+            job.client_manifest_id_str = client_manifest.id_str
+            transaction.commit()
 
     def transfer_cache(self, job_cache_path):
         # TODO per-client files cache, on the client or on the server?
@@ -237,7 +249,7 @@ class BackupJobExecutor(JobExecutor):
 
     def create_job_cache(self, cache_path):
         self.ensure_cache(cache_path)
-        job_cache_path = cache_path / str(self.job.id)
+        job_cache_path = cache_path / str(self.job.oid)
         job_cache_path.mkdir()
         log.debug('create_job_cache: path is %r', job_cache_path)
 
@@ -248,7 +260,7 @@ class BackupJobExecutor(JobExecutor):
         config.add_section('cache')
         config.set('cache', 'version', '1')
         config.set('cache', 'repository', self.repository.repository_id)
-        config.set('cache', 'manifest',  self.job.data['client_manifest_id_str'])
+        config.set('cache', 'manifest',  self.job.client_manifest_id_str)
         # TODO: path canoniciialailaition thing
         config.set('cache', 'previous_location', Location(self.job.reverse_location).canonical_path().replace('/./', '/~/'))
         with (job_cache_path / 'config').open('w') as fd:
@@ -303,20 +315,19 @@ class BackupJobExecutor(JobExecutor):
             command_line += '--remote-path', settings.SERVER_PROXY_PATH
 
         config = self.job.config
-        assert config['version'] == 1, 'Unknown JobConfig version: %r' % config['version']
-        for path in config['paths']:
+        for path in config.paths:
             command_line.append(shlex.quote(path))
-        for exclude in config['excludes']:
+        for exclude in config.excludes:
             command_line += '--exclude', shlex.quote(exclude)
-        if config['one_file_system']:
+        if config.one_file_system:
             command_line += '--one-file-system',
-        if config['read_special']:
+        if config.read_special:
             command_line += '--read-special',
-        if config['ignore_inode']:
+        if config.ignore_inode:
             command_line += '--ignore-inode',
-        command_line += '--checkpoint-interval', str(config['checkpoint_interval'])
-        command_line += '--compression', config['compression']
-        extra_options = config.get('extra_options')
+        command_line += '--checkpoint-interval', str(config.checkpoint_interval)
+        command_line += '--compression', config.compression
+        extra_options = config.extra_options
         if extra_options:
             command_line += extra_options,
 
@@ -330,15 +341,14 @@ class BackupJobExecutor(JobExecutor):
         except CalledProcessError as cpe:
             if cpe.returncode == 1:
                 log.debug('remote create finished (warning)')
-                self.job.refresh_from_db()
-                self.job.data['borg_warning'] = True
-                self.job.save()
+                with transaction.manager:
+                    self.job.borg_warning = True
             else:
                 raise
         else:
-            self.job.refresh_from_db()
             log.debug('remote create finished (success)')
-        self.job.repository.refresh_from_db()
+        finally:
+            transaction.begin()
         self.job.update_state(BackupJob.State.client_in_progress, BackupJob.State.client_done)
 
     def client_cleanup(self):

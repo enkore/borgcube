@@ -15,7 +15,7 @@ from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 
 from ..core.models import Job
-from ..utils import set_process_name, hook, data_root
+from ..utils import set_process_name, hook, data_root, reset_db_connection
 
 log = logging.getLogger('borgcubed')
 
@@ -132,6 +132,8 @@ class APIServer(BaseServer):
         super().__init__(address, context)
         # PID -> (command, params...)
         self.children = {}
+        # PID -> type-of-service
+        self.services = {}
         self.queue = []
         set_process_name('borgcubed [main process]')
         if settings.BUILTIN_ZEO:
@@ -171,7 +173,9 @@ class APIServer(BaseServer):
         except OSError:
             pass
         pid = self.fork()
-        if not pid:
+        if pid:
+            self.services[pid] = 'zeo'
+        else:
             from ZEO.StorageServer import StorageServer
             set_process_name('borgcubed [database process]')
 
@@ -190,6 +194,7 @@ class APIServer(BaseServer):
                 server.loop()
             finally:
                 server.close()
+                sys.exit(0)
 
     def handle_request(self, request):
         command = request['command']
@@ -223,23 +228,25 @@ class APIServer(BaseServer):
 
     def cmd_cancel_job(self, request):
         try:
-            job_id = request['job_id']
-            job = Job.objects.get(id=job_id)
+            job_id = bytes.fromhex(request['job_id'])
+            job = data_root()._p_jar[job_id]
+            # if int(job.created.timestamp()) not in data_root().jobs:
+            #  abort
         except KeyError as ke:
             return self.error('Missing parameter %r', ke.args[0])
-        except ObjectDoesNotExist:
-            return self.error('No such JobConfig')
+        except KeyError:
+            return self.error('No such job')
         log.info('Cancelling job %s', job_id)
         if job.state not in job.State.STABLE:
             job.force_state(job.State.cancelled)
         # TODO update
-        for i, (ec, item_job_id) in enumerate(self.queue[:]):
-            if item_job_id == job_id:
+        for i, (ec, item_job) in enumerate(self.queue[:]):
+            if item_job == job:
                 del self.queue[i]
                 log.info('Cancelled queued job %s', job_id)
                 return {'success': True}
-        for pid, (command, item_job_id) in self.children.items():
-            if item_job_id == job_id:
+        for pid, (command, item_job) in self.children.items():
+            if item_job == job:
                 os.kill(pid, signal.SIGTERM)
                 log.info('Cancelled job %s (worker pid was %d)', job_id, pid)
                 return {'success': True}
@@ -293,7 +300,7 @@ class APIServer(BaseServer):
     }
 
     def check_children(self):
-        while self.children:
+        while self.children or self.services:
             try:
                 pid, waitres = os.waitpid(-1, os.WNOHANG)
             except OSError as oe:
@@ -302,6 +309,8 @@ class APIServer(BaseServer):
                     log.error('waitpid(2) failed with ECHILD, but we thought we had children')
                     for pid, (command, job) in self.children.items():
                         log.error('I am missing child %d, command %s %s', pid, command, job.oid)
+                    self.children.clear()
+                    break
             if not pid:
                 break
             signo = waitres & 0xFF
@@ -312,6 +321,10 @@ class APIServer(BaseServer):
                 logger('Child %d exited with code %d on signal %d', pid, code, signo)
             else:
                 logger('Child %d exited with code %d', pid, code)
+            service = self.services.pop(pid, None)
+            if service:
+                logger('Child was service process %s', service)
+                continue
             command, job = self.children.pop(pid)
             logger('Command was: %s %r', command, job.oid)
             if code or signo:
@@ -324,6 +337,7 @@ class APIServer(BaseServer):
         if self.shutdown:
             self.queue.clear()
             return
+        transaction.begin()
         nope = []
         while self.queue:
             executor_class, job = self.queue.pop()
@@ -333,15 +347,25 @@ class APIServer(BaseServer):
             try:
                 executor_class.prefork(job)
             except Exception:
-                log.exception('Unhandled exception in %s.prefork(%s)', executor_class.__name__, job.id)
+                log.exception('Unhandled exception in %s.prefork(%s)', executor_class.__name__, job.oid)
                 job.force_state(job.State.failed)
                 continue
+
+            oid = job.oid
             pid = self.fork()
             if pid:
                 # Parent, gotta watch the kids
                 self.children[pid] = executor_class.name, job
             else:
-                set_process_name('borgcubed [%s %s]' % (executor_class.name, job.id))
+                # One important thing to note about ZODB is that live objects are connected to their DB instance
+                # which is entangled with the async/client business. When forking we need to get rid of these FDs
+                # (can't use them from two processes at once), which also means we can't re-use objects across
+                # a fork.
+                # (Technically *job* was live and loaded, so we could use it here, but to make this more explicit
+                # we don't).
+                set_process_name('borgcubed [%s %s]' % (executor_class.name, oid))
+                reset_db_connection()
+                job = data_root()._p_jar[bytes.fromhex(oid)]
                 executor_class.run(job)
                 sys.exit(0)
         self.queue.extend(nope)

@@ -20,7 +20,7 @@ from ..metrics import Metric
 
 from borgcube.core.models import Client, Repository, CheckConfig, RshClientConnection
 from borgcube.core.models import Job, JobConfig
-from borgcube.core.models import ScheduledAction
+from borgcube.core.models import Schedule, ScheduledAction
 from borgcube.daemon.client import APIClient
 from borgcube.utils import data_root
 
@@ -47,25 +47,20 @@ def fetch_metrics():
 
 
 def dashboard(request):
+    recent_jobs = []
+    jobs = data_root().jobs
+    key = jobs.minKey()
+    while len(recent_jobs) < 20:
+        recent_jobs.append(jobs[key])
+        keys = jobs.keys(min=key, excludemin=True)
+        for key in keys:
+            break
+        else:
+            break
     return TemplateResponse(request, 'core/dashboard.html', {
         'metrics': fetch_metrics(),
-        'recent_jobs': Job.objects.all()[:20],
+        'recent_jobs': recent_jobs,
     })
-
-
-#class ClientForm(forms.ModelForm):
-#    class Meta:
-#        model = Client
-#        fields = '__all__'
-#        exclude =('connection',)
-
-
-#class ClientConnectionForm(forms.ModelForm):
-#    prefix = 'connection'
-#
-#    class Meta:
-#        model = ClientConnection
-#        fields = '__all__'
 
 
 def clients(request):
@@ -138,10 +133,12 @@ def job_view(request, job_id):
 
 
 def job_cancel(request, job_id):
-    job = get_object_or_404(Job, id=job_id)
+    job = data_root()._p_jar[bytes.fromhex(job_id)]
+    if int(job.created.timestamp()) not in data_root().jobs:
+        raise Http404
     daemon = APIClient()
     daemon.cancel_job(job)
-    return redirect(client_view, job.client.pk)
+    return redirect(client_view, job.client.hostname)
 
 
 def repositories_as_choices():
@@ -284,13 +281,6 @@ def job_config_trigger(request, client_id, config_id):
     return redirect(client_view, client_id)
 
 
-#class RepositoryForm(forms.ModelForm):
-#    # TODO update repo id during connection check
-#    class Meta:
-#        model = Repository
-#        fields = '__all__'
-
-
 def repositories(request):
     return TemplateResponse(request, 'core/repository/list.html', {
         'm': Repository,
@@ -384,46 +374,39 @@ def repository_check_config_trigger(request, id, config_id):
     return redirect(repository_view, id)
 
 
-#class ScheduleItemForm(forms.ModelForm):
-#    class Meta:
-#        model = ScheduleItem
-#        fields = '__all__'
-
-
 from dateutil.relativedelta import relativedelta
 
 
-def schedule(request):
+def schedules(request):
     this_month = now().replace(day=1, hour=0, minute=0, second=0)
     end_of_this_month = this_month + relativedelta(months=1)
 
-    items = []
-    for si in ScheduleItem.objects.all():
-        si.occurences = si.recurrence.between(this_month, end_of_this_month, dtstart=si.recurrence_start)
-        items += si,
+    schedules = data_root().schedules
+    for schedule in schedules:
+        schedule.occurences = schedule.recurrence.between(this_month, end_of_this_month, dtstart=schedule.recurrence_start)
     return TemplateResponse(request, 'core/schedule/schedule.html', {
-        'items': items,
+        'schedules': schedules,
     })
 
 
-def schedule_add_and_edit(request, data, item=None, context=None):
-    form = ScheduleItemForm(data, instance=item)
+def schedule_add_and_edit(request, data, schedule=None, context=None):
+    if schedule:
+        schedule._p_activate()
+        form = Schedule.Form(data, initial=schedule.__dict__)
+    else:
+        form = Schedule.Form(data)
     action_forms = []
 
     # This generally works since pluggy loads plugin modules for us.
-    classes = ScheduledAction.SchedulableAction.__subclasses__()
+    classes = ScheduledAction.__subclasses__()
     log.debug('Discovered schedulable actions: %s', ', '.join(cls.dotted_path() for cls in classes))
 
-    for scheduled_action in ScheduledAction.objects.filter(item=item):
-        action = scheduled_action.get_class()
-        if not action:
-            # If saved, this object will be gone.
-            log.error('cannot edit invalid/unknown schedulable action %r, ignoring', scheduled_action.py_class)
-            log.error('args were: %r', scheduled_action.py_args)
-            continue
-        action = import_string(scheduled_action.py_class)
-        action_form = action.form(initial=scheduled_action.py_args)
-        action_forms.append(action_form)
+    if schedule:
+        for scheduled_action in schedule.actions:
+            scheduled_action._p_activate()
+            action_form = scheduled_action.Form(initial=scheduled_action.__dict__)
+            action_form.name = scheduled_action.name
+            action_forms.append(action_form)
 
     if data:
         actions_data = json.loads(data['actions-data'])
@@ -434,13 +417,14 @@ def schedule_add_and_edit(request, data, item=None, context=None):
             pass
 
         try:
-            with transaction.atomic():
-                # A bit of transaction-control-flow magic to ensure that this also works if
-                # any of the SchedulableAction.Forms modify the DB in the background for whatever reason.
+            with transaction.manager:
                 if all_valid:
-                    if item:
-                        ScheduledAction.objects.filter(item=item).delete()
-                    item = form.save()
+                    if schedule:
+                        schedule.actions.clear()
+                        schedule._update(form.cleaned_data)
+                    else:
+                        schedule = Schedule(**form.cleaned_data)
+                        data_root().schedules.append(schedule)
 
                 for serialized_action in actions_data:
                     dotted_path = serialized_action.pop('class')
@@ -449,27 +433,19 @@ def schedule_add_and_edit(request, data, item=None, context=None):
                         continue
                     action = import_string(dotted_path)
 
-                    action_form = action.form(serialized_action)
+                    action_form = action.Form(serialized_action)
+                    action_form.name = action.name
 
                     valid = action_form.is_valid()
                     all_valid &= valid
                     if all_valid:
-                        if hasattr(action_form, 'save'):
-                            action_form.save()
-                        scheduled_action = ScheduledAction(
-                            py_class=dotted_path,
-                            py_args=action_form.cleaned_data,
-                            order=len(action_forms),
-                            item=item,
-                        )
-                        scheduled_action.save()
-
+                        scheduled_action = action(schedule, **action_form.cleaned_data)
+                        schedule.actions.append(scheduled_action)
                     action_forms.append(action_form)
 
                 if not all_valid:
                     raise AbortTransaction
-
-                return redirect(schedule)
+                return redirect(schedules)
         except AbortTransaction:
             pass
     context = dict(context or {})
@@ -489,13 +465,17 @@ def schedule_add(request):
     })
 
 
-def schedule_edit(request, item_id):
-    item = get_object_or_404(ScheduleItem, id=item_id)
+def schedule_edit(request, schedule_id):
+    for schedule in data_root().schedules:
+        if schedule.oid == schedule_id:
+            break
+    else:
+        raise Http404
     data = request.POST or None
-    return schedule_add_and_edit(request, data, item, context={
-        'title': _('Edit schedule {}').format(item.name),
+    return schedule_add_and_edit(request, data, schedule, context={
+        'title': _('Edit schedule {}').format(schedule.name),
         'submit': _('Save changes'),
-        'schedule': item,
+        'schedule': schedule,
     })
 
 
@@ -520,6 +500,6 @@ def scheduled_action_form(request):
 
 def schedule_list(request):
     return TemplateResponse(request, 'core/schedule/list.html', {
-        'm': ScheduleItem,
-        'schedules': ScheduleItem.objects.all(),
+        'm': Schedule,
+        'schedules': data_root().schedules,
     })

@@ -7,7 +7,7 @@
 {% block content %}
   <h1>{% trans 'Schedules' %}
     <small>
-      (<a href='{% url 'core.schedule' %}'>{% trans 'calendar' %}</a>)
+      (<a href='{% url 'core.schedules' %}'>{% trans 'calendar' %}</a>)
       (<a href='{% url 'core.schedule_add' %}'>{% trans 'add' %}</a>)
     </small>
   </h1>
@@ -23,8 +23,8 @@
 
       <!-- TODO last execution overall outcome -->
       <td>
-        <a href='{% url 'core.schedule_edit' schedule.pk %}'>edit</a>
-        {% url 'core.schedule_delete' schedule.pk as url %}
+        <a href='{% url 'core.schedule_edit' schedule.oid %}'>edit</a>
+        {% url 'core.schedule_delete' schedule.oid as url %}
         {% trans 'delete' as label %}
         {% trans 'Are you sure you want to delete this schedule?' as confirm %}
         {% include 'core/post_link.html' with url=url label=label confirm=confirm %}

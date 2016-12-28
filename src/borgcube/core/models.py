@@ -1,5 +1,4 @@
 import datetime
-import enum
 import hmac
 import inspect
 import logging
@@ -8,11 +7,8 @@ from hashlib import sha224
 from pathlib import Path
 
 from django.conf import settings
-from django.contrib.contenttypes.models import ContentType
 from django.core import validators
 from django.db import models
-from django.db.models import QuerySet
-from django.utils.module_loading import import_string
 from django.utils.translation import ugettext_lazy as _
 from django.utils import timezone
 from django import forms
@@ -70,6 +66,16 @@ class Updateable:
         self._p_changed = True
 
 
+class Volatility:
+    _volatile = ()
+
+    def __getstate__(self):
+        state = super().__getstate__()
+        for volatile in self._volatile:
+            state.pop(volatile, None)
+        return state
+
+
 class Evolvable(persistent.Persistent, StringObjectID, Updateable):
     version = 1
 
@@ -113,7 +119,7 @@ class Evolvable(persistent.Persistent, StringObjectID, Updateable):
 class DataRoot(Evolvable):
     def __init__(self):
         self.repositories = PersistentList()
-        # binary archive id -> Archive
+        # hex archive id -> Archive
         self.archives = OOBTree()
         # client hostname -> Client
         self.clients = OOBTree()
@@ -159,13 +165,13 @@ class Repository(Evolvable):
     class Form(forms.Form):
         name = forms.CharField()
         description = forms.CharField(widget=forms.Textarea, required=False)
-        url = forms.CharField(help_text=_('For example /data0/repository or user@storage:/path.'))
-        repository_id = forms.CharField(min_length=64, max_length=64)
+        url = forms.CharField(help_text=_('For example /data0/repository or user@storage:/path.'), label=_('URL'))
+        repository_id = forms.CharField(min_length=64, max_length=64, label=_('Repository ID'))
         remote_borg = forms.CharField(help_text=_('Remote borg binary name (only applies to remote repositories).'))
 
 
 class Archive(Evolvable):
-    def __init__(self, id, repository, name,
+    def __init__(self, id, repository, name, client=None,
                  comment='',
                  nfiles=0, original_size=0, compressed_size=0, deduplicated_size=0,
                  duration=datetime.timedelta()):
@@ -178,6 +184,10 @@ class Archive(Evolvable):
         self.compressed_size = compressed_size
         self.deduplicated_size = deduplicated_size
         self.duration = duration
+        data_root().archives[id] = self
+        repository.archives[id] = self
+        if client:
+            client.archives[id] = self
 
 
 class RshClientConnection(Evolvable):
@@ -253,7 +263,7 @@ class JobConfig(Evolvable):
 
     def __str__(self):
         return _('{client}: {label}').format(
-            client=self.client.name,
+            client=self.client.hostname,
             label=self.label,
         )
 
@@ -263,6 +273,9 @@ class s(str):
         obj = super().__new__(cls, str)
         obj.verbose_name = translation
         return obj
+
+    def __getnewargs__(self):
+        return str(self), self.verbose_name
 
 
 class Job(Evolvable):
@@ -298,11 +311,16 @@ class Job(Evolvable):
 
     def __init__(self, repository=None):
         self.created = timezone.now()
+        self.timestamp_end = None
+        self.timestamp_start = None
         self.repository = repository
         self.state = self.State.job_created
+        key = int(self.created.timestamp())
         if repository:
             # TODO better (more resolution, unique)
-            repository.jobs[int(self.created.timestamp())] = self
+            repository.jobs[key] = self
+        data_root().jobs[key] = self
+        data_root().jobs_by_state.setdefault(self.state, TimestampTree())[key] = self
 
     @property
     def duration(self):
@@ -327,41 +345,31 @@ class Job(Evolvable):
     def stable(self):
         return self.state in self.State.STABLE
 
-    def is_blocked(self):
-        if self.repository:
-            blocking_jobs = self.objects.filter(repository=self.repository)
-        else:
-            blocking_jobs = self.objects.all()
-        blocking_jobs = blocking_jobs.exclude(state__in=self.State.STABLE)
-        job_is_blocked = blocking_jobs.exists()
-        if job_is_blocked:
-            log.debug('Job %s blocked by running backup jobs: %s', self.id,
-                      ' '.join('{} ({})'.format(job.id, job.state) for job in blocking_jobs))
-        return job_is_blocked
-
     def update_state(self, previous, to):
-        with transaction:
-            self.refresh_from_db()
+        with transaction.manager:
             if self.state != previous:
                 raise ValueError('Cannot transition job state from %r to %r, because current state is %r'
                                  % (previous, to, self.state))
             borgcube.utils.hook.borgcube_job_pre_state_update(job=self, current_state=previous, target_state=to)
+            del data_root().jobs_by_state[self.state][int(self.created.timestamp())]
             self.state = to
+            data_root().jobs_by_state.setdefault(self.state, TimestampTree())[int(self.created.timestamp())] = self
             self._check_set_start_timestamp(previous)
             self._check_set_end_timestamp()
-            self.save()
-            log.debug('%s: phase %s -> %s', self.id, previous, to)
+            log.debug('%s: phase %s -> %s', self.oid, previous, to)
             borgcube.utils.hook.borgcube_job_post_state_update(job=self, prior_state=previous, current_state=to)
 
     def force_state(self, state):
-        self.refresh_from_db()
+        transaction.begin()
         if self.state == state:
             return False
-        log.debug('%s: Forced state %s -> %s', self.id, self.state, state)
+        log.debug('%s: Forced state %s -> %s', self.oid, self.state, state)
         self._check_set_start_timestamp(self.state)
+        del data_root().jobs_by_state[self.state][int(self.created.timestamp())]
         self.state = state
+        data_root().jobs_by_state.setdefault(self.state, TimestampTree())[int(self.created.timestamp())] = self
         self._check_set_end_timestamp()
-        self.save()
+        transaction.commit()
         borgcube.utils.hook.borgcube_job_post_force_state(job=self, forced_state=state)
         return True
 
@@ -372,7 +380,7 @@ class Job(Evolvable):
             'kind': kind,
         }
         self.failure_cause.update(kwargs)
-        self.save()
+        transaction.commit()
 
     def log_path(self):
         short_timestamp = self.created.replace(microsecond=0).isoformat()
@@ -382,7 +390,7 @@ class Job(Evolvable):
         return logs_path / file
 
     def _log_file_name(self, timestamp):
-        return '%s-%s-%s' % (timestamp, self.short_name, self.id)
+        return '%s-%s-%s' % (timestamp, self.short_name, self.oid)
 
     def delete(self, using=None, keep_parents=False):
         borgcube.utils.hook.borgcube_job_pre_delete(job=self)
@@ -395,15 +403,15 @@ class Job(Evolvable):
     def _check_set_start_timestamp(self, from_state):
         if from_state == self.State.job_created:
             self.timestamp_start = timezone.now()
-            log.debug('%s: Recording %s as start time', self.id, self.timestamp_start.isoformat())
+            log.debug('%s: Recording %s as start time', self.oid, self.timestamp_start.isoformat())
 
     def _check_set_end_timestamp(self):
         if self.state in self.State.STABLE:
             self.timestamp_end = timezone.now()
-            log.debug('%s: Recording %s as end time', self.id, self.timestamp_end.isoformat())
+            log.debug('%s: Recording %s as end time', self.oid, self.timestamp_end.isoformat())
 
     def __str__(self):
-        return str(self.id)
+        return str(self.oid)
 
     class Meta:
         ordering = ['-created']
@@ -431,26 +439,24 @@ class BackupJob(Job):
         client.jobs[int(self.created.timestamp())] = self
         self.archive = None
         self.config = config
+        self.checkpoint_archives = PersistentList()
 
     @property
     def reverse_path(self):
         return hmac.HMAC((settings.SECRET_KEY + 'BackupJob-revloc').encode(),
-                         str(self.id).encode(),
+                         str(self.oid).encode(),
                          sha224).hexdigest()
 
     @property
     def reverse_location(self):
         return settings.SERVER_LOGIN + ':' + self.reverse_path
 
-    def get_jobconfig(self):
-        return
-
     @property
     def archive_name(self):
-        return self.client.hostname + '-' + str(self.id)
+        return self.client.hostname + '-' + str(self.oid)
 
     def _log_file_name(self, timestamp):
-        return '%s-%s-%s-%s' % (timestamp, self.short_name, self.client.hostname, self.id)
+        return '%s-%s-%s-%s' % (timestamp, self.short_name, self.client.hostname, self.oid)
 
 
 class CheckConfig(Evolvable):
@@ -500,13 +506,15 @@ class Schedule(Evolvable):
 
     class Form(forms.Form):
         name = forms.CharField()
-        description = forms.CharField()
+        description = forms.CharField(required=False, initial='')
 
-        recurrence_start = forms.DateTimeField()
-        recurrence = RecurrenceField(
+        recurrence_start = forms.DateTimeField(
+            initial=timezone.now,
             help_text=_('The recurrence defined below is applied from this date and time onwards.<br/>'
                         'Eg. for daily recurrence the actions would be scheduled for the time set here.<br/>'
-                        'The set time zone is %s.') % settings.TIME_ZONE)
+                        'The set time zone is %s.') % settings.TIME_ZONE
+        )
+        recurrence = RecurrenceField()
 
 
 class DottedPath:

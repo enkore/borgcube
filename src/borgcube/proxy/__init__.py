@@ -5,6 +5,8 @@ from binascii import unhexlify
 
 import msgpack
 
+import transaction
+
 from borg.archive import Archive as BorgArchive
 from borg.helpers import bin_to_hex, IntegrityError, Manifest
 from borg.repository import Repository
@@ -14,7 +16,7 @@ from borg.item import ArchiveItem
 
 from ..core.models import BackupJob, Archive
 from ..keymgt import synthetic_key_from_data, synthesize_client_key, SyntheticManifest
-from ..utils import set_process_name, open_repository
+from ..utils import set_process_name, open_repository, data_root
 
 log = logging.getLogger(__name__)
 # TODO per job log file, the log from this process should not get to the connected client
@@ -82,7 +84,7 @@ class ReverseRepositoryProxy(RepositoryServer):
         except ValueError:
             raise PathNotAllowed(path)
 
-        for job in BackupJob.objects.filter(state=BackupJob.State.client_prepared):
+        for job in data_root().jobs_by_state[BackupJob.State.client_prepared].values():
             if job.reverse_path == path:
                 self.job = job
                 break
@@ -90,13 +92,13 @@ class ReverseRepositoryProxy(RepositoryServer):
             raise PathNotAllowed(path)
 
         self.job.update_state(previous=BackupJob.State.client_prepared, to=BackupJob.State.client_in_progress)
-        set_process_name('borgcube-proxy [job %s]' % self.job.id)
+        set_process_name('borgcube-proxy [job %s]' % self.job.oid)
 
-        log.info('Opening repository for job %s', self.job.id)
+        log.info('Opening repository for job %s', self.job.oid)
         location = self.job.repository.location
         self._real_open(location)
         self._load_repository_key()
-        self._load_client_key(self.job.data)
+        self._load_client_key()
         self._load_cache()
         self._got_archive = False
         self._final_archive = False
@@ -109,14 +111,9 @@ class ReverseRepositoryProxy(RepositoryServer):
     def commit_nonce_reservation(self, next_unreserved, start_nonce):
         pass
 
-    @property
-    def _checkpoint_archives(self):
-        return self.job.data.setdefault('checkpoint-archives', [])
-
     def _add_checkpoint(self, id):
-        # XXX TODO does this work? Test!
-        self._checkpoint_archives.append(bin_to_hex(id))
-        self.job.save()
+        self.job.checkpoint_archives.append(bin_to_hex(id))
+        transaction.commit()
 
     def _real_open(self, location):
         self.repository = open_repository(self.job.repository)
@@ -126,20 +123,20 @@ class ReverseRepositoryProxy(RepositoryServer):
     def _load_repository_key(self):
         self._manifest, self._repository_key = Manifest.load(self.repository)
 
-    def _load_client_key(self, job_data):
+    def _load_client_key(self):
         try:
-            key_data = job_data['client_key_data']
-        except KeyError:
+            key_data = self.job.client_key_data
+        except AttributeError:
             # Plaintext key
             log.debug('No synthesized client key found - it\'s PlaintextKey')
             self._client_key = synthesize_client_key(self._repository_key, self.repository)
         else:
-            synthetic_type = job_data['client_key_type']
+            synthetic_type = self.job.client_key_type
             log.debug('Loading synthesized client key (%s)', synthetic_type)
             self._client_key = synthetic_key_from_data(key_data, synthetic_type, self.repository)
-        self._client_manifest = SyntheticManifest.load(unhexlify(job_data['client_manifest_data']), self._client_key, self.repository.id)
+        self._client_manifest = SyntheticManifest.load(unhexlify(self.job.client_manifest_data), self._client_key, self.repository.id)
         self._first_manifest_read = True
-        assert self._client_manifest.id_str == job_data['client_manifest_id_str']
+        assert self._client_manifest.id_str == self.job.client_manifest_id_str
         log.debug('Loaded client key and manifest')
 
     def _load_cache(self):
@@ -201,7 +198,7 @@ class ReverseRepositoryProxy(RepositoryServer):
 
     @doom_on_exception()
     def delete(self, id, wait=True):
-        if bin_to_hex(id) not in self._checkpoint_archives:
+        if bin_to_hex(id) not in self.job.checkpoint_archives:
             raise ValueError('BorgCube: illegal delete(id=%s), not a checkpoint archive ID', bin_to_hex(id))
         self.repository.delete(id, wait)
         self._cache.chunks.decref(id)
@@ -224,6 +221,7 @@ class ReverseRepositoryProxy(RepositoryServer):
             id=archive.fpr,
             repository=self.job.repository,
             name=archive.name,
+            client=self.job.client,
             nfiles=stats.nfiles,
             original_size=stats.osize,
             compressed_size=stats.csize,
@@ -231,8 +229,7 @@ class ReverseRepositoryProxy(RepositoryServer):
             duration=duration,
         )
         self.job.archive = ao
-        ao.save()
-        self.job.save()
+        transaction.commit()
         log.debug('Saved archive metadata')
 
     @doom_on_exception()
@@ -253,7 +250,7 @@ class ReverseRepositoryProxy(RepositoryServer):
     def _manifest_repo_to_client(self):
         if self._first_manifest_read:
             self._first_manifest_read = False
-            return unhexlify(self.job.data['client_manifest_data'])
+            return unhexlify(self.job.client_manifest_data)
         return self._client_manifest.write()
 
     def _manifest_client_to_repo(self, data):

@@ -11,9 +11,9 @@
     </small>
   </h1>
 
-  {% for item in items %}
-    <h2 id='item-{{ item.pk }}'>{{ item.name }}
-      <small>(<a href='{% url 'core.schedule_edit' item.pk %}'>{% trans 'edit' %}</a>)</small></h2>
+  {% for item in schedules %}
+    <h2 id='item-{{ item.oid }}'>{{ item.name }}
+      <small>(<a href='{% url 'core.schedule_edit' item.oid %}'>{% trans 'edit' %}</a>)</small></h2>
 
     <p>{{ item.description }}</p>
 

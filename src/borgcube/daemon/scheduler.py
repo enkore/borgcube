@@ -35,13 +35,8 @@ def borgcubed_idle(apiserver):
 
 def execute(apiserver, schedule):
     log.debug('Executing schedule %s', schedule)
-    for action in schedule.actions.all():
-        action_class = action.get_class()
-        if not action_class:
-            log.error('schedule %s, action %s: unknown/invalid scheduled action %r, skipping', schedule, action.pk, action.py_class)
-            continue
-        executable_action = action_class(apiserver, **action.py_args)
-        executable_action.execute()
+    for action in schedule.actions:
+        action.execute(apiserver)
 
 
 def seconds_until_next_occurence():
