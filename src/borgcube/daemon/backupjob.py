@@ -1,6 +1,7 @@
 import configparser
 import collections
 import logging
+import re
 import shlex
 import shutil
 import subprocess
@@ -75,6 +76,20 @@ def make_backup_job(apiserver, client, config):
     return job
 
 
+def queue_backup_job_conditional(apiserver, job_config: JobConfig):
+    for state, jobs in data_root().jobs_by_state.items():
+        if state in BackupJob.State.STABLE - {BackupJob.State.job_created}:
+            continue
+        for job in jobs.values():
+            if job.config == job_config:
+                log.warning(
+                    'run_from_schedule: not triggering a new job for config %s, since job %s is queued or running',
+                    job_config.oid, job.oid)
+                return
+
+    make_backup_job(apiserver, job_config.client, job_config)
+
+
 def job_configs_as_choices():
     for client in data_root().clients.values():
         for config in client.job_configs:
@@ -82,8 +97,7 @@ def job_configs_as_choices():
 
 
 class ScheduledBackup(ScheduledAction):
-    name = _('Schedule backup job')
-    job_config = None
+    name = _('Run backup job')
 
     def __init__(self, schedule, job_config):
         super().__init__(schedule)
@@ -93,17 +107,7 @@ class ScheduledBackup(ScheduledAction):
         return _('Run {}').format(self.job_config)
 
     def execute(self, apiserver):
-        for state, jobs in data_root().jobs_by_state.items():
-            if state in BackupJob.State.STABLE - {BackupJob.State.job_created}:
-                continue
-            for job in jobs.values():
-                if job.config == self.job_config:
-                    log.warning(
-                        'run_from_schedule: not triggering a new job for config %s, since job %s is queued or running',
-                        self.job_config.oid, job.oid)
-                    return
-
-        make_backup_job(apiserver, self.job_config.client, self.job_config)
+        queue_backup_job_conditional(apiserver, self.job_config)
 
     class Form(forms.Form):
         job_config = forms.ChoiceField(choices=job_configs_as_choices)
@@ -115,6 +119,53 @@ class ScheduledBackup(ScheduledAction):
                 raise ValidationError('Invalid object reference')
             data['job_config'] = o
             return data
+
+
+def validate_regex(regex):
+    try:
+        re.compile(regex, re.IGNORECASE)
+    except re.error as error:
+        raise ValidationError(error.msg)
+
+
+class RegexScheduledBackup(ScheduledAction):
+    name = _('Run bulk backup')
+
+    def __init__(self, schedule, client_re, job_config_re):
+        super().__init__(schedule)
+        self.client_re = client_re
+        self.job_config_re = job_config_re
+
+    def execute(self, apiserver):
+        client_re = re.compile(self.client_re, re.IGNORECASE)
+        job_config_re = re.compile(self.job_config_re, re.IGNORECASE)
+
+        job_configs = []
+        for client in data_root().clients.values():
+            if not client_re.fullmatch(client.hostname):
+                continue
+            log.debug('Matched client %s to pattern %r', client.hostname, self.client_re)
+            for job_config in client.job_configs:
+                if not job_config_re.fullmatch(job_config.label):
+                    continue
+                log.debug('Matched job config %s to pattern %r', job_config.label, self.job_config_re)
+                job_configs.append(job_config)
+
+        for job_config in job_configs:
+            queue_backup_job_conditional(apiserver, job_config)
+
+    class Form(forms.Form):
+        client_re = forms.CharField(
+            validators=[validate_regex],
+            initial='.*',
+            label=_('Regex for selecting clients'),
+        )
+        job_config_re = forms.CharField(
+            validators=[validate_regex],
+            initial='.*',
+            label=_('Regex for selecting configurations'),
+        )
+
 
 
 def cpe_means_connection_failure(called_process_error):
