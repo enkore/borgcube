@@ -33,14 +33,18 @@ def reset_db_connection():
 
 def db():
     global _db
-    try:
-        return _db.open()
-    except AttributeError:
+    if not _db:
         with _db_lock:
             storage_factory, dbkw = zodburi.resolve_uri(settings.DB_URI)
             storage = storage_factory()
             _db = DB(storage, **dbkw)
         return db()
+    try:
+        return _db_local.conn
+    except AttributeError:
+        log.debug('Opening new database connection')
+        _db_local.conn = _db.open()
+        return _db_local.conn
 
 
 def data_root():

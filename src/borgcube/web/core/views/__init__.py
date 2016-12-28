@@ -49,14 +49,19 @@ def fetch_metrics():
 def dashboard(request):
     recent_jobs = []
     jobs = data_root().jobs
-    key = jobs.minKey()
-    while len(recent_jobs) < 20:
-        recent_jobs.append(jobs[key])
-        keys = jobs.keys(min=key, excludemin=True)
-        for key in keys:
-            break
-        else:
-            break
+    try:
+        key = jobs.maxKey()
+    except KeyError:
+        pass
+    else:
+        while len(recent_jobs) < 20:
+            recent_jobs.append(jobs.pop(key))
+            try:
+                key = jobs.maxKey(key)
+            except KeyError:
+                break
+    transaction.abort()
+
     return TemplateResponse(request, 'core/dashboard.html', {
         'metrics': fetch_metrics(),
         'recent_jobs': recent_jobs,
@@ -264,6 +269,11 @@ def job_config_delete(request, client_id, config_id):
         raise Http404
     if request.method == 'POST':
         client.job_configs.remove(job_config)
+        # Could just leave it there, but likely not the intention behind clicking (delete).
+        for schedule in data_root().schedules:
+            for action in list(schedule.actions):
+                if getattr(action, 'job_config', None) == job_config:
+                    schedule.actions.remove(action)
         transaction.commit()
     return redirect(client_view, client_id)
 
@@ -404,8 +414,7 @@ def schedule_add_and_edit(request, data, schedule=None, context=None):
     if schedule:
         for scheduled_action in schedule.actions:
             scheduled_action._p_activate()
-            action_form = scheduled_action.Form(initial=scheduled_action.__dict__)
-            action_form.name = scheduled_action.name
+            action_form = scheduled_action.form(initial=scheduled_action.__dict__)
             action_forms.append(action_form)
 
     if data:
@@ -432,9 +441,7 @@ def schedule_add_and_edit(request, data, schedule=None, context=None):
                         log.error('invalid/unknown schedulable action %r, ignoring', dotted_path)
                         continue
                     action = import_string(dotted_path)
-
-                    action_form = action.Form(serialized_action)
-                    action_form.name = action.name
+                    action_form = action.form(serialized_action)
 
                     valid = action_form.is_valid()
                     all_valid &= valid

@@ -138,6 +138,8 @@ class APIServer(BaseServer):
         set_process_name('borgcubed [main process]')
         if settings.BUILTIN_ZEO:
             self.launch_builtin_zeo()
+        if settings.BUILTIN_WEB:
+            self.launch_builtin_web()
 
         hook.borgcubed_startup(apiserver=self)
         db = data_root()
@@ -196,6 +198,29 @@ class APIServer(BaseServer):
                 server.close()
                 sys.exit(0)
 
+    def launch_builtin_web(self):
+        pid = self.fork()
+        if pid:
+            self.services[pid] = 'web'
+        else:
+            from wsgiref.simple_server import make_server
+            from borgcube.web.wsgi import get_wsgi_application
+            host, port = settings.BUILTIN_WEB.rsplit(':', maxsplit=1)
+
+            set_process_name('borgcubed [web process]')
+
+            log.info('Serving HTTP on http://%s:%s', host, port)
+
+            if settings.DEBUG:
+                log.warning('DEBUG mode is enabled. This is rather dangerous.')
+
+                if host not in ('127.0.0.1', 'localhost'):
+                    log.error('DEBUG mode is not possible for non-local host %s', host)
+                    sys.exit(1)
+
+            httpd = make_server(host, int(port), get_wsgi_application())
+            httpd.serve_forever()
+
     def handle_request(self, request):
         command = request['command']
         if command in self.commands:
@@ -203,6 +228,7 @@ class APIServer(BaseServer):
         return hook.borgcubed_handle_request(apiserver=self, request=request)
 
     def idle(self):
+        transaction.begin()
         hook.borgcubed_idle(apiserver=self)
         self.check_children()
         self.check_queue()
@@ -337,7 +363,6 @@ class APIServer(BaseServer):
         if self.shutdown:
             self.queue.clear()
             return
-        transaction.begin()
         nope = []
         while self.queue:
             executor_class, job = self.queue.pop()

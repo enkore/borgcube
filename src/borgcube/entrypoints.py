@@ -44,9 +44,9 @@ def proxy():
     from .utils import log_to_daemon, hook
     _set_db_uri()
     hook.borgcube_startup(db=True, process='proxy')
-    with log_to_daemon():
-        proxy = ReverseRepositoryProxy()
-        proxy.serve()
+    #with log_to_daemon():
+    proxy = ReverseRepositoryProxy()
+    proxy.serve()
 
 
 def manage():

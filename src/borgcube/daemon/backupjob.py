@@ -99,7 +99,7 @@ class ScheduledBackup(ScheduledAction):
             for job in jobs.values():
                 if job.config == self.job_config:
                     log.warning(
-                        'run_from_schedule: not triggering a new job for config %d, since job %d is queued or running',
+                        'run_from_schedule: not triggering a new job for config %s, since job %s is queued or running',
                         self.job_config.oid, job.oid)
                     return
 
@@ -202,6 +202,8 @@ class BackupJobExecutor(JobExecutor):
             log.error('Job %s failed because the stored repository ID (%s) doesn\'t match the real repository ID (%s)', self.job, repo, db)
 
     def analyse_job_process_error(self, called_process_error):
+        log.error('%s', called_process_error.stderr)
+        log.error('%s', called_process_error.output)
         if cpe_means_connection_failure(called_process_error):
             self.job.set_failure_cause('client-connection-failed', command=called_process_error.cmd, exit_code=called_process_error.returncode)
             log.error('Job %s failed due to client connection failure', self.job.oid)
@@ -278,7 +280,7 @@ class BackupJobExecutor(JobExecutor):
 
         stderr_tail = collections.deque(maxlen=100)
         stdout_tail = collections.deque(maxlen=100)
-        with subprocess.Popen(command_line, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.DEVNULL, universal_newlines=True) as p:
+        with subprocess.Popen(command_line, stdout=subprocess.PIPE, stderr=None, stdin=subprocess.DEVNULL, universal_newlines=True) as p:
             try:
                 stderr, stdout = p.communicate()
                 if not stderr and not stdout:

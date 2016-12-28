@@ -116,7 +116,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/1.10/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'de-DE'
 
 TIME_ZONE = 'UTC'
 
@@ -165,7 +165,17 @@ LOGGING = {
         },
         'borg.key': {
             'level': 'WARNING',
-        }
+        },
+
+        'ZEO': {
+            'level': 'WARNING',
+        },
+        'txn': {
+            'level': 'WARNING',
+        },
+        'asyncio': {
+            'level': 'WARNING',
+        },
     },
 }
 
@@ -193,3 +203,9 @@ SOCKET_PREFIX = '/run/user/{euid}/borgcube'
 # zodburi ( http://docs.pylonsproject.org/projects/zodburi/en/latest/ ) of the DB to use
 # note: file:// paths are always absolute.
 DB_URI = 'file:///home/mabe/Projekte/_oss/borgcube/_db/Data.fs'
+
+
+# borgcubed can also run the web server itself, so you don't need to care about that,
+# if you like.
+# BUILTIN_WEB = '127.0.0.1:8002'
+BUILTIN_WEB = False
