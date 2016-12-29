@@ -18,7 +18,7 @@ import transaction
 from ..models import OverviewMetric
 from ..metrics import Metric
 
-from borgcube.core.models import Client, Repository, CheckConfig, RshClientConnection
+from borgcube.core.models import Client, Repository, RshClientConnection
 from borgcube.core.models import Job, JobConfig
 from borgcube.core.models import Schedule, ScheduledAction
 from borgcube.daemon.client import APIClient
@@ -161,7 +161,7 @@ class JobConfigForm(forms.Form):
 
     label = forms.CharField()
 
-    repository = forms.ChoiceField(choices=repositories_as_choices)
+    repository = Repository.ChoiceField()
 
     one_file_system = forms.BooleanField(initial=True, required=False,
                                          help_text=_('Don\'t cross over file system boundaries.'))
@@ -205,11 +205,7 @@ def job_config_add(request, client_id):
         config['paths'] = config.get('paths', '').split('\n')
         config['excludes'] = [s for s in config.get('excludes', '').split('\n') if s]
 
-        print(config)
-
-        repository = data_root()._p_jar.get(bytes.fromhex(config.pop('repository')))
-        if repository not in data_root().repositories:
-            raise Http404
+        repository = config.pop('repository')
         job_config = JobConfig(client=client, repository=repository, label=config['label'])
         job_config._update(config)
         client.job_configs.append(job_config)
@@ -245,9 +241,6 @@ def job_config_edit(request, client_id, config_id):
         config.update(advanced_form.cleaned_data)
         config['paths'] = config.get('paths', '').split('\n')
         config['excludes'] = [s for s in config.get('excludes', '').split('\n') if s]
-        job_config.repository = data_root()._p_jar.get(bytes.fromhex(config.pop('repository')))
-        if job_config.repository not in data_root().repositories:
-            raise Http404
         job_config._update(config)
         # TODO StringListValidator
         # TODO Pattern validation
@@ -487,9 +480,15 @@ def schedule_edit(request, schedule_id):
 
 
 def schedule_delete(request, schedule_id):
-    item = get_object_or_404(ScheduleItem, id=schedule_id)
-    item.delete()
-    return redirect(schedule)
+    for schedule in data_root().schedules:
+        if schedule.oid == schedule_id:
+            break
+    else:
+        raise Http404
+    if request.method == 'POST':
+        data_root().schedules.remove(schedule)
+        transaction.commit()
+    return redirect(schedules)
 
 
 def scheduled_action_form(request):

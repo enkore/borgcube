@@ -8,6 +8,7 @@ from pathlib import Path
 
 from django.conf import settings
 from django.core import validators
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
 from django.utils import timezone
@@ -133,16 +134,6 @@ class DataRoot(Evolvable):
 
 
 class Repository(Evolvable):
-    name = ''
-    description = ''
-
-    url = ''
-
-    # 32 bytes in hex
-    repository_id = ''
-
-    remote_borg = 'borg'
-
     def __init__(self, name, url, description='', repository_id='', remote_borg='borg'):
         self.name = name
         self.url = url
@@ -162,12 +153,38 @@ class Repository(Evolvable):
         except ValueError:
             return
 
+    def __str__(self):
+        return self.name
+
     class Form(forms.Form):
         name = forms.CharField()
         description = forms.CharField(widget=forms.Textarea, required=False)
         url = forms.CharField(help_text=_('For example /data0/repository or user@storage:/path.'), label=_('URL'))
         repository_id = forms.CharField(min_length=64, max_length=64, label=_('Repository ID'))
-        remote_borg = forms.CharField(help_text=_('Remote borg binary name (only applies to remote repositories).'))
+        remote_borg = forms.CharField(
+            help_text=_('Remote borg binary name (only applies to remote repositories).'),
+            initial='borg',
+        )
+
+    class ChoiceField(forms.ChoiceField):
+        @staticmethod
+        def get_choices():
+            for repository in data_root().repositories:
+                yield repository.oid, str(repository)
+
+        def __init__(self, **kwargs):
+            super().__init__(choices=self.get_choices, **kwargs)
+
+        def clean(self, value):
+            value = super().clean(value)
+            for repository in data_root().repositories:
+                if repository.oid == value:
+                    return repository
+            else:
+                raise ValidationError(self.error_messages['invalid_choice'], code='invalid_choice')
+
+        def prepare_value(self, value):
+            return value.oid
 
 
 class Archive(Evolvable):
@@ -457,41 +474,6 @@ class BackupJob(Job):
 
     def _log_file_name(self, timestamp):
         return '%s-%s-%s-%s' % (timestamp, self.short_name, self.client.hostname, self.oid)
-
-
-class CheckConfig(Evolvable):
-    def __init__(self, label, repository, check_repository, verify_data, check_archives, check_only_new_archives):
-        self.label = label
-        self.repository = repository
-        self.check_repository = check_repository
-        self.verify_data = verify_data
-        self.check_archives = check_archives
-        self.check_only_new_archives = check_only_new_archives
-
-    class Form(forms.Form):
-        label = CharField()
-        repository = None  # TODO
-
-        check_repository = forms.BooleanField(initial=True, required=False)
-        verify_data = forms.BooleanField(initial=False, required=False, help_text=_('Verify all data cryptographically (slow)'))
-        check_archives = forms.BooleanField(initial=True, required=False)
-
-        check_only_new_archives = forms.BooleanField(
-            initial=False, required=False,
-            help_text=_('Check only archives added since the last check'))
-
-
-class CheckJob(Job):
-    short_name = 'check'
-
-    class State(Job.State):
-        repository_check = s('repository_check', _('Checking repository'))
-        verify_data = s('verify_data', _('Verifying data'))
-        archives_check = s('archives_check', _('Checking archives'))
-
-    def __init__(self, repository, config):
-        super().__init__(repository)
-        self.config = config
 
 
 class Schedule(Evolvable):

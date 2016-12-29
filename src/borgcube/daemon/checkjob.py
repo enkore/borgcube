@@ -2,11 +2,15 @@ import logging
 
 from borg.helpers import Manifest
 from django.core.exceptions import ObjectDoesNotExist
+from django.utils.translation import ugettext_lazy as _
+from django import forms
+
+import transaction
 
 from borg.archive import ArchiveChecker
 
-from borgcube.core.models import CheckJob, CheckConfig
-from borgcube.utils import tee_job_logs, open_repository
+from borgcube.core.models import Job, Evolvable, s
+from borgcube.utils import tee_job_logs, open_repository, data_root
 from .hookspec import JobExecutor
 from .client import APIError
 
@@ -47,27 +51,62 @@ def borgcubed_client_call(apiclient, call):
     def initiate_check_job(check_config):
         reply = apiclient.do_request({
             'command': 'initiate-check-job',
-            'check_config': check_config.id,
+            'check_config': check_config.oid,
         })
         if not reply['success']:
-            log.error('APIClient.initiate_check_job(%d) failed: %s', check_config.id, reply['message'])
+            log.error('APIClient.initiate_check_job(%s) failed: %s', check_config.oid, reply['message'])
             raise APIError(reply['message'])
         log.info('Initiated check job %s', reply['job'])
-        return CheckJob.objects.get(id=reply['job'])
+        transaction.begin()
+        return data_root()._p_jar[bytes.fromhex(reply['job'])]
     return initiate_check_job
+
+
+class CheckConfig(Evolvable):
+    def __init__(self, label, repository, check_repository, verify_data, check_archives, check_only_new_archives):
+        self.label = label
+        self.repository = repository
+        self.check_repository = check_repository
+        self.verify_data = verify_data
+        self.check_archives = check_archives
+        self.check_only_new_archives = check_only_new_archives
+
+    class Form(forms.Form):
+        label = forms.CharField()
+        repository = None  # TODO
+
+        check_repository = forms.BooleanField(initial=True, required=False)
+        verify_data = forms.BooleanField(initial=False, required=False,
+                                         help_text=_('Verify all data cryptographically (slow)'))
+        check_archives = forms.BooleanField(initial=True, required=False)
+
+        check_only_new_archives = forms.BooleanField(
+            initial=False, required=False,
+            help_text=_('Check only archives added since the last check'))
+
+
+class CheckJob(Job):
+    short_name = 'check'
+
+    class State(Job.State):
+        repository_check = s('repository_check', _('Checking repository'))
+        verify_data = s('verify_data', _('Verifying data'))
+        archives_check = s('archives_check', _('Checking archives'))
+
+    def __init__(self, repository, config):
+        super().__init__(repository)
+        self.config = config
 
 
 class CheckJobExecutor(JobExecutor):
     name = 'check-job'
 
     @classmethod
-    def prefork(cls, job_id):
-        job = CheckJob.objects.get(id=job_id)
+    def prefork(cls, job):
         job.update_state(CheckJob.State.job_created, CheckJob.State.repository_check)
 
     @classmethod
-    def run(cls, job_id):
-        job = CheckJob.objects.get(id=job_id)
+    def run(cls, job):
         executor = cls(job)
         executor.execute()
 
@@ -80,15 +119,15 @@ class CheckJobExecutor(JobExecutor):
     def execute(self):
         log.debug('Beginning check job on repository %r', self.repository.url)
         with open_repository(self.repository) as repository:
-            if self.config['check_repository']:
+            if self.config.check_repository:
                 self.check_repository(repository)
-            if self.config['verify_data'] or self.config['check_archives']:
+            if self.config.verify_data or self.config.check_archives:
                 self.job.update_state(CheckJob.State.repository_check, CheckJob.State.verify_data)
                 archive_checker = self.get_archive_checker(repository)
-                if self.config['verify_data']:
+                if self.config.verify_data:
                     self.verify_data(repository, archive_checker)
                 self.job.update_state(CheckJob.State.verify_data, CheckJob.State.archives_check)
-                if self.config['check_archives']:
+                if self.config.check_archives:
                     self.check_archives(repository, archive_checker)
             else:
                 self.job.update_state(CheckJob.State.verify_data, CheckJob.State.archives_check)
