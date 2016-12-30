@@ -13,6 +13,7 @@ from ZODB import DB
 from borg.repository import Repository
 from borg.remote import RemoteRepository
 from borg.constants import UMASK_DEFAULT
+from django.http import Http404
 
 from .vendor import pluggy
 
@@ -61,6 +62,14 @@ def data_root():
             from borgcube.core.models import DataRoot
             root.data_root = DataRoot()
             return root.data_root
+
+
+def find_oid_or_404(iterable, oid):
+    for object in iterable:
+        if object.oid == oid:
+            return object
+    else:
+        raise Http404
 
 
 def open_repository(repository):

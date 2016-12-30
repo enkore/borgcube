@@ -22,7 +22,7 @@ from borgcube.core.models import Client, Repository, RshClientConnection
 from borgcube.core.models import Job, JobConfig
 from borgcube.core.models import Schedule, ScheduledAction
 from borgcube.daemon.client import APIClient
-from borgcube.utils import data_root
+from borgcube.utils import data_root, find_oid_or_404
 
 from borgcube.daemon.checkjob import CheckConfig
 
@@ -211,8 +211,6 @@ def job_config_add(request, client_id):
         job_config = JobConfig(client=client, repository=repository, label=config['label'])
         job_config._update(config)
         client.job_configs.append(job_config)
-        # client._p_changed = True  # TODO ??? !!!
-        assert client.job_configs._p_changed
         transaction.commit()
 
         # TODO StringListValidator
@@ -228,9 +226,7 @@ def job_config_add(request, client_id):
 
 def job_config_edit(request, client_id, config_id):
     client = data_root().clients[client_id]
-    job_config = data_root()._p_jar.get(bytes.fromhex(config_id))
-    if job_config not in client.job_configs:
-        raise Http404
+    job_config = find_oid_or_404(client.job_configs, config_id)
     data = request.POST or None
     job_config._p_activate()
     initial_data = dict(job_config.__dict__)
@@ -259,9 +255,7 @@ def job_config_edit(request, client_id, config_id):
 
 def job_config_delete(request, client_id, config_id):
     client = data_root().clients[client_id]
-    job_config = data_root()._p_jar.get(bytes.fromhex(config_id))
-    if job_config not in client.job_configs:
-        raise Http404
+    job_config = find_oid_or_404(client.job_configs, config_id)
     if request.method == 'POST':
         client.job_configs.remove(job_config)
         # Could just leave it there, but likely not the intention behind clicking (delete).
@@ -275,11 +269,7 @@ def job_config_delete(request, client_id, config_id):
 
 def job_config_trigger(request, client_id, config_id):
     client = data_root().clients[client_id]
-    for config in client.job_configs:
-        if config.oid == config_id:
-            break
-    else:
-        raise Http404
+    config = find_oid_or_404(client.job_configs, config_id)
     if request.method == 'POST':
         daemon = APIClient()
         job = daemon.initiate_backup_job(client, config)
@@ -332,15 +322,10 @@ def repository_check_config_add(request, repository_id):
     repository = Repository.oid_get(repository_id)
     data = request.POST or None
     config_form = CheckConfig.Form(data)
-    print(repository.version)
     if data and config_form.is_valid():
         config = CheckConfig(repository, **config_form.cleaned_data)
         repository.job_configs.append(config)
-        print(type(repository.job_configs))
-        print(repository._p_changed, repository.job_configs._p_changed)
         transaction.commit()
-        print(config._p_oid)
-        print('vcmt')
         return redirect(repository_view, repository.oid)
     return TemplateResponse(request, 'core/repository/config_add.html', {
         'form': config_form,
@@ -348,30 +333,36 @@ def repository_check_config_add(request, repository_id):
 
 
 def repository_check_config_edit(request, repository_id, config_id):
-    check_config = get_object_or_404(CheckConfig, repository=id, pk=config_id)
+    repository = Repository.oid_get(repository_id)
+    check_config = find_oid_or_404(repository.job_configs, config_id)
     data = request.POST or None
-    config_form = CheckConfigForm(data, instance=check_config)
+    check_config._p_activate()
+    config_form = check_config.Form(data, initial=check_config.__dict__)
     if data and config_form.is_valid():
-        config_form.save()
-        return redirect(repository_view, id)
+        check_config._update(config_form.cleaned_data)
+        transaction.commit()
+        return redirect(repository_view, repository_id)
     return TemplateResponse(request, 'core/repository/config_edit.html', {
         'form': config_form,
     })
 
 
 def repository_check_config_delete(request, repository_id, config_id):
-    config = get_object_or_404(CheckConfig, repository=id, id=config_id)
+    repository = Repository.oid_get(repository_id)
+    check_config = find_oid_or_404(repository.job_configs, config_id)
     if request.method == 'POST':
-        config.delete()
-    return redirect(repository_view, id)
+        repository.job_configs.remove(check_config)
+        transaction.commit()
+    return redirect(repository_view, repository_id)
 
 
 def repository_check_config_trigger(request, repository_id, config_id):
-    config = get_object_or_404(CheckConfig, repository=id, id=config_id)
+    repository = Repository.oid_get(repository_id)
+    check_config = find_oid_or_404(repository.job_configs, config_id)
     if request.method == 'POST':
         daemon = APIClient()
-        job = daemon.initiate_check_job(config)
-    return redirect(repository_view, id)
+        job = daemon.initiate_check_job(check_config)
+    return redirect(repository_view, repository_id)
 
 
 from dateutil.relativedelta import relativedelta

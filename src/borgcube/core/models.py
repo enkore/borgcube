@@ -501,10 +501,6 @@ class Job(Evolvable):
             return timezone.now() - (self.timestamp_start or self.created)
 
     @property
-    def verbose_name(self):
-        return self._meta.verbose_name
-
-    @property
     def failed(self):
         return self.state == self.State.failed
 
@@ -583,9 +579,6 @@ class Job(Evolvable):
 
     def __str__(self):
         return str(self.oid)
-
-    class Meta:
-        ordering = ['-created']
 
 
 class BackupJob(Job):

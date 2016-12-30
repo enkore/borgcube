@@ -26,21 +26,21 @@ def borgcubed_handle_request(apiserver, request):
     if request['command'] != 'initiate-check-job':
         return
     try:
-        check_config_id = request['check_config']
+        check_config_oid = request['check_config']
     except KeyError as ke:
         return apiserver.error('Missing parameter %r', ke.args[0])
     try:
-        check_config = CheckConfig.objects.get(id=check_config_id)
-    except ObjectDoesNotExist:
-        return apiserver.error('No such JobConfig')
-    job = CheckJob.from_config(check_config)
-    job.save()
-    log.info('Created job %s for check config %d (repository is %s / %s)',
-             job.id, check_config.id, job.repository.name, job.repository.url)
+        check_config = data_root()._p_jar[bytes.fromhex(check_config_oid)]
+    except KeyError:
+        return apiserver.error('No such CheckConfig')
+    job = CheckJob(check_config)
+    transaction.commit()
+    log.info('Created job %s for check config %s (repository is %s / %s)',
+             job.oid, check_config.oid, job.repository.name, job.repository.url)
     apiserver.queue_job(job)
     return {
         'success': True,
-        'job': str(job.id),
+        'job': job.oid,
     }
 
 
@@ -93,8 +93,8 @@ class CheckJob(Job):
         verify_data = s('verify_data', _('Verifying data'))
         archives_check = s('archives_check', _('Checking archives'))
 
-    def __init__(self, repository, config):
-        super().__init__(repository)
+    def __init__(self, config: CheckConfig):
+        super().__init__(config.repository)
         self.config = config
 
 
