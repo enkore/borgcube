@@ -9,7 +9,6 @@ from pathlib import Path
 from django.conf import settings
 from django.core import validators
 from django.core.exceptions import ValidationError
-from django.db import models
 from django.http import Http404
 from django.utils.translation import ugettext_lazy as _
 from django.utils import timezone
@@ -18,11 +17,8 @@ from django import forms
 import persistent
 import transaction
 from BTrees.LOBTree import LOBTree as TimestampTree
-from BTrees.LOBTree import LOBTree
 from BTrees.OOBTree import OOBTree
 from persistent.list import PersistentList
-
-import persistent
 
 from recurrence.forms import RecurrenceField
 
@@ -32,12 +28,6 @@ import borgcube
 from borgcube.utils import data_root
 
 log = logging.getLogger(__name__)
-
-
-def CharField(*args, **kwargs):
-    if 'max_length' not in kwargs:
-        kwargs['max_length'] = 200
-    return models.CharField(*args, **kwargs)
 
 
 slug_validator = validators.RegexValidator(
@@ -697,20 +687,3 @@ class ScheduledAction(Evolvable, DottedPath):
     @classmethod
     def valid_class(cls, dotted_path):
         return any(action_class.dotted_path() == dotted_path for action_class in cls.__subclasses__())
-
-
-class SlugWithDotField(models.CharField):
-    """
-    A SlugField where dots are allowed.
-
-    This makes it compatible with hostnames and FQDNs.
-    """
-    def __init__(self, *args, **kwargs):
-        kwargs['max_length'] = kwargs.get('max_length', 200)
-        super().__init__(*args, **kwargs)
-
-    default_error_messages = {
-        'invalid': u"Enter a valid 'slug' consisting of letters, numbers, "
-                   u"underscores, dots or hyphens.",
-    }
-    default_validators = [slug_validator]
