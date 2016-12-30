@@ -117,27 +117,11 @@
         background-repeat: repeat-x;
       }
 
-      /* Onwards to the main content layout.
-       * We have a simple layout with a fixed sidebar and a fixed content block.
-       * Overall width is 1200px.
-       */
-      #sidebar {
-        width: 200px;
-        float: left;
-        margin-left: 1em;
-      }
-
-      #sidebar h2 {
-        /* Lighten sidebar headings slightly so that they don't draw as much attention -
-         * they're not the main content.
-         */
-        color: #333;
-      }
-
       #content {
-        float: left;
+        margin-left: 3.3em;
+        /* This makes it expand in width to occupy available space */
+        overflow: hidden;
         position: relative;
-        width: 1000px;
       }
 
       .plist th,
@@ -251,20 +235,6 @@
       </nav>
       <div style='clear:both;'></div>
     </header>
-
-    <div id='sidebar'>
-      {% block sidebar %}
-      {% endblock %}
-      <h2>Clients <small>(<a href=''>add</a>)</small></h2>
-      <ul>
-        TODO
-      </ul>
-      <h2>Repositories <small>(<a href=''>add</a>)</small></h2>
-      <ul>
-        TODO
-      </ul>
-
-    </div>
 
     <div id='content'>
       {% block content %}
