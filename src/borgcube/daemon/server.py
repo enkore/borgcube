@@ -45,30 +45,24 @@ class BaseServer:
         self.socket.bind(address)
         log.info('bound to %s', address)
 
-        self.exit = False
         self.shutdown = False
         signal.signal(signal.SIGTERM, self.signal_terminate)
-        signal.signal(signal.SIGINT, self.signal_shutdown)
+        signal.signal(signal.SIGINT, self.signal_terminate)
 
     def signal_terminate(self, signum, stack_frame):
         log.info('Received signal %d, initiating exorcism', signum)
-        self.exit = True
-        signal.signal(signal.SIGTERM, signal.SIG_IGN)
-
-    def signal_shutdown(self, signum, stack_frame):
-        log.info('Received signal %d, initiating slow exorcism', signum)
         self.shutdown = True
-        signal.signal(signal.SIGINT, signal.SIG_IGN)
+        signal.signal(signum, signal.SIG_IGN)
 
     def main_loop(self):
-        while not self.exit:
+        while not self.shutdown:
+            self.idle()
             last_idle = time.perf_counter()
             while time.perf_counter() < last_idle + 1:
                 if self.socket.poll(timeout=500):
                     request = self.socket.recv_json()
                     reply = self._handle_request(request)
                     self.socket.send_json(reply)
-            self.idle()
         self.close()
         log.info('Exorcism successful. Have a nice day.')
 
@@ -120,6 +114,7 @@ class BaseServer:
         if pid:
             log.debug('Forked worker PID is %d', pid)
         else:
+            os.setpgrp()
             self.socket.close()
             self.socket = None
             exit_by_exception()
@@ -128,7 +123,6 @@ class BaseServer:
 
 class APIServer(BaseServer):
     def __init__(self, address, context=None):
-        os.setpgrp()
         super().__init__(address, context)
         # PID -> (command, params...)
         self.children = {}
@@ -239,9 +233,15 @@ class APIServer(BaseServer):
     def close(self):
         super().close()
         log.debug('Killing children')
-        os.killpg(0, signal.SIGTERM)
+        for pid in self.children:
+            os.killpg(pid, signal.SIGTERM)
         log.debug('Waiting for all children to die')
         while self.children:
+            self.check_children()
+        log.debug('Killing services')
+        for pid in self.services:
+            os.killpg(pid, signal.SIGTERM)
+        while self.services:
             self.check_children()
 
     def queue_job(self, job):
@@ -360,7 +360,6 @@ class APIServer(BaseServer):
                 if job.state not in job.State.STABLE or job.state == job.State.job_created:
                     job.force_state(job.State.failed)
             hook.borgcubed_job_exit(apiserver=self, job=job, exit_code=code, signo=signo)
-        self.exit |= self.shutdown and not self.children
 
     def check_queue(self):
         if self.shutdown:
