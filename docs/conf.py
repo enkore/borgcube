@@ -56,10 +56,12 @@ import borgcube.entrypoints
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
+sys.path.insert(0, os.path.abspath('.'))
 extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.intersphinx',
     'sphinx.ext.viewcode',
+    'Form',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -374,5 +376,7 @@ texinfo_documents = [
 # Example configuration for intersphinx: refer to the Python standard library.
 intersphinx_mapping = {
     'python': ('https://docs.python.org/3/', None),
-    'django': ('http://docs.djangoproject.com/en/1.10/', 'https://docs.djangoproject.com/en/1.10/_objects/'),
+    'django': ('https://docs.djangoproject.com/en/1.10/', 'https://docs.djangoproject.com/en/1.10/_objects/'),
+    'zodb': ('https://zodb-docs.readthedocs.io/en/latest/', None),
+    'persistent': ('https://persistent.readthedocs.io/en/latest/', None),
 }
