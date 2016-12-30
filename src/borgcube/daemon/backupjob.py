@@ -409,6 +409,17 @@ class BackupJobExecutor(JobExecutor):
 
     def client_cleanup(self):
         self.job.update_state(BackupJob.State.client_done, BackupJob.State.client_cleanup)
+
+        del self.job.client_manifest_data
+        del self.job.client_manifest_id_str
+        try:
+            del self.job.client_key_data
+            del self.job.client_key_type
+        except AttributeError:
+            pass
+
+        transaction.get().note('Deleted client keys of job %s' % self.job.oid)
+        transaction.commit()
         # TODO delete checkpoints
 
         # TODO do we actually want this? if we leave the cache, the next job has a good chance of rsyncing just a delta

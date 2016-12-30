@@ -57,7 +57,7 @@ def data_root():  # type: borgcube.core.models.DataRoot
         root = _db_local.db.root
     try:
         return root.data_root
-    except AttributeError as ae:
+    except AttributeError:
         with transaction.manager as txn:
             txn.note('Initialized new data root.')
             log.info('Initializing new data root.')
