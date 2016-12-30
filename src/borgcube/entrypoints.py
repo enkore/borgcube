@@ -1,4 +1,10 @@
 
+"""
+This module contains the various entry points accessed by binaries installed into the system.
+
+It also does the initialization of the various subsystems (Django, Logging, Plugins, ...).
+"""
+
 import os
 import logging
 import sys
