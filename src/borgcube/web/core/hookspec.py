@@ -5,13 +5,6 @@ hookspec = pluggy.HookspecMarker('borgcube')
 
 
 @hookspec
-def borgcube_web_metrics():
-    """
-    Return list of metric (borgcube.web.metrics.Metric) implementations.
-    """
-
-
-@hookspec
 def borgcube_web_urlpatterns(urlpatterns, js_info_dict):
     """
     Called once at setup time with the root *urlpatterns*.

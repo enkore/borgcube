@@ -15,9 +15,6 @@ from django.utils.translation import ugettext_lazy as _
 
 import transaction
 
-from ..models import OverviewMetric
-from ..metrics import Metric
-
 from borgcube.core.models import Client, Repository, RshClientConnection
 from borgcube.core.models import Job, JobConfig
 from borgcube.core.models import Schedule, ScheduledAction
@@ -25,27 +22,9 @@ from borgcube.daemon.client import APIClient
 from borgcube.utils import data_root, find_oid_or_404
 
 from borgcube.daemon.checkjob import CheckConfig
+from ..metrics import WebData
 
 log = logging.getLogger(__name__)
-
-
-def fetch_metrics():
-    metrics = []
-    for metric in OverviewMetric.objects.all()[:]:
-        try:
-            MetricClass = import_string(metric.py_class)
-            if not issubclass(MetricClass, Metric):
-                raise ImportError('Not a Metric')
-        except ImportError as ie:
-            log.error('Could not import metric %r: %s', metric.py_class, ie)
-            metric.delete()
-            continue
-        instance = MetricClass()
-        metrics.append({
-            'label': metric.label,
-            'value': instance.formatted_value(),
-        })
-    return metrics
 
 
 def dashboard(request):
@@ -65,7 +44,7 @@ def dashboard(request):
     transaction.abort()
 
     return TemplateResponse(request, 'core/dashboard.html', {
-        'metrics': fetch_metrics(),
+        'metrics': data_root().plugin_data('web', WebData).metrics,
         'recent_jobs': recent_jobs,
     })
 

@@ -19,6 +19,7 @@ import transaction
 from BTrees.LOBTree import LOBTree as TimestampTree
 from BTrees.OOBTree import OOBTree
 from persistent.list import PersistentList
+from persistent.dict import PersistentDict
 
 from recurrence.forms import RecurrenceField
 
@@ -247,6 +248,12 @@ class Evolvable(persistent.Persistent, StringObjectID, Updateable):
 
 
 class DataRoot(Evolvable):
+    version = 2
+
+    @evolve(1, 2)
+    def add_ext_dict(self):
+        self.ext = PersistentDict()
+
     def __init__(self):
         self.repositories = PersistentList()
         # hex archive id -> Archive
@@ -260,6 +267,14 @@ class DataRoot(Evolvable):
         self.jobs_by_state = OOBTree()
 
         self.schedules = PersistentList()
+
+        self.ext = PersistentDict()
+
+    def plugin_data(self, name, factory):
+        try:
+            return self.ext[name]
+        except KeyError:
+            return self.ext.setdefault(name, factory())
 
 
 class Repository(Evolvable):
