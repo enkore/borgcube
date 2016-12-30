@@ -513,7 +513,7 @@ class Job(Evolvable):
         return self.state in self.State.STABLE
 
     def update_state(self, previous, to):
-        with transaction.manager:
+        with transaction.manager as txn:
             if self.state != previous:
                 raise ValueError('Cannot transition job state from %r to %r, because current state is %r'
                                  % (previous, to, self.state))
@@ -524,19 +524,20 @@ class Job(Evolvable):
             self._check_set_start_timestamp(previous)
             self._check_set_end_timestamp()
             log.debug('%s: phase %s -> %s', self.oid, previous, to)
-            borgcube.utils.hook.borgcube_job_post_state_update(job=self, prior_state=previous, current_state=to)
+            txn.note('Job %s state update: %s -> %s' % (self.oid, previous, to))
+        borgcube.utils.hook.borgcube_job_post_state_update(job=self, prior_state=previous, current_state=to)
 
     def force_state(self, state):
-        transaction.begin()
-        if self.state == state:
-            return False
-        log.debug('%s: Forced state %s -> %s', self.oid, self.state, state)
-        self._check_set_start_timestamp(self.state)
-        del data_root().jobs_by_state[self.state][int(self.created.timestamp())]
-        self.state = state
-        data_root().jobs_by_state.setdefault(self.state, TimestampTree())[int(self.created.timestamp())] = self
-        self._check_set_end_timestamp()
-        transaction.commit()
+        with transaction.manager as txn:
+            if self.state == state:
+                return False
+            log.debug('%s: Forced state %s -> %s', self.oid, self.state, state)
+            self._check_set_start_timestamp(self.state)
+            del data_root().jobs_by_state[self.state][int(self.created.timestamp())]
+            self.state = state
+            data_root().jobs_by_state.setdefault(self.state, TimestampTree())[int(self.created.timestamp())] = self
+            self._check_set_end_timestamp()
+            txn.note('Job %s forced to state %s' % (self.oid, state))
         borgcube.utils.hook.borgcube_job_post_force_state(job=self, forced_state=state)
         return True
 
@@ -547,6 +548,7 @@ class Job(Evolvable):
             'kind': kind,
         }
         self.failure_cause.update(kwargs)
+        transaction.get().note('Set failure cause of job %s to %s' % (self.oid, kind))
         transaction.commit()
 
     def log_path(self):

@@ -113,6 +113,7 @@ class ReverseRepositoryProxy(RepositoryServer):
 
     def _add_checkpoint(self, id):
         self.job.checkpoint_archives.append(bin_to_hex(id))
+        transaction.get().note('Added checkpoint archive %s for job %s' % (bin_to_hex(id), self.job.oid))
         transaction.commit()
 
     def _real_open(self, location):
@@ -229,6 +230,7 @@ class ReverseRepositoryProxy(RepositoryServer):
             duration=duration,
         )
         self.job.archive = ao
+        transaction.get().note('Added completed archive %s for job %s' % (ao.id, self.job.oid))
         transaction.commit()
         log.debug('Saved archive metadata')
 

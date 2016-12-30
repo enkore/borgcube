@@ -34,6 +34,7 @@ def borgcubed_handle_request(apiserver, request):
     except KeyError:
         return apiserver.error('No such CheckConfig')
     job = CheckJob(check_config)
+    transaction.get().note('Created check job from check config %s on repository %s' % (check_config.oid , check_config.repository.oid))
     transaction.commit()
     log.info('Created job %s for check config %s (repository is %s / %s)',
              job.oid, check_config.oid, job.repository.name, job.repository.url)

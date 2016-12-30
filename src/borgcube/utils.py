@@ -15,6 +15,7 @@ from borg.remote import RemoteRepository
 from borg.constants import UMASK_DEFAULT
 from django.http import Http404
 
+import borgcube
 from .vendor import pluggy
 
 log = logging.getLogger(__name__)
@@ -48,7 +49,7 @@ def db():
         return _db_local.conn
 
 
-def data_root():
+def data_root():  # type: borgcube.core.models.DataRoot
     try:
         root = _db_local.db.root
     except AttributeError:
@@ -57,7 +58,8 @@ def data_root():
     try:
         return root.data_root
     except AttributeError as ae:
-        with transaction.manager:
+        with transaction.manager as txn:
+            txn.note('Initialized new data root.')
             log.info('Initializing new data root.')
             from borgcube.core.models import DataRoot
             root.data_root = DataRoot()

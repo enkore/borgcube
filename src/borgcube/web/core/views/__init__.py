@@ -108,6 +108,7 @@ def client_add(request):
     if data and client_form.is_valid() and connection_form.is_valid():
         connection = RshClientConnection(**connection_form.cleaned_data)
         client = Client(connection=connection, **client_form.cleaned_data)
+        transaction.get().note('Added client %s' % client.hostname)
         transaction.commit()
         return redirect(client_view, client.hostname)
     return TemplateResponse(request, 'core/client/add.html', {
@@ -126,6 +127,7 @@ def client_edit(request, client_id):
     if data and client_form.is_valid() and connection_form.is_valid():
         client._update(client_form.cleaned_data)
         client.connection._update(connection_form.cleaned_data)
+        transaction.get().note('Edited client %s' % client.hostname)
         transaction.commit()
         return redirect(client_view, client.hostname)
     return TemplateResponse(request, 'core/client/edit.html', {
@@ -146,11 +148,6 @@ def job_cancel(request, job_id):
     daemon = APIClient()
     daemon.cancel_job(job)
     return redirect(client_view, job.client.hostname)
-
-
-def repositories_as_choices():
-    for repository in data_root().repositories:
-        yield repository.oid, repository.name
 
 
 class JobConfigForm(forms.Form):
@@ -211,6 +208,8 @@ def job_config_add(request, client_id):
         job_config = JobConfig(client=client, repository=repository, label=config['label'])
         job_config._update(config)
         client.job_configs.append(job_config)
+
+        transaction.get().note('Added job config to client %s' % client.hostname)
         transaction.commit()
 
         # TODO StringListValidator
@@ -243,6 +242,8 @@ def job_config_edit(request, client_id, config_id):
         # TODO StringListValidator
         # TODO Pattern validation
         # TODO fancy pattern editor with test area
+
+        transaction.get().note('Edited job config %s of client %s' % (job_config.oid, client.hostname))
         transaction.commit()
         return redirect(reverse(client_view, args=[job_config.client.hostname]) + '#jobconfig-%s' % job_config.oid)
     return TemplateResponse(request, 'core/client/config_edit.html', {
@@ -263,6 +264,7 @@ def job_config_delete(request, client_id, config_id):
             for action in list(schedule.actions):
                 if getattr(action, 'job_config', None) == job_config:
                     schedule.actions.remove(action)
+        transaction.get().note('Deleted job config %s from client %s' % (job_config.oid, client.hostname))
         transaction.commit()
     return redirect(client_view, client_id)
 
@@ -297,6 +299,7 @@ def repository_edit(request, repository_id):
     repository_form = Repository.Form(data, initial=repository.__dict__)
     if data and repository_form.is_valid():
         repository._update(repository_form.cleaned_data)
+        transaction.get().note('Edited repository %s' % repository.oid)
         transaction.commit()
         return redirect(repository_view, repository.oid)
     return TemplateResponse(request, 'core/repository/edit.html', {
@@ -311,6 +314,7 @@ def repository_add(request):
     if data and repository_form.is_valid():
         repository = Repository(**repository_form.cleaned_data)
         data_root().repositories.append(repository)
+        transaction.get().note('Added repository %s' % repository.name)
         transaction.commit()
         return redirect(repository_view, repository.oid)
     return TemplateResponse(request, 'core/repository/add.html', {
@@ -325,6 +329,7 @@ def repository_check_config_add(request, repository_id):
     if data and config_form.is_valid():
         config = CheckConfig(repository, **config_form.cleaned_data)
         repository.job_configs.append(config)
+        transaction.get().note('Added check config to repository %s' % repository.oid)
         transaction.commit()
         return redirect(repository_view, repository.oid)
     return TemplateResponse(request, 'core/repository/config_add.html', {
@@ -340,6 +345,7 @@ def repository_check_config_edit(request, repository_id, config_id):
     config_form = check_config.Form(data, initial=check_config.__dict__)
     if data and config_form.is_valid():
         check_config._update(config_form.cleaned_data)
+        transaction.get().note('Edited check config %s on repository %s' % (check_config.oid, repository.oid))
         transaction.commit()
         return redirect(repository_view, repository_id)
     return TemplateResponse(request, 'core/repository/config_edit.html', {
@@ -352,6 +358,7 @@ def repository_check_config_delete(request, repository_id, config_id):
     check_config = find_oid_or_404(repository.job_configs, config_id)
     if request.method == 'POST':
         repository.job_configs.remove(check_config)
+        transaction.get().note('Deleted check config %s from repository %s' % (check_config.oid, repository.oid))
         transaction.commit()
     return redirect(repository_view, repository_id)
 
@@ -407,14 +414,16 @@ def schedule_add_and_edit(request, data, schedule=None, context=None):
             pass
 
         try:
-            with transaction.manager:
+            with transaction.manager as txn:
                 if all_valid:
                     if schedule:
                         schedule.actions.clear()
                         schedule._update(form.cleaned_data)
+                        txn.note('Edited schedule %s' % schedule.oid)
                     else:
                         schedule = Schedule(**form.cleaned_data)
                         data_root().schedules.append(schedule)
+                        txn.note('Added schedule %s' % schedule.name)
 
                 for serialized_action in actions_data:
                     dotted_path = serialized_action.pop('class')
@@ -429,6 +438,7 @@ def schedule_add_and_edit(request, data, schedule=None, context=None):
                     if all_valid:
                         scheduled_action = action(schedule, **action_form.cleaned_data)
                         schedule.actions.append(scheduled_action)
+                        txn.note(' - Added scheduled action %s' % scheduled_action.dotted_path())
                     action_forms.append(action_form)
 
                 if not all_valid:
@@ -475,6 +485,7 @@ def schedule_delete(request, schedule_id):
         raise Http404
     if request.method == 'POST':
         data_root().schedules.remove(schedule)
+        transaction.get().note('Deleted schedule %s' % schedule.oid)
         transaction.commit()
     return redirect(schedules)
 

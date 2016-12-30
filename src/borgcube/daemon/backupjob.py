@@ -70,6 +70,7 @@ def make_backup_job(apiserver, client, config):
         client=client,
         config=config,
     )
+    transaction.get().note('Created backup job from check config %s on client %s' % (config.oid , client.hostname))
     transaction.commit()
     log.info('Created job %s for client %s, job config %s', job.oid, client.hostname, config.oid)
     apiserver.queue_job(job)
@@ -279,6 +280,7 @@ class BackupJobExecutor(JobExecutor):
             client_manifest = SyntheticManifest(client_key, repository.id)
             job.client_manifest_data = bin_to_hex(client_manifest.write())
             job.client_manifest_id_str = client_manifest.id_str
+            transaction.get().note('Synthesized crypto for job %s' % job.oid)
             transaction.commit()
 
     def transfer_cache(self, job_cache_path):
@@ -394,8 +396,9 @@ class BackupJobExecutor(JobExecutor):
         except CalledProcessError as cpe:
             if cpe.returncode == 1:
                 log.debug('remote create finished (warning)')
-                with transaction.manager:
+                with transaction.manager as txn:
                     self.job.borg_warning = True
+                    txn.note('Set borg warning flag on job %s' % self.job.oid)
             else:
                 raise
         else:

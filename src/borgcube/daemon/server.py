@@ -144,14 +144,17 @@ class APIServer(BaseServer):
         hook.borgcubed_startup(apiserver=self)
         db = data_root()
 
-        with transaction.manager:
+        with transaction.manager as txn:
+            txn.note('borgcubed starting')
             for state, jobs in db.jobs_by_state.items():
                 if state in Job.State.STABLE:
                     continue
                 for job in jobs.values():
                     job.set_failure_cause('borgcubed-restart')
+                    txn.note(' - Failing previously running job %s due to restart' % job.oid)
             for job in db.jobs_by_state.get(Job.State.job_created, {}).values():
                 self.queue_job(job)
+                txn.note(' - Queuing job %s' % job.oid)
 
     def launch_builtin_zeo(self):
         received = False
