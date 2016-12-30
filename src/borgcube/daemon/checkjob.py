@@ -63,9 +63,10 @@ def borgcubed_client_call(apiclient, call):
 
 
 class CheckConfig(Evolvable):
-    def __init__(self, label, repository, check_repository, verify_data, check_archives, check_only_new_archives):
-        self.label = label
+    def __init__(self, repository,
+                 label, check_repository, verify_data, check_archives, check_only_new_archives):
         self.repository = repository
+        self.label = label
         self.check_repository = check_repository
         self.verify_data = verify_data
         self.check_archives = check_archives
@@ -73,7 +74,6 @@ class CheckConfig(Evolvable):
 
     class Form(forms.Form):
         label = forms.CharField()
-        repository = None  # TODO
 
         check_repository = forms.BooleanField(initial=True, required=False)
         verify_data = forms.BooleanField(initial=False, required=False,

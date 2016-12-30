@@ -24,6 +24,8 @@ from borgcube.core.models import Schedule, ScheduledAction
 from borgcube.daemon.client import APIClient
 from borgcube.utils import data_root
 
+from borgcube.daemon.checkjob import CheckConfig
+
 log = logging.getLogger(__name__)
 
 
@@ -291,19 +293,15 @@ def repositories(request):
     })
 
 
-def repository_view(request, id):
-    repository = data_root()._p_jar.get(bytes.fromhex(id))
-    if repository not in data_root().repositories:
-        raise Http404
+def repository_view(request, repository_id):
+    repository = Repository.oid_get(repository_id)
     return TemplateResponse(request, 'core/repository/view.html', {
         'repository': repository,
     })
 
 
-def repository_edit(request, id):
-    repository = data_root()._p_jar.get(bytes.fromhex(id))
-    if repository not in data_root().repositories:
-        raise Http404
+def repository_edit(request, repository_id):
+    repository = Repository.oid_get(repository_id)
     data = request.POST or None
     repository._p_activate()
     repository_form = Repository.Form(data, initial=repository.__dict__)
@@ -329,28 +327,27 @@ def repository_add(request):
         'repository_form': repository_form,
     })
 
-#class CheckConfigForm(forms.ModelForm):
-#    class Meta:
-#        model = CheckConfig
-#        fields = '__all__'
-#        exclude =('repository',)
 
-
-def repository_check_config_add(request, id):
-    repository = get_object_or_404(Repository, pk=id)
+def repository_check_config_add(request, repository_id):
+    repository = Repository.oid_get(repository_id)
     data = request.POST or None
-    config_form = CheckConfigForm(data)
+    config_form = CheckConfig.Form(data)
+    print(repository.version)
     if data and config_form.is_valid():
-        check_config = config_form.save(commit=False)
-        check_config.repository = repository
-        check_config.save()
-        return redirect(repository_view, repository.pk)
+        config = CheckConfig(repository, **config_form.cleaned_data)
+        repository.job_configs.append(config)
+        print(type(repository.job_configs))
+        print(repository._p_changed, repository.job_configs._p_changed)
+        transaction.commit()
+        print(config._p_oid)
+        print('vcmt')
+        return redirect(repository_view, repository.oid)
     return TemplateResponse(request, 'core/repository/config_add.html', {
         'form': config_form,
     })
 
 
-def repository_check_config_edit(request, id, config_id):
+def repository_check_config_edit(request, repository_id, config_id):
     check_config = get_object_or_404(CheckConfig, repository=id, pk=config_id)
     data = request.POST or None
     config_form = CheckConfigForm(data, instance=check_config)
@@ -362,14 +359,14 @@ def repository_check_config_edit(request, id, config_id):
     })
 
 
-def repository_check_config_delete(request, id, config_id):
+def repository_check_config_delete(request, repository_id, config_id):
     config = get_object_or_404(CheckConfig, repository=id, id=config_id)
     if request.method == 'POST':
         config.delete()
     return redirect(repository_view, id)
 
 
-def repository_check_config_trigger(request, id, config_id):
+def repository_check_config_trigger(request, repository_id, config_id):
     config = get_object_or_404(CheckConfig, repository=id, id=config_id)
     if request.method == 'POST':
         daemon = APIClient()

@@ -64,7 +64,7 @@ urlpatterns = [
 
     url(r'^repositories/$', core_views.repositories, name='core.repositories'),
     url(r'^repositories/add/$', core_views.repository_add, name='core.repository_add'),
-    url(r'^repositories/(?P<id>\d+)/', include(repo_urls)),
+    url(r'^repositories/(?P<repository_id>[a-f0-9]+)/', include(repo_urls)),
 
     url(r'^job/', include(job_urls)),
 

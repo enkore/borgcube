@@ -10,6 +10,7 @@ from django.conf import settings
 from django.core import validators
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.http import Http404
 from django.utils.translation import ugettext_lazy as _
 from django.utils import timezone
 from django import forms
@@ -20,6 +21,8 @@ from BTrees.LOBTree import LOBTree as TimestampTree
 from BTrees.LOBTree import LOBTree
 from BTrees.OOBTree import OOBTree
 from persistent.list import PersistentList
+
+import persistent
 
 from recurrence.forms import RecurrenceField
 
@@ -44,17 +47,6 @@ slug_validator = validators.RegexValidator(
 )
 
 
-def evolve(from_version=1, to_version=None):
-    def decorator(function):
-        try:
-            function._evolves_from = tuple(from_version)
-        except TypeError:
-            function._evolves_from = from_version,
-        function._evolves_to = to_version
-        return function
-    return decorator
-
-
 class StringObjectID:
     @property
     def oid(self):
@@ -77,44 +69,191 @@ class Volatility:
         return state
 
 
+def evolve(from_version=1, to_version=None):
+    def decorator(function):
+        function._evolves_from = from_version
+        function._evolves_to = to_version
+        return function
+    return decorator
+
+
 class Evolvable(persistent.Persistent, StringObjectID, Updateable):
+    """
+    Main class for persistent data in BorgCube.
+
+    This provides a means for online data migration ("evolution"). For this both objects
+    and classes are versioned through the `version` attribute. When an object is written
+    to the database the current `version` is stored along with it (via `__getstate__`),
+    while retrieving an object may evolve it to the current version of the class.
+
+    This is best illustrated with a simple example::
+
+        class Dog(Evolvable):
+            def __init__(self):
+                pass
+
+    Fair enough. We acquire some dogs, but notice we forgot a few things, which we want
+    to add::
+
+        class Dog(Evolvable):
+            def __init__(self, good_boy, food_bowl):
+                self.good_boy = good_boy
+                self.food_bowl = food_bowl
+
+    New code will expect these attributes to be available, so it would fail with older dogs.
+    We fix this through evolution::
+
+        class Dog(Evolvable):
+            version = 2
+
+            @evolve(from_version=1, to_version=2)
+            def added_important_things(self):
+                self.good_boy = True
+                self.food_bowl = FoodBowl.find_free_bowl_or_create_one()
+
+            def __init__(self, good_boy, food_bowl):
+                self.good_boy = good_boy
+                self.food_bowl = food_bowl
+
+    If now an old dog (version=1) is loaded, the system will notice that and run
+    `added_important_things`, which will perform the changes needed to match version=2 dogs.
+
+    Note that this is subject to the regular transaction rules, so when, after loading old objects,
+    no commit happens, the in-database data isn't updated -- the evolution would happen again
+    next time they are loaded.
+
+    You can also provide shortcuts (or leaps), if there is a better upgrade path between certain
+    versions, like so::
+
+        class Dog(Evolvable):
+            version = 7
+
+            @evolve(from_version=2, to_version=7):
+            def direct_upgrade_2to7(self):
+                ...
+
+            @evolve(from_version=2, to_version=3):
+            def upgrade_2to3(self):
+                ...
+
+    Note that evolution isn't a SAT-solver, but works in a short-circuit way; in each step the largest
+    leap is selected. Hidden paths are not considered.
+    """
     version = 1
 
-    def __setstate__(self, state):
-        if state['version'] != self.version:
+    # The simple-but-wrong way to implement this is to do changes to the state or even the object
+    # in __setstate__. This is completely illegal, and leads to the object being marked unmodified
+    # (while it actually was modified), and also leads to objects added to the object graph not
+    # being registered properly. Since the object is unchanged it wouldn't be reset on a rollback,
+    # so it would leak into the next transaction.
+    #
+    # Instead one has to look at the points where unghostification happens. Note that persistent
+    # doesn't call into _p_activate for unghostification, rather these calls are inlined
+    # (in the C implementation; the Python implementation always calls into _p_activate).
+    #
+    # These are:
+    #  - _p_activate
+    #  - tp_getattro (~ __getattribute__)
+    #  - tp_setattro (~ __setattr__)
+    #  - _p_getattr
+    #  - _p_setattr
+    #  - _p_delattr
+    #  - __getstate__
+    #  - Per_set_changed
+    #  - Per_get_mtime
+    #
+    # This probably means a fair hit in performance, which could be avoided if the C implementation
+    # would go through the _p_activate method instead of unghostify() (of course this would then be
+    # a bit slower for unghostifying and wouldn't be much use if it's not used; using a separate slot
+    # might help).
+
+    def _p_activate(self):
+        ghost = self._p_jar is not None and self._p_changed is None
+        super()._p_activate()
+        if ghost:
+            self._evolve()
+
+    def __getattribute__(self, attr):
+        ga = persistent.Persistent.__getattribute__
+        if attr.startswith(('_p_', '_v_')):
+            return ga(self, attr)
+        ghost = self._p_jar is not None and self._p_changed is None
+        v = ga(self, attr)
+        if ghost:
+            self._evolve()
+        return v
+
+    def __setattr__(self, k, v):
+        ghost = self._p_jar is not None and self._p_changed is None
+        if ghost:
+            self._evolve()
+        super().__setattr__(k, v)
+
+    def _p_getattr(self, k):
+        ghost = self._p_jar is not None and self._p_changed is None
+        if ghost:
+            self._evolve()
+        return super()._p_getattr(k)
+
+    def _p_setattr(self, k, v):
+        ghost = self._p_jar is not None and self._p_changed is None
+        if ghost:
+            self._evolve()
+        super()._p_setattr(k, v)
+
+    def _p_delattr(self, k):
+        ghost = self._p_jar is not None and self._p_changed is None
+        if ghost:
+            self._evolve()
+        return super()._p_delattr(k)
+
+    def __getstate__(self):
+        ghost = self._p_jar is not None and self._p_changed is None
+        if ghost:
+            self._evolve()
+        state = super().__getstate__()
+        state.setdefault('version', self.version)
+        return state
+
+    def _set_changed(self, value):
+        ghost = self._p_jar is not None and self._p_changed is None
+        if ghost:
+            self._evolve()
+        persistent.Persistent._p_changed.__set__(self, value)
+
+    _p_changed = property(persistent.Persistent._p_changed.__get__, _set_changed, persistent.Persistent._p_changed.__delete__)
+
+    @property
+    def _p_mtime(self):
+        ghost = self._p_jar is not None and self._p_changed is None
+        if ghost:
+            self._evolve()
+        return persistent.Persistent._p_mtime.__get__(self)
+
+    def _evolve(self):
+        current_version = type(self).version
+        needs_evolution = self.version != current_version
+        if needs_evolution:
             def evolves(member):
                 is_method = inspect.ismethod(member)
                 if not is_method:
                     return False
                 return hasattr(member, '_evolves_from') and hasattr(member, '_evolves_to')
 
-            log.debug('Evolving object %r from version %d to version %d', self, state['version'], self.version)
+            log.debug('Evolving object %r from version %d to version %d', self, self.version, current_version)
             transitory_sacrifices = list(zip(*inspect.getmembers(self, predicate=evolves)))[1]
             log.debug('Possible evolutionary paths are: %s', ', '.join(f.__name__ for f in transitory_sacrifices))
-            while state['version'] != self.version:
+            while self.version != current_version:
                 possible_evolution = []
                 for evolve in transitory_sacrifices:
-                    if state['version'] in evolve._evolves_from:
+                    if self.version == evolve._evolves_from:
                         possible_evolution.append(evolve)
                 possible_evolution.sort(key=lambda evolve: evolve._evolves_to)
                 evolve = possible_evolution.pop()
-                log.debug('Evolution is at version %d, next mutation is %s', state['version'], evolve.__name__)
-                state = evolve(state)
-                state['version'] = evolve._evolves_to
+                log.debug('Evolution is at version %d, next mutation is %s', self.version, evolve.__name__)
+                evolve()
+                self.version = evolve._evolves_to
             log.debug('Evolution completed.')
-
-        try:
-            super().__setstate__(state)
-        except AttributeError:
-            self.__dict__.update(state)
-
-    def __getstate__(self):
-        try:
-            state = super().__getstate__()
-        except AttributeError:
-            state = self.__dict__.copy()
-        state.setdefault('version', self.version)
-        return state
 
 
 class DataRoot(Evolvable):
@@ -134,6 +273,12 @@ class DataRoot(Evolvable):
 
 
 class Repository(Evolvable):
+    version = 2
+
+    @evolve(1, 2)
+    def add_job_configs(self):
+        self.job_configs = PersistentList()
+
     def __init__(self, name, url, description='', repository_id='', remote_borg='borg'):
         self.name = name
         self.url = url
@@ -142,6 +287,7 @@ class Repository(Evolvable):
         self.remote_borg = remote_borg
         self.jobs = TimestampTree()
         self.archives = OOBTree()
+        self.job_configs = PersistentList()
 
     @property
     def location(self):
@@ -155,6 +301,14 @@ class Repository(Evolvable):
 
     def __str__(self):
         return self.name
+
+    @staticmethod
+    def oid_get(oid):
+        for repository in data_root().repositories:
+            if repository.oid == oid:
+                return repository
+        else:
+            raise Http404
 
     class Form(forms.Form):
         name = forms.CharField()

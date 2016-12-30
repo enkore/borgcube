@@ -42,7 +42,6 @@ import borg
 import borg.platform
 for mod_name in MOCK_MODULES:
     if 'platform.' not in mod_name:
-        print(mod_name.split('.')[-1])
         setattr(borg, mod_name.split('.')[-1], unittest.mock.Mock())
     else:
         setattr(borg.platform, mod_name.split('.')[-1], unittest.mock.Mock())
