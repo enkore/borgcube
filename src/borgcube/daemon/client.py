@@ -5,9 +5,7 @@ from django.conf import settings
 
 import zmq
 
-import transaction
-
-from ..utils import hook, data_root
+from ..utils import hook
 
 log = logging.getLogger(__name__)
 
@@ -42,20 +40,6 @@ class APIClient:
         """
         self.socket.send_json(request_dict)
         return self.socket.recv_json()
-
-    def initiate_backup_job(self, client, job_config):
-        self.socket.send_json({
-            'command': 'initiate-backup-job',
-            'client': client.hostname,
-            'job_config': job_config.oid,
-        })
-        reply = self.socket.recv_json()
-        if not reply['success']:
-            log.error('APIClient.initiate_backup_job(%r, %d) failed: %s', client.hostname, job_config.oid, reply['message'])
-            raise APIError(reply['message'])
-        log.info('Initiated backup job %s', reply['job'])
-        transaction.begin()
-        return data_root()._p_jar[bytes.fromhex(reply['job'])]
 
     def cancel_job(self, job):
         self.socket.send_json({

@@ -1,7 +1,6 @@
 import logging
 
 from borg.helpers import Manifest
-from django.core.exceptions import ObjectDoesNotExist
 from django.utils.translation import ugettext_lazy as _
 from django import forms
 
@@ -12,7 +11,6 @@ from borg.archive import ArchiveChecker
 from borgcube.core.models import Job, Evolvable, s
 from borgcube.utils import tee_job_logs, open_repository, data_root
 from .hookspec import JobExecutor
-from .client import APIError
 
 log = logging.getLogger('borgcubed.checkjob')
 
@@ -20,47 +18,6 @@ log = logging.getLogger('borgcubed.checkjob')
 def borgcubed_job_executor(job):
     if job.short_name == 'check':
         return CheckJobExecutor
-
-
-def borgcubed_handle_request(apiserver, request):
-    if request['command'] != 'initiate-check-job':
-        return
-    try:
-        check_config_oid = request['check_config']
-    except KeyError as ke:
-        return apiserver.error('Missing parameter %r', ke.args[0])
-    try:
-        check_config = data_root()._p_jar[bytes.fromhex(check_config_oid)]
-    except KeyError:
-        return apiserver.error('No such CheckConfig')
-    job = CheckJob(check_config)
-    transaction.get().note('Created check job from check config %s on repository %s' % (check_config.oid , check_config.repository.oid))
-    transaction.commit()
-    log.info('Created job %s for check config %s (repository is %s / %s)',
-             job.oid, check_config.oid, job.repository.name, job.repository.url)
-    apiserver.queue_job(job)
-    return {
-        'success': True,
-        'job': job.oid,
-    }
-
-
-def borgcubed_client_call(apiclient, call):
-    if call != 'initiate_check_job':
-        return
-
-    def initiate_check_job(check_config):
-        reply = apiclient.do_request({
-            'command': 'initiate-check-job',
-            'check_config': check_config.oid,
-        })
-        if not reply['success']:
-            log.error('APIClient.initiate_check_job(%s) failed: %s', check_config.oid, reply['message'])
-            raise APIError(reply['message'])
-        log.info('Initiated check job %s', reply['job'])
-        transaction.begin()
-        return data_root()._p_jar[bytes.fromhex(reply['job'])]
-    return initiate_check_job
 
 
 class CheckConfig(Evolvable):
@@ -72,6 +29,14 @@ class CheckConfig(Evolvable):
         self.verify_data = verify_data
         self.check_archives = check_archives
         self.check_only_new_archives = check_only_new_archives
+
+    def create_job(self):
+        job = CheckJob(self)
+        transaction.get().note(
+            'Created check job from check config %s on repository %s' % (self.oid, self.repository.oid))
+        log.info('Created job for check config %s (repository is %s / %s)',
+                 self.oid, job.repository.name, job.repository.url)
+        return job
 
     class Form(forms.Form):
         label = forms.CharField()

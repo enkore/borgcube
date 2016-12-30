@@ -437,6 +437,15 @@ class JobConfig(Evolvable):
         self.label = label
         self.repository = repository
 
+    def create_job(self):
+        job = BackupJob(
+            repository=self.repository,
+            client=self.client,
+            config=self,
+        )
+        transaction.get().note('Created backup job from check config %s on client %s' % (self.oid, self.client.hostname))
+        log.info('Created job for client %s, job config %s', self.client.hostname, self.oid)
+
     def __str__(self):
         return _('{client}: {label}').format(
             client=self.client.hostname,

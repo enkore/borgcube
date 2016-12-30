@@ -252,8 +252,8 @@ def job_config_trigger(request, client_id, config_id):
     client = data_root().clients[client_id]
     config = find_oid_or_404(client.job_configs, config_id)
     if request.method == 'POST':
-        daemon = APIClient()
-        job = daemon.initiate_backup_job(client, config)
+        job = config.create_job()
+        transaction.commit()
     return redirect(client_view, client_id)
 
 
@@ -346,8 +346,8 @@ def repository_check_config_trigger(request, repository_id, config_id):
     repository = Repository.oid_get(repository_id)
     check_config = find_oid_or_404(repository.job_configs, config_id)
     if request.method == 'POST':
-        daemon = APIClient()
-        job = daemon.initiate_check_job(check_config)
+        job = check_config.create_job()
+        transaction.commit()
     return redirect(repository_view, repository_id)
 
 

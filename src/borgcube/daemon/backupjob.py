@@ -23,7 +23,7 @@ from borg.locking import LockTimeout, LockFailed, LockError, LockErrorT
 from borgcube.core.models import BackupJob, JobConfig, ScheduledAction
 from borgcube.keymgt import synthesize_client_key, SyntheticManifest
 from borgcube.utils import open_repository, tee_job_logs, data_root
-from django.core.exceptions import ObjectDoesNotExist, ValidationError
+from django.core.exceptions import ValidationError
 
 from .hookspec import JobExecutor
 
@@ -40,43 +40,6 @@ def borgcubed_job_executor(job):
         return BackupJobExecutor
 
 
-def borgcubed_handle_request(apiserver, request):
-    if request['command'] != 'initiate-backup-job':
-        return
-    try:
-        client_hostname = request['client']
-        jobconfig_oid = request['job_config']
-    except KeyError as ke:
-        return apiserver.error('Missing parameter %r', ke.args[0])
-    try:
-        client = data_root().clients[client_hostname]
-        for config in client.job_configs:
-            if config.oid == jobconfig_oid:
-                break
-        else:
-            raise KeyError
-    except KeyError:
-        return apiserver.error('No such JobConfig')
-    job = make_backup_job(apiserver, client, config)
-    return {
-        'success': True,
-        'job': job.oid,
-    }
-
-
-def make_backup_job(apiserver, client, config):
-    job = BackupJob(
-        repository=config.repository,
-        client=client,
-        config=config,
-    )
-    transaction.get().note('Created backup job from check config %s on client %s' % (config.oid , client.hostname))
-    transaction.commit()
-    log.info('Created job %s for client %s, job config %s', job.oid, client.hostname, config.oid)
-    apiserver.queue_job(job)
-    return job
-
-
 def queue_backup_job_conditional(apiserver, job_config: JobConfig):
     for state, jobs in data_root().jobs_by_state.items():
         if state in BackupJob.State.STABLE - {BackupJob.State.job_created}:
@@ -87,8 +50,7 @@ def queue_backup_job_conditional(apiserver, job_config: JobConfig):
                     'run_from_schedule: not triggering a new job for config %s, since job %s is queued or running',
                     job_config.oid, job.oid)
                 return
-
-    make_backup_job(apiserver, job_config.client, job_config)
+    job_config.create_job()
 
 
 def job_configs_as_choices():
@@ -109,6 +71,7 @@ class ScheduledBackup(ScheduledAction):
 
     def execute(self, apiserver):
         queue_backup_job_conditional(apiserver, self.job_config)
+        transaction.commit()
 
     class Form(forms.Form):
         job_config = forms.ChoiceField(choices=job_configs_as_choices)
@@ -141,7 +104,6 @@ class RegexScheduledBackup(ScheduledAction):
         client_re = re.compile(self.client_re, re.IGNORECASE)
         job_config_re = re.compile(self.job_config_re, re.IGNORECASE)
 
-        job_configs = []
         for client in data_root().clients.values():
             if not client_re.fullmatch(client.hostname):
                 continue
@@ -150,10 +112,8 @@ class RegexScheduledBackup(ScheduledAction):
                 if not job_config_re.fullmatch(job_config.label):
                     continue
                 log.debug('Matched job config %s to pattern %r', job_config.label, self.job_config_re)
-                job_configs.append(job_config)
-
-        for job_config in job_configs:
-            queue_backup_job_conditional(apiserver, job_config)
+                job_config.create_job()
+        transaction.commit()
 
     class Form(forms.Form):
         client_re = forms.CharField(

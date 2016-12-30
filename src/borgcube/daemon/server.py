@@ -228,6 +228,7 @@ class APIServer(BaseServer):
         transaction.begin()
         hook.borgcubed_idle(apiserver=self)
         self.check_children()
+        self.queue_new_jobs()
         self.check_queue()
 
     def close(self):
@@ -254,6 +255,10 @@ class APIServer(BaseServer):
             return
         self.queue.append((executor_class, job))
         log.debug('Enqueued job %s', job.oid)
+
+    def queue_new_jobs(self):
+        for job in data_root().jobs_by_state.get(Job.State.job_created, {}).values():
+            self.queue_job(job)
 
     def cmd_cancel_job(self, request):
         try:
