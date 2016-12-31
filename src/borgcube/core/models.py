@@ -651,7 +651,7 @@ class Schedule(Evolvable):
 
     class Form(forms.Form):
         name = forms.CharField()
-        description = forms.CharField(required=False, initial='')
+        description = forms.CharField(required=False, initial='', widget=forms.Textarea)
 
         recurrence_start = forms.DateTimeField(
             initial=timezone.now,
