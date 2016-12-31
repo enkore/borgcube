@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/1.10/ref/settings/
 """
 
 import os
+import sys
 from pathlib import Path
 from pkg_resources import iter_entry_points
 
@@ -104,7 +105,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/1.10/topics/i18n/
 
-LANGUAGE_CODE = 'de-DE'
+LANGUAGE_CODE = 'en-US'
 
 TIME_ZONE = 'UTC'
 
@@ -171,14 +172,15 @@ LOGGING = {
 
 # SERVER_CACHE_DIR = '~/'
 
-SERVER_LOGS_DIR = str(Path(__file__).parent.parent.parent.parent / '_logs')
+# Absolute path to a directory where logs should be stored.
+SERVER_LOGS_DIR = 'somewhere'
 
+# This is the remote identifier used for accessing the borgcube server from the clients.
 SERVER_LOGIN = 'mabe@localhost'
 
 # This can usually be left empty. It is only needed if no SSH forced commands are used.
 # (This is then passed as the --remote-path option to the Borg running on the client)
 SERVER_PROXY_PATH = None
-SERVER_PROXY_PATH = '/home/mabe/Projekte/_oss/borgcube/_venv/bin/borgcube-proxy'
 
 DAEMON_ADDRESS = 'tcp://127.0.0.1:58123'
 
@@ -190,10 +192,30 @@ SOCKET_PREFIX = '/run/user/{euid}/borgcube'
 
 # zodburi ( http://docs.pylonsproject.org/projects/zodburi/en/latest/ ) of the DB to use
 # note: file:// paths are always absolute.
-DB_URI = 'file:///home/mabe/Projekte/_oss/borgcube/_db/Data.fs'
+DB_URI = 'file:///var/...somewhere...'
 
 
 # borgcubed can also run the web server itself, so you don't need to care about that,
 # if you like.
 # BUILTIN_WEB = '127.0.0.1:8002'
 BUILTIN_WEB = False
+
+
+def conf():
+    try:
+        return os.environ['BORGCUBE_CONF']
+    except KeyError:
+        pass
+
+    base = os.environ.get('XDG_CONFIG_HOME',
+                          os.path.join(os.path.expanduser('~' + os.environ.get('USER', '')), '.config'))
+    return os.path.join(base, 'borgcube', 'conf.py')
+
+
+try:
+    with open(conf()) as fd:
+        code = compile(fd.read(), conf(), 'exec')
+        exec(code, globals(), locals())
+except FileNotFoundError as fnfe:
+    print('Configuration file', fnfe.filename, 'not found.')
+    sys.exit(1)
