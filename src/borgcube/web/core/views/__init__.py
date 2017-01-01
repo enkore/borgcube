@@ -378,7 +378,10 @@ class CalendarSheet:
         self.sheet_begin = self.month + relativedelta(days=weekday_delta)
 
         weekday_delta = 7 - self.month_end.isoweekday()
-        self.sheet_end = self.month_end + relativedelta(days=weekday_delta)
+        self.sheet_end = self.month_end
+        if weekday_delta != 6:
+            # Don't append a full week of the following month
+            self.sheet_end += relativedelta(days=weekday_delta)
 
         log.debug('calendar from %s to %s', self.month, self.month_end)
         log.debug('the sheet will start on %s and end on %s', self.sheet_begin, self.sheet_end)
