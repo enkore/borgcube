@@ -399,7 +399,11 @@ class CalendarSheet:
 
 
 def schedules(request):
-    sheet = CalendarSheet(now())
+    try:
+        month = localtime(now()).replace(year=int(request.GET['year']), month=int(request.GET['month']), day=1)
+    except (KeyError, TypeError):
+        month = now()
+    sheet = CalendarSheet(month)
     schedules = data_root().schedules
 
     for week in sheet.weeks:
@@ -413,6 +417,8 @@ def schedules(request):
     return TemplateResponse(request, 'core/schedule/schedule.html', {
         'calsheet': sheet,
         'schedules': schedules,
+        'prev_month': sheet.month - relativedelta(months=1),
+        'next_month': sheet.month + relativedelta(months=1),
     })
 
 

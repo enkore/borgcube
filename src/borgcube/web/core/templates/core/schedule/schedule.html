@@ -25,8 +25,20 @@
 
   </h2>
 
-  <table class='calendar'>
-    <tr>
+  <table class='calendar' width='100%'>
+    <tr class='month-nav'>
+      <td colspan='3'>
+        <a href='{% url 'core.schedules' %}?year={{ prev_month.year }}&month={{ prev_month.month }}'>{% trans '« previous month' %}</a>
+      </td>
+      <td colspan='2' style='text-align: center;'>
+        <a href='{% url 'core.schedules' %}'>{% trans 'current month' %}</a>
+      </td>
+      <td colspan='3' style='text-align: right'>
+        <a href='{% url 'core.schedules' %}?year={{ next_month.year }}&month={{ next_month.month }}'>{% trans 'next month »' %}</a>
+      </td>
+    </tr>
+
+    <tr class='month-header'>
       <th>{% trans 'KW' %}</th>
       <th>{% trans 'Monday' %}</th>
       <th>{% trans 'Tuesday' %}</th>
