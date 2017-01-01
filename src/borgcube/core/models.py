@@ -725,5 +725,7 @@ class ScheduledAction(Evolvable, DottedPath):
         pass
 
     @classmethod
-    def valid_class(cls, dotted_path):
-        return any(action_class.dotted_path() == dotted_path for action_class in cls.__subclasses__())
+    def get_class(cls, dotted_path):
+        for action_class in cls.__subclasses__():
+            if action_class.dotted_path() == dotted_path:
+                return action_class

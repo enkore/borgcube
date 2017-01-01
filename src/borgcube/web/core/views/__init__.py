@@ -9,7 +9,6 @@ from django.http import HttpResponseBadRequest
 from django.shortcuts import redirect, get_object_or_404
 from django.template.response import TemplateResponse
 from django.urls import reverse
-from django.utils.module_loading import import_string
 from django.utils.timezone import now, localtime
 from django.utils.translation import ugettext_lazy as _
 
@@ -478,10 +477,10 @@ def schedule_add_and_edit(request, data, schedule=None, context=None):
 
                 for serialized_action in actions_data:
                     dotted_path = serialized_action.pop('class')
-                    if not ScheduledAction.valid_class(dotted_path):
+                    action = ScheduledAction.get_class(dotted_path)
+                    if not action:
                         log.error('invalid/unknown schedulable action %r, ignoring', dotted_path)
                         continue
-                    action = import_string(dotted_path)
                     action_form = action.form(serialized_action)
 
                     valid = action_form.is_valid()
@@ -543,13 +542,9 @@ def schedule_delete(request, schedule_id):
 
 def scheduled_action_form(request):
     dotted_path = request.GET.get('class')
-    if not ScheduledAction.valid_class(dotted_path):
+    cls = ScheduledAction.get_class(dotted_path)
+    if not cls:
         log.error('scheduled_action_form request for %r which is not a schedulable action', dotted_path)
-        return HttpResponseBadRequest()
-    try:
-        cls = import_string(dotted_path)
-    except ImportError:
-        log.error('scheduled_action_form: failed to import %r', dotted_path)
         return HttpResponseBadRequest()
     return HttpResponse(cls.Form().as_table())
 
