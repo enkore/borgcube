@@ -62,7 +62,10 @@
           {% for schedule in day.schedules %}
             <a href='{% url 'core.schedule_edit' schedule.oid %}'
                class='schedule-link'
-               style='background-color: {{ schedule.color }};'>
+               style='background-color: {{ schedule.color }};'
+               title='{{ schedule.occurs }}
+{% for action in schedule.actions %}
+{{ action }}{% endfor %}'>
               {{ schedule.name }}
             </a><br>
           {% endfor %}

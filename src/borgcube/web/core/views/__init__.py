@@ -427,6 +427,12 @@ def schedules(request):
             for schedule in schedules:
                 occurences = schedule.recurrence.between(day.begin, day.end, cache=True, inc=True)
                 if occurences:
+                    occurs = []
+                    for occurence in occurences[:5]:
+                        occurs.append(occurence.time().strftime('%X'))
+                    if len(occurences) > 5:
+                        occurs.append('…')
+                    schedule.occurs = ', '.join(occurs)
                     day.schedules.append(schedule)
 
     return TemplateResponse(request, 'core/schedule/schedule.html', {
