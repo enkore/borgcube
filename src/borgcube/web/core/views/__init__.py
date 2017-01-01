@@ -399,30 +399,18 @@ class CalendarSheet:
 
 
 def schedules(request):
-    this_month = localtime(now()).replace(day=1, hour=0, minute=0, second=0)
-    end_of_this_month = this_month + relativedelta(months=1)
-
     sheet = CalendarSheet(now())
-
     schedules = data_root().schedules
-
-    import time
-
-    td = 0
 
     for week in sheet.weeks:
         for day in week.days:
             day.schedules = []
             for schedule in schedules:
-                t0 = time.perf_counter()
-                next_occurence = schedule.recurrence.after(day.begin, dtstart=schedule.recurrence_start)
-                td += time.perf_counter() - t0
+                next_occurence = schedule.recurrence.after(day.begin, dtstart=schedule.recurrence_start, cache=True)
                 if not next_occurence:
                     continue
                 if next_occurence < day.end:
                     day.schedules.append(schedule)
-
-    log.error('Spent %.2f seconds pondering over recurrence', td)
 
     return TemplateResponse(request, 'core/schedule/schedule.html', {
         'calsheet': sheet,
