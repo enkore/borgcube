@@ -366,7 +366,7 @@ class CalendarSheet:
     class Day:
         def __init__(self, datetime, off_month):
             self.begin = self.datetime = datetime
-            self.end = datetime + relativedelta(days=1)
+            self.end = datetime + relativedelta(days=1) - relativedelta(microsecond=1)
             self.date = datetime.date()
             self.off_month = off_month
 
@@ -406,7 +406,7 @@ def schedules(request):
         for day in week.days:
             day.schedules = []
             for schedule in schedules:
-                occurences = schedule.recurrence.between(day.begin, day.end, dtstart=schedule.recurrence_start, cache=True)
+                occurences = schedule.recurrence.between(day.begin, day.end, dtstart=schedule.recurrence_start, cache=True, inc=True)
                 if occurences:
                     day.schedules.append(schedule)
 
