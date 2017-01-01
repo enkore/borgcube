@@ -53,14 +53,14 @@
     <tr>
       <td>{{ week.number }}</td>
       {% for day in week.days %}
-        <td class='{% if day.off_month %}day-off-month{% endif %}'>
-          <div class='day'>
+        <td class='{% if day.off_month %}day-off-month{% endif %} day'>
+          <span class='day-number'>
             {% trans 'j' context 'calender day cell date format' as fmt %}
             {{ day.date|date:fmt }}
-          </div>
+          </span><br>
 
           {% for schedule in day.schedules %}
-            {{ schedule.name }}<br>
+            <a href='{% url 'core.schedule_edit' schedule.oid %}'>{{ schedule.name }}</a><br>
           {% endfor %}
         </td>
       {% endfor %}
@@ -84,8 +84,16 @@
 
 {% block extracss %}
 <style type="text/css">
+  .calendar .day {
+    height: 3em;
+  }
+
   .calendar .day-off-month {
     opacity: 0.5;
+  }
+
+  .calendar .day-number {
+    font-weight: bold;
   }
 </style>
 {% endblock %}
