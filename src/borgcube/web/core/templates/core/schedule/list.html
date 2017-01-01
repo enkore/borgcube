@@ -23,7 +23,7 @@
       <td>{{ schedule.name }}</td>
 
       <!-- TODO last execution overall outcome -->
-      <td>{{ schedule.recurrence|describe_recurrence:schedule.recurrence_start }}</td>
+      <td>{{ schedule.recurrence|describe_recurrence }}</td>
 
       <td>
         <a href='{% url 'core.schedule_edit' schedule.oid %}'>edit</a>

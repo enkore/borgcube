@@ -1,5 +1,4 @@
 
-import datetime
 from json import dumps
 
 from django import template
@@ -7,7 +6,6 @@ from django.forms.utils import pretty_name
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 from django.utils.translation import ugettext_lazy as _
-from django.utils.translation import ungettext_lazy as ungettext
 from django.core.serializers.json import DjangoJSONEncoder
 
 import recurrence
@@ -156,7 +154,7 @@ def json(obj):
 
 
 @register.filter
-def describe_recurrence(rec: recurrence.Recurrence, start: datetime.datetime):
+def describe_recurrence(rec: recurrence.Recurrence):
     if rec.rdates or rec.exdates or rec.exrules:
         return _('(complicated)')
     output = []

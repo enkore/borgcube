@@ -26,7 +26,7 @@ def borgcubed_idle(apiserver):
     this_very_moment = now()
     for schedule in data_root().schedules:
         # TODO: when django-recurrence#81 is resolved, use cache.
-        occurence = schedule.recurrence.after(this_very_moment, dtstart=schedule.recurrence_start)
+        occurence = schedule.recurrence.after(this_very_moment)
         if latest_executions.get(schedule._p_oid) == occurence:
             continue
         if occurence and abs((occurence - this_very_moment).total_seconds()) < 10:

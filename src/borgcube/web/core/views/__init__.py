@@ -413,7 +413,7 @@ def schedules(request):
         for day in week.days:
             day.schedules = []
             for schedule in schedules:
-                occurences = schedule.recurrence.between(day.begin, day.end, dtstart=schedule.recurrence_start, cache=True, inc=True)
+                occurences = schedule.recurrence.between(day.begin, day.end, cache=True, inc=True)
                 if occurences:
                     day.schedules.append(schedule)
 

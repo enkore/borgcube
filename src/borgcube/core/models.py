@@ -640,11 +640,17 @@ class BackupJob(Job):
 
 
 class Schedule(Evolvable):
-    def __init__(self, name, recurrence_start, recurrence, description=''):
+    version = 2
+
+    @evolve(1, 2)
+    def make_dtstart_implicit(self):
+        self.recurrence.dtstart = self.recurrence_start
+        del self.recurrence_start
+
+    def __init__(self, name, recurrence, description=''):
         self.name = name
         self.description = description
 
-        self.recurrence_start = recurrence_start
         self.recurrence = recurrence
 
         self.actions = PersistentList()
@@ -660,6 +666,16 @@ class Schedule(Evolvable):
                         'The set time zone is %s.') % settings.TIME_ZONE
         )
         recurrence = RecurrenceField()
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            if 'recurrence' in self.initial:
+                self.initial['recurrence_start'] = self.initial['recurrence'].dtstart
+
+        def clean(self):
+            dtstart = self.cleaned_data.pop('recurrence_start')
+            self.cleaned_data['recurrence'].dtstart = dtstart
+            return self.cleaned_data
 
 
 class DottedPath:
