@@ -1,4 +1,5 @@
 
+import datetime
 from json import dumps
 
 from django import template
@@ -6,7 +7,10 @@ from django.forms.utils import pretty_name
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import ungettext_lazy as ungettext
 from django.core.serializers.json import DjangoJSONEncoder
+
+import recurrence
 
 from borg.helpers import format_file_size
 
@@ -149,3 +153,37 @@ def get(obj, attr):
 def json(obj):
     """Return safe JSON serialization of *obj*."""
     return mark_safe(dumps(obj, cls=DjangoJSONEncoder))
+
+
+@register.filter
+def describe_recurrence(rec: recurrence.Recurrence, start: datetime.datetime):
+    if rec.rdates or rec.exdates or rec.exrules:
+        return _('(complicated)')
+    output = []
+    for rrule in rec.rrules:
+        if rrule.interval != 1 or rrule.until or rrule.bysetpos or rrule.bymonth or rrule.bymonthday or \
+                rrule.byyearday or rrule.byweekno or rrule.byday or rrule.byhour or rrule.byminute or rrule.bysecond: \
+            return _('(complicated)')
+
+        freq = {
+            recurrence.YEARLY: _('yearly'),
+            recurrence.MONTHLY: _('monthly'),
+            recurrence.WEEKLY: _('weekly'),
+            recurrence.DAILY: _('daily'),
+            recurrence.HOURLY: _('hourly'),
+            recurrence.MINUTELY: _('minutely'),
+            recurrence.SECONDLY: _('secondly'),
+        }[rrule.freq]
+
+        output.append(freq)
+
+    if len(output) == 1:
+        return output.pop()
+    elif len(output) == 2:
+        return _('%s and %s') % output
+    elif len(output) == 3:
+        return _('%s, %s and %s') % output
+    elif len(output) == 4:
+        return _('%s, %s, %s and %s') % output
+    else:
+        return _('(complicated)')
