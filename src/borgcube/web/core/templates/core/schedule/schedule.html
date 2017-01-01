@@ -1,15 +1,60 @@
 {% extends 'base.html' %}
 {% load i18n %}
 
-{% block title %}{% trans 'Schedule' %}{% endblock %}
+{% block title %}
+  {% trans 'F Y' context 'schedule heading strftime for month' as fmt %}
+  {% blocktrans with from=calsheet.month.date|date:fmt to=calsheet.month_end.date|date:fmt %}
+  {{ from }} schedule
+  {% endblocktrans %}
+{% endblock %}
 
 {% block content %}
-  <h1>{% trans 'Schedule' %}
+  <h1>
+    {% trans 'F Y' context 'schedule heading strftime for month' as fmt %}
+    {% blocktrans with from=calsheet.month.date|date:fmt to=calsheet.month_end.date|date:fmt %}
+    {{ from }} schedule
+    {% endblocktrans %}
+
     <small>
       (<a href='{% url 'core.schedule_list' %}'>{% trans 'list' %}</a>)
       (<a href='{% url 'core.schedule_add' %}'>{% trans 'add' %}</a>)
     </small>
   </h1>
+
+  <h2>
+
+  </h2>
+
+  <table class='calendar'>
+    <tr>
+      <th>{% trans 'KW' %}</th>
+      <th>{% trans 'Monday' %}</th>
+      <th>{% trans 'Tuesday' %}</th>
+      <th>{% trans 'Wednesday' %}</th>
+      <th>{% trans 'Thursday' %}</th>
+      <th>{% trans 'Friday' %}</th>
+      <th>{% trans 'Saturday' %}</th>
+      <th>{% trans 'Sunday' %}</th>
+    </tr>
+
+    {% for week in calsheet.weeks %}
+    <tr>
+      <td>{{ week.number }}</td>
+      {% for day in week.days %}
+        <td class='{% if day.off_month %}day-off-month{% endif %}'>
+          <div class='day'>
+            {% trans 'j' context 'calender day cell date format' as fmt %}
+            {{ day.date|date:fmt }}
+          </div>
+
+          {% for schedule in day.schedules %}
+            {{ schedule.name }}<br>
+          {% endfor %}
+        </td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+  </table>
 
   {% for item in schedules %}
     <h2 id='item-{{ item.oid }}'>{{ item.name }}
@@ -23,4 +68,12 @@
       {% endfor %}
     </ul>
   {% endfor %}
+{% endblock %}
+
+{% block extracss %}
+<style type="text/css">
+  .calendar .day-off-month {
+    opacity: 0.5;
+  }
+</style>
 {% endblock %}

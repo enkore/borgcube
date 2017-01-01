@@ -10,7 +10,7 @@ from django.shortcuts import redirect, get_object_or_404
 from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.module_loading import import_string
-from django.utils.timezone import now
+from django.utils.timezone import now, localtime
 from django.utils.translation import ugettext_lazy as _
 
 import transaction
@@ -354,14 +354,78 @@ def repository_check_config_trigger(request, repository_id, config_id):
 from dateutil.relativedelta import relativedelta
 
 
+class CalendarSheet:
+    # FYI I'm a masochist
+
+    class Week:
+        def __init__(self, first_day, days):
+            self.first_day = first_day
+            self.days = days
+            self.number = first_day.datetime.isocalendar()[1]
+
+    class Day:
+        def __init__(self, datetime, off_month):
+            self.begin = self.datetime = datetime
+            self.end = datetime + relativedelta(days=1)
+            self.date = datetime.date()
+            self.off_month = off_month
+
+    def __init__(self, datetime_month):
+        self.month = localtime(datetime_month).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        self.month_end = self.month + relativedelta(months=1)
+
+        weekday_delta = -self.month.weekday()
+        self.sheet_begin = self.month + relativedelta(days=weekday_delta)
+
+        weekday_delta = 7 - self.month_end.isoweekday()
+        self.sheet_end = self.month_end + relativedelta(days=weekday_delta)
+
+        log.debug('calendar from %s to %s', self.month, self.month_end)
+        log.debug('the sheet will start on %s and end on %s', self.sheet_begin, self.sheet_end)
+
+        self.weeks = []
+        current = self.sheet_begin
+
+        def day():
+            off_month = current.month != self.month.month
+            return self.Day(datetime=current, off_month=off_month)
+
+        while current < self.sheet_end:
+            week = self.Week(day(), [])
+            self.weeks.append(week)
+            for i in range(7):
+                week.days.append(day())
+                current += relativedelta(days=1)
+
+
 def schedules(request):
-    this_month = now().replace(day=1, hour=0, minute=0, second=0)
+    this_month = localtime(now()).replace(day=1, hour=0, minute=0, second=0)
     end_of_this_month = this_month + relativedelta(months=1)
 
+    sheet = CalendarSheet(now())
+
     schedules = data_root().schedules
-    for schedule in schedules:
-        schedule.occurences = schedule.recurrence.between(this_month, end_of_this_month, dtstart=schedule.recurrence_start)
+
+    import time
+
+    td = 0
+
+    for week in sheet.weeks:
+        for day in week.days:
+            day.schedules = []
+            for schedule in schedules:
+                t0 = time.perf_counter()
+                next_occurence = schedule.recurrence.after(day.begin, dtstart=schedule.recurrence_start)
+                td += time.perf_counter() - t0
+                if not next_occurence:
+                    continue
+                if next_occurence < day.end:
+                    day.schedules.append(schedule)
+
+    log.error('Spent %.2f seconds pondering over recurrence', td)
+
     return TemplateResponse(request, 'core/schedule/schedule.html', {
+        'calsheet': sheet,
         'schedules': schedules,
     })
 
