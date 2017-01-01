@@ -117,3 +117,50 @@ This is already a working plugin. You can *pip install path/to/the/directory* it
     - `borgcube.web.core.hookspec`
 
 .. _pluggy: https://github.com/pytest-dev/pluggy
+
+The database
+------------
+
+BorgCube uses the `ZODB`_ [#1]_ object database, which is somewhat different from the Django ORM, while
+providing relevant advantages to this particular project (it's not exactly the most popular database,
+but it's mature, stable and very easy to use [#2]_)
+
+Instead of using migration scripts and migration state deduction to perform data migration on-the-fly
+data migration through the `Evolvable` system.
+
+The most important differences between RBDMS accessed through an ORM and the ZODB are (this section
+is not project-specific)
+
+1.  No explicit ORM is required, and fields don't have to be declared in advance. Object instances
+    referred to by other objects are stored in the database as they are, including all attributes.
+
+    Attributes starting with `_p_` (attributes related to handling persistence) and
+    `_v_` (volatile attributes) are not preserved.
+
+    Additionally this is further customizable through the standard `pickle`_ system,
+    which is normally not required.
+
+2.  There is no autocommit mode. Because the state of your objects and the transactions' snapshot
+    are the same, autocommit wouldn't be particularly helpful -- the state of your objects would
+    be continuously, uncontrollably be changed as other transactions commit.
+
+3.  There is no `refresh_from_db <django.db.models.Model.refresh_from_db>` --
+    ZODB ensures that the state of your objects exactly matches the state of the transaction.
+
+4.  ZODB caches (aggressively). In ZODB every database connection has an associated cache, which
+    contains already deserialized and alive objects. This makes read operations often as fast as
+    just accessing a Python object (that already exists), because the database server is not
+    contacted at all, and no additional object allocations need to be performed.
+
+    Rollbacks are normally cheap, because only changed objects need to be re-fetched from the server.
+
+    (In fact, a site will be able to serve common requests indefinitely with a dead database server,
+    as long as no writes happen.)
+
+.. _ZODB: http://www.zodb.org/en/latest/
+.. _pickle: https://docs.python.org/3/library/pickle.html#pickling-class-instances
+
+.. [#1] Canonically ZODB stands for *Zope Object DataBase*, but it's okay if you call it
+        *Ze Object Database* with a German accent ;)
+.. [#2] It's almost as old as PostgreSQL, and unlike *Strozzi 'the first' NoSQL* it's really
+        not relational.
