@@ -409,6 +409,19 @@ def schedules(request):
     sheet = CalendarSheet(month)
     schedules = data_root().schedules
 
+    colors = [
+        '#e6e6e6',
+        '#d4c5f9',
+        '#fef2c0',
+        '#f9d0c4',
+    ]
+
+    for schedule in schedules:
+        try:
+            schedule.color = colors.pop()
+        except IndexError:
+            schedule.color = None
+
     for week in sheet.weeks:
         for day in week.days:
             day.schedules = []

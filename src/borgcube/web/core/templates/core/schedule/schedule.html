@@ -60,7 +60,11 @@
           </span><br>
 
           {% for schedule in day.schedules %}
-            <a href='{% url 'core.schedule_edit' schedule.oid %}'>{{ schedule.name }}</a><br>
+            <a href='{% url 'core.schedule_edit' schedule.oid %}'
+               class='schedule-link'
+               style='background-color: {{ schedule.color }};'>
+              {{ schedule.name }}
+            </a><br>
           {% endfor %}
         </td>
       {% endfor %}
@@ -95,6 +99,13 @@
 
   .calendar .day-number {
     font-weight: bold;
+  }
+
+  .calendar .schedule-link {
+    display: inline-block;
+    text-decoration: none;
+    padding: 3px;
+    border-radius: 2px;
   }
 </style>
 {% endblock %}
