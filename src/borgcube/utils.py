@@ -50,6 +50,9 @@ def db():
 
 
 def data_root():  # type: borgcube.core.models.DataRoot
+    """
+    Return a `DataRoot` instance.
+    """
     try:
         root = _db_local.db.root
     except AttributeError:

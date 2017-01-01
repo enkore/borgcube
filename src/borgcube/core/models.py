@@ -248,6 +248,17 @@ class Evolvable(persistent.Persistent, StringObjectID, Updateable):
 
 
 class DataRoot(Evolvable):
+    """
+    The DataRoot has the following attributes:
+
+    :ivar repositories: a `PersistentList` of `Repository` instances.
+    :ivar archives: an `OOBTree` mapping hex archive IDs to `Archive` instances.
+    :ivar clients: an `OOBTree` mapping host names to `Client` instances.
+    :ivar jobs: an `OOBTree` mapping TODO to `Job` instances.
+    :ivar jobs_by_state: an `OOBTree` mapping job states to trees of `Job` instances.
+    :ivar schedules: a `PersistentList` of `Schedule` instances.
+    :ivar ext: a `PersistentDict` of extension data (see `plugin_data`, **do not use directly**).
+    """
     version = 2
 
     @evolve(1, 2)
@@ -271,6 +282,28 @@ class DataRoot(Evolvable):
         self.ext = PersistentDict()
 
     def plugin_data(self, name, factory):
+        """
+        Return an instance generated (at some point in time) by *factory*, indexed by *name*.
+
+        This should be used for storing plugin data, eg.::
+
+            class AwesomePluginData(Evolvable):
+                def __init__(self):
+                    self.some_data = OOBTree()
+
+            ...
+
+            def show_some_data(request):
+                # You might want to just put this in a separate helper (below)
+                plugdat = data_root().plugin_data('awesome-plugin', AwesomePluginData)
+                return TemplateResponse(...)
+
+            # A sample helper
+            def plugin_root():
+                return data_root().plugin_data('awesome-plugin', AwesomePluginData)
+
+        A good *name* would be the entrypoint name of your plugin, or it's root module/package name.
+        """
         try:
             return self.ext[name]
         except KeyError:

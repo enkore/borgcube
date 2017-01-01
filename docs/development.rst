@@ -121,9 +121,9 @@ This is already a working plugin. You can *pip install path/to/the/directory* it
 The database
 ------------
 
-BorgCube uses the `ZODB`_ [#1]_ object database, which is somewhat different from the Django ORM, while
+BorgCube uses the `ZODB`_ [#]_ object database, which is somewhat different from the Django ORM, while
 providing relevant advantages to this particular project (it's not exactly the most popular database,
-but it's mature, stable and very easy to use [#2]_)
+but it's mature, stable and very easy to use [#]_)
 
 Instead of using migration scripts and migration state deduction to perform data migration on-the-fly
 data migration through the `Evolvable` system.
@@ -161,10 +161,51 @@ is not project-specific)
    in the database are (have to be) reachable from the root, through an arbitrary number of objects
    referring to each other (including object cycles).
 
+.. [#] Canonically ZODB stands for *Zope Object DataBase*, but it's okay if you call it
+        *Ze Object Database* with a German accent ;)
+.. [#] It's almost as old as PostgreSQL, and unlike *Strozzi 'the first' NoSQL* it's really
+        not relational.
+
+Use in BorgCube
++++++++++++++++
+
+Locating and connecting to the database is handled transparently by the `data_root` function,
+which returns a ready-to-use `DataRoot` instance. All other data follows from there. Plugins should
+use the `DataRoot.plugin_data` instead of creating their own attributes on the DataRoot.
+
+In `borgcube.web` view functions the transaction is reset before and after calling the view
+through the `borgcube.web.core.middleware.transaction_middleware`, so any modifications to objects
+in a view have to be explicitly committed. A simple example of this is the `repository_add` view:
+
+.. code-block:: python
+    :emphasize-lines: 11-12
+
+    import transaction
+
+    ...
+
+    def repository_add(request):
+        data = request.POST or None
+        repository_form = Repository.Form(data)
+        if data and repository_form.is_valid():
+            repository = Repository(**repository_form.cleaned_data)
+            data_root().repositories.append(repository)
+            transaction.get().note('Added repository %s' % repository.name)
+            transaction.commit()
+            return redirect(repository_view, repository.oid)
+        return TemplateResponse(request, 'core/repository/add.html', {
+            'repository_form': repository_form,
+        })
+
+It's considered good practice to leave a meaningful transaction note, because in ZODB transactions
+can be (selectively) undone, which is much easier if the transaction log makes it obvious
+which transaction was the bad one. [#]_
+
+Note how some functions bring their own transactions, eg. `Job.force_state` or `Job.update_state`.
+
 .. _ZODB: http://www.zodb.org/en/latest/
 .. _pickle: https://docs.python.org/3/library/pickle.html#pickling-class-instances
 
-.. [#1] Canonically ZODB stands for *Zope Object DataBase*, but it's okay if you call it
-        *Ze Object Database* with a German accent ;)
-.. [#2] It's almost as old as PostgreSQL, and unlike *Strozzi 'the first' NoSQL* it's really
-        not relational.
+
+.. [#] We can also associate a user with a transaction, which is done by `borgcube.web` (TODO).
+        This makes the transaction log of the ZODB similar to a free audit log.
