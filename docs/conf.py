@@ -82,7 +82,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'BorgCube'
-copyright = '2016, Marian Beermann'
+copyright = '2016-2017, Marian Beermann'
 author = 'Marian Beermann'
 
 # The version info for the project you're documenting, acts as replacement for
