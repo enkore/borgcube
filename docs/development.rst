@@ -157,6 +157,10 @@ is not project-specific)
     (In fact, a site will be able to serve common requests indefinitely with a dead database server,
     as long as no writes happen.)
 
+5. The database only stores a *single* object. This object is the "root" object and all objects
+   in the database are (have to be) reachable from the root, through an arbitrary number of objects
+   referring to each other (including object cycles).
+
 .. _ZODB: http://www.zodb.org/en/latest/
 .. _pickle: https://docs.python.org/3/library/pickle.html#pickling-class-instances
 
