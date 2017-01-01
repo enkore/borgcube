@@ -406,10 +406,8 @@ def schedules(request):
         for day in week.days:
             day.schedules = []
             for schedule in schedules:
-                next_occurence = schedule.recurrence.after(day.begin, dtstart=schedule.recurrence_start, cache=True)
-                if not next_occurence:
-                    continue
-                if next_occurence < day.end:
+                occurences = schedule.recurrence.between(day.begin, day.end, dtstart=schedule.recurrence_start, cache=True)
+                if occurences:
                     day.schedules.append(schedule)
 
     return TemplateResponse(request, 'core/schedule/schedule.html', {
