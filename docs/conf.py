@@ -22,6 +22,11 @@ import sys
 
 import unittest.mock
 
+on_rtd = os.environ.get('READTHEDOCS') == 'True'
+if on_rtd:
+    os.environ['BORGCUBE_IGNORE_CONF'] = 'True'
+
+
 MOCK_MODULES = [
     'borg.chunker',
     'borg.compress',

@@ -212,10 +212,11 @@ def conf():
     return os.path.join(base, 'borgcube', 'conf.py')
 
 
-try:
-    with open(conf()) as fd:
-        code = compile(fd.read(), conf(), 'exec')
-        exec(code, globals(), locals())
-except FileNotFoundError as fnfe:
-    print('Configuration file', fnfe.filename, 'not found.')
-    sys.exit(1)
+if not os.environ.get('BORGCUBE_IGNORE_CONF'):
+    try:
+        with open(conf()) as fd:
+            code = compile(fd.read(), conf(), 'exec')
+            exec(code, globals(), locals())
+    except FileNotFoundError as fnfe:
+        print('Configuration file', fnfe.filename, 'not found.')
+        sys.exit(1)
