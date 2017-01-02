@@ -365,7 +365,7 @@ class CalendarSheet:
     class Day:
         def __init__(self, datetime, off_month):
             self.begin = self.datetime = datetime
-            self.end = datetime + relativedelta(days=1) - relativedelta(microsecond=1)
+            self.end = datetime + relativedelta(days=1) - relativedelta(microseconds=1)
             self.date = datetime.date()
             self.off_month = off_month
 
