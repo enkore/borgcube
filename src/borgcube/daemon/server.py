@@ -249,10 +249,7 @@ class APIServer(BaseServer):
         """
         Enqueue *job* instance for execution.
         """
-        executor_class = hook.borgcubed_job_executor(job=job)
-        if not executor_class:
-            log.error('Cannot queue job %s: No JobExecutor found', job)
-            return
+        executor_class = job.executor
         self.queue.append((executor_class, job))
         log.debug('Enqueued job %s', job.oid)
 

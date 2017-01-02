@@ -24,7 +24,7 @@ from recurrence.forms import RecurrenceField
 from borg.helpers import Location
 
 import borgcube
-from borgcube.utils import data_root
+from borgcube.utils import data_root, hook
 
 log = logging.getLogger(__name__)
 
@@ -481,6 +481,32 @@ class s(str):
         return str(self), self.verbose_name
 
 
+class JobExecutor:
+    name = 'job-executor'
+
+    @classmethod
+    def can_run(cls, job):
+        blocking_jobs = []
+        if job.repository:
+            for other_job in job.repository.jobs.values():
+                if other_job.state in Job.State.STABLE:
+                    continue
+                blocking_jobs.append(other_job)
+                hook.borgcube_job_blocked(job=job, blocking_jobs=blocking_jobs)
+        if blocking_jobs:
+            log.debug('Job %s blocked by running backup jobs: %s',
+                      job.oid, ' '.join('{} ({})'.format(job.oid, job.state) for job in blocking_jobs))
+        return not blocking_jobs
+
+    @classmethod
+    def prefork(cls, job):
+        pass
+
+    @classmethod
+    def run(cls, job):
+        raise NotImplementedError
+
+
 class Job(Evolvable):
     """
     Core job model.
@@ -492,12 +518,12 @@ class Job(Evolvable):
 
     1. Derive from this
     2. Define additional states, if necessary, by deriving the State class in your model from `Job.State`
-    3. borgcubed needs to know how to run the job, therefore implement the
-       `borgcubed_job_executor <hookspec.borgcubed_job_executor>` hook.
-       Also, implement the required `JobExecutor` class.
-    4. Other relevant hooks: `borgcube_job_blocked`, `borgcubed_job_exit`.
+    3. borgcubed needs to know how to run the job, therefore set *executor* to your *JobExecutor* subclass.
+    4. Relevant hooks: `borgcube_job_blocked`, `borgcubed_job_exit`.
     """
     short_name = 'job'
+
+    executor = JobExecutor
 
     class State:
         job_created = s('job_created', _('Job created'))

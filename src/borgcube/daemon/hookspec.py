@@ -1,8 +1,6 @@
 import logging
 
 from borgcube.vendor import pluggy
-from borgcube.core.models import Job
-from borgcube.utils import hook, data_root
 
 log = logging.getLogger('borgcubed')
 hookspec = pluggy.HookspecMarker('borgcube')
@@ -39,13 +37,6 @@ def borgcubed_idle(apiserver):
     """
 
 
-@hookspec(firstresult=True)
-def borgcubed_job_executor(job):
-    """
-    Return JobExecutor class for *job* or None.
-    """
-
-
 @hookspec
 def borgcubed_job_exit(apiserver, job, exit_code, signo):
     """
@@ -73,29 +64,3 @@ def borgcubed_client_call(apiclient, call):
 
     Don't forget to raise the appropiate APIError if the daemon returns an error.
     """
-
-
-class JobExecutor:
-    name = 'job-executor'
-
-    @classmethod
-    def can_run(cls, job):
-        blocking_jobs = []
-        if job.repository:
-            for other_job in job.repository.jobs.values():
-                if other_job.state in Job.State.STABLE:
-                    continue
-                blocking_jobs.append(other_job)
-                hook.borgcube_job_blocked(job=job, blocking_jobs=blocking_jobs)
-        if blocking_jobs:
-            log.debug('Job %s blocked by running backup jobs: %s',
-                      job.oid, ' '.join('{} ({})'.format(job.oid, job.state) for job in blocking_jobs))
-        return not blocking_jobs
-
-    @classmethod
-    def prefork(cls, job):
-        pass
-
-    @classmethod
-    def run(cls, job):
-        raise NotImplementedError

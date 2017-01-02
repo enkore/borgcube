@@ -8,16 +8,10 @@ import transaction
 
 from borg.archive import ArchiveChecker
 
-from borgcube.core.models import Job, Evolvable, s
+from borgcube.core.models import Job, JobExecutor, Evolvable, s
 from borgcube.utils import tee_job_logs, open_repository
-from borgcube.daemon.hookspec import JobExecutor
 
 log = logging.getLogger(__name__)
-
-
-def borgcubed_job_executor(job):
-    if job.short_name == 'check':
-        return CheckJobExecutor
 
 
 class CheckConfig(Evolvable):
@@ -49,19 +43,6 @@ class CheckConfig(Evolvable):
         check_only_new_archives = forms.BooleanField(
             initial=False, required=False,
             help_text=_('Check only archives added since the last check'))
-
-
-class CheckJob(Job):
-    short_name = 'check'
-
-    class State(Job.State):
-        repository_check = s('repository_check', _('Checking repository'))
-        verify_data = s('verify_data', _('Verifying data'))
-        archives_check = s('archives_check', _('Checking archives'))
-
-    def __init__(self, config: CheckConfig):
-        super().__init__(config.repository)
-        self.config = config
 
 
 class CheckJobExecutor(JobExecutor):
@@ -132,3 +113,17 @@ class CheckJobExecutor(JobExecutor):
         check.rebuild_refcounts(sort_by='ts')
         check.orphan_chunks_check()
         check.finish()
+
+
+class CheckJob(Job):
+    short_name = 'check'
+    executor = CheckJobExecutor
+
+    class State(Job.State):
+        repository_check = s('repository_check', _('Checking repository'))
+        verify_data = s('verify_data', _('Verifying data'))
+        archives_check = s('archives_check', _('Checking archives'))
+
+    def __init__(self, config: CheckConfig):
+        super().__init__(config.repository)
+        self.config = config

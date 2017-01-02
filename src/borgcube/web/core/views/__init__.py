@@ -420,11 +420,12 @@ def schedules(request):
         '#f9d0c4',
     ]
 
-    for schedule in schedules:
-        try:
-            schedule.color = colors.pop()
-        except IndexError:
-            schedule.color = None
+    if len(schedules) > 1:
+        for schedule in schedules:
+            try:
+                schedule.color = colors.pop()
+            except IndexError:
+                schedule.color = None
 
     for week in sheet.weeks:
         for day in week.days:

@@ -24,150 +24,11 @@ from borg.key import PlaintextKey
 from borg.repository import Repository
 from borg.locking import LockTimeout, LockFailed, LockError, LockErrorT
 
-from borgcube.core.models import Evolvable, ScheduledAction, Job, s
+from borgcube.core.models import Evolvable, ScheduledAction, Job, JobExecutor, s
 from borgcube.keymgt import synthesize_client_key, SyntheticManifest
 from borgcube.utils import open_repository, tee_job_logs, data_root
-from borgcube.daemon.hookspec import JobExecutor
 
 log = logging.getLogger(__name__)
-
-
-class BackupJob(Job):
-    short_name = 'backup'
-
-    class State(Job.State):
-        # Cache is uploaded to client
-        client_preparing = s('client_preparing', _('Preparing client'))
-        # Cache upload done, borg-create will be started
-        client_prepared = s('client_prepared', _('Prepared client'))
-        # borg-create has connected to reverse proxy
-        client_in_progress = s('client_in_progress', _('In progress'))
-        # borg-create is done
-        client_done = s('client_done', _('Client is done'))
-        # Cache is removed from client
-        client_cleanup = s('client_cleanup', _('Client is cleaned up'))
-
-    def __init__(self, repository, client, config):
-        super().__init__(repository)
-        self.client = client
-        client.jobs[int(self.created.timestamp())] = self
-        self.archive = None
-        self.config = config
-        self.checkpoint_archives = PersistentList()
-
-    @property
-    def reverse_path(self):
-        return hmac.HMAC((settings.SECRET_KEY + 'BackupJob-revloc').encode(),
-                         str(self.oid).encode(),
-                         sha224).hexdigest()
-
-    @property
-    def reverse_location(self):
-        return settings.SERVER_LOGIN + ':' + self.reverse_path
-
-    @property
-    def archive_name(self):
-        return self.client.hostname + '-' + str(self.oid)
-
-    def _log_file_name(self, timestamp):
-        return '%s-%s-%s-%s' % (timestamp, self.short_name, self.client.hostname, self.oid)
-
-
-class BackupConfig(Evolvable):
-    def __init__(self, client, label, repository):
-        self.client = client
-        self.label = label
-        self.repository = repository
-
-    def create_job(self):
-        job = BackupJob(
-            repository=self.repository,
-            client=self.client,
-            config=self,
-        )
-        transaction.get().note('Created backup job from check config %s on client %s' % (self.oid, self.client.hostname))
-        log.info('Created job for client %s, job config %s', self.client.hostname, self.oid)
-
-    def __str__(self):
-        return _('{client}: {label}').format(
-            client=self.client.hostname,
-            label=self.label,
-        )
-
-
-def job_configs_as_choices():
-    for client in data_root().clients.values():
-        for config in client.job_configs:
-            yield config.oid, config
-
-
-class ScheduledBackup(ScheduledAction):
-    name = _('Run backup job')
-
-    def __init__(self, schedule, job_config):
-        super().__init__(schedule)
-        self.job_config = job_config
-
-    def __str__(self):
-        return _('Run {}').format(self.job_config)
-
-    def execute(self, apiserver):
-        queue_backup_job_conditional(apiserver, self.job_config)
-        transaction.commit()
-
-    class Form(forms.Form):
-        job_config = forms.ChoiceField(choices=job_configs_as_choices)
-
-        def clean(self):
-            data = super().clean()
-            o = data_root()._p_jar[bytes.fromhex(data['job_config'])]
-            if not isinstance(o, BackupConfig):
-                raise ValidationError('Invalid object reference')
-            data['job_config'] = o
-            return data
-
-
-def validate_regex(regex):
-    try:
-        re.compile(regex, re.IGNORECASE)
-    except re.error as error:
-        raise ValidationError(error.msg)
-
-
-class RegexScheduledBackup(ScheduledAction):
-    name = _('Run bulk backup')
-
-    def __init__(self, schedule, client_re, job_config_re):
-        super().__init__(schedule)
-        self.client_re = client_re
-        self.job_config_re = job_config_re
-
-    def execute(self, apiserver):
-        client_re = re.compile(self.client_re, re.IGNORECASE)
-        job_config_re = re.compile(self.job_config_re, re.IGNORECASE)
-
-        for client in data_root().clients.values():
-            if not client_re.fullmatch(client.hostname):
-                continue
-            log.debug('Matched client %s to pattern %r', client.hostname, self.client_re)
-            for job_config in client.job_configs:
-                if not job_config_re.fullmatch(job_config.label):
-                    continue
-                log.debug('Matched job config %s to pattern %r', job_config.label, self.job_config_re)
-                job_config.create_job()
-        transaction.commit()
-
-    class Form(forms.Form):
-        client_re = forms.CharField(
-            validators=[validate_regex],
-            initial='.*',
-            label=_('Regex for selecting clients'),
-        )
-        job_config_re = forms.CharField(
-            validators=[validate_regex],
-            initial='.*',
-            label=_('Regex for selecting configurations'),
-        )
 
 
 def check_call(*popenargs, **kwargs):
@@ -175,12 +36,7 @@ def check_call(*popenargs, **kwargs):
     return subprocess.check_call(*popenargs, **kwargs)
 
 
-def borgcubed_job_executor(job):
-    if job.short_name == 'backup':
-        return BackupJobExecutor
-
-
-def queue_backup_job_conditional(apiserver, job_config: BackupConfig):
+def queue_backup_job_conditional(apiserver, job_config):
     for state, jobs in data_root().jobs_by_state.items():
         if state in BackupJob.State.STABLE - {BackupJob.State.job_created}:
             continue
@@ -474,3 +330,142 @@ class BackupJobExecutor(JobExecutor):
             remote_cache_dir = shlex.quote(remote_cache_dir)
         log.debug('remote_cache_dir is %r', remote_cache_dir)
         return remote_cache_dir
+
+
+class BackupJob(Job):
+    short_name = 'backup'
+    executor = BackupJobExecutor
+
+    class State(Job.State):
+        # Cache is uploaded to client
+        client_preparing = s('client_preparing', _('Preparing client'))
+        # Cache upload done, borg-create will be started
+        client_prepared = s('client_prepared', _('Prepared client'))
+        # borg-create has connected to reverse proxy
+        client_in_progress = s('client_in_progress', _('In progress'))
+        # borg-create is done
+        client_done = s('client_done', _('Client is done'))
+        # Cache is removed from client
+        client_cleanup = s('client_cleanup', _('Client is cleaned up'))
+
+    def __init__(self, repository, client, config):
+        super().__init__(repository)
+        self.client = client
+        client.jobs[int(self.created.timestamp())] = self
+        self.archive = None
+        self.config = config
+        self.checkpoint_archives = PersistentList()
+
+    @property
+    def reverse_path(self):
+        return hmac.HMAC((settings.SECRET_KEY + 'BackupJob-revloc').encode(),
+                         str(self.oid).encode(),
+                         sha224).hexdigest()
+
+    @property
+    def reverse_location(self):
+        return settings.SERVER_LOGIN + ':' + self.reverse_path
+
+    @property
+    def archive_name(self):
+        return self.client.hostname + '-' + str(self.oid)
+
+    def _log_file_name(self, timestamp):
+        return '%s-%s-%s-%s' % (timestamp, self.short_name, self.client.hostname, self.oid)
+
+
+class BackupConfig(Evolvable):
+    def __init__(self, client, label, repository):
+        self.client = client
+        self.label = label
+        self.repository = repository
+
+    def create_job(self):
+        job = BackupJob(
+            repository=self.repository,
+            client=self.client,
+            config=self,
+        )
+        transaction.get().note('Created backup job from check config %s on client %s' % (self.oid, self.client.hostname))
+        log.info('Created job for client %s, job config %s', self.client.hostname, self.oid)
+
+    def __str__(self):
+        return _('{client}: {label}').format(
+            client=self.client.hostname,
+            label=self.label,
+        )
+
+
+def job_configs_as_choices():
+    for client in data_root().clients.values():
+        for config in client.job_configs:
+            yield config.oid, config
+
+
+class ScheduledBackup(ScheduledAction):
+    name = _('Run backup job')
+
+    def __init__(self, schedule, job_config):
+        super().__init__(schedule)
+        self.job_config = job_config
+
+    def __str__(self):
+        return _('Run {}').format(self.job_config)
+
+    def execute(self, apiserver):
+        queue_backup_job_conditional(apiserver, self.job_config)
+        transaction.commit()
+
+    class Form(forms.Form):
+        job_config = forms.ChoiceField(choices=job_configs_as_choices)
+
+        def clean(self):
+            data = super().clean()
+            o = data_root()._p_jar[bytes.fromhex(data['job_config'])]
+            if not isinstance(o, BackupConfig):
+                raise ValidationError('Invalid object reference')
+            data['job_config'] = o
+            return data
+
+
+def validate_regex(regex):
+    try:
+        re.compile(regex, re.IGNORECASE)
+    except re.error as error:
+        raise ValidationError(error.msg)
+
+
+class RegexScheduledBackup(ScheduledAction):
+    name = _('Run bulk backup')
+
+    def __init__(self, schedule, client_re, job_config_re):
+        super().__init__(schedule)
+        self.client_re = client_re
+        self.job_config_re = job_config_re
+
+    def execute(self, apiserver):
+        client_re = re.compile(self.client_re, re.IGNORECASE)
+        job_config_re = re.compile(self.job_config_re, re.IGNORECASE)
+
+        for client in data_root().clients.values():
+            if not client_re.fullmatch(client.hostname):
+                continue
+            log.debug('Matched client %s to pattern %r', client.hostname, self.client_re)
+            for job_config in client.job_configs:
+                if not job_config_re.fullmatch(job_config.label):
+                    continue
+                log.debug('Matched job config %s to pattern %r', job_config.label, self.job_config_re)
+                job_config.create_job()
+        transaction.commit()
+
+    class Form(forms.Form):
+        client_re = forms.CharField(
+            validators=[validate_regex],
+            initial='.*',
+            label=_('Regex for selecting clients'),
+        )
+        job_config_re = forms.CharField(
+            validators=[validate_regex],
+            initial='.*',
+            label=_('Regex for selecting configurations'),
+        )
