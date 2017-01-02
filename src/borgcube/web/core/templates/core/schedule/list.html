@@ -23,7 +23,15 @@
       <td>{{ schedule.name }}</td>
 
       <!-- TODO last execution overall outcome -->
-      <td>{{ schedule.recurrence|describe_recurrence }}</td>
+      <td>
+        {% if schedule.recurrence|recurrence_is_complicated %}
+        <a href='{% url 'core.schedules' %}?schedule={{ forloop.counter0 }}'>
+        {% endif %}
+        {{ schedule.recurrence|describe_recurrence }}
+        {% if schedule.recurrence|recurrence_is_complicated %}
+        </a>
+        {% endif %}
+      </td>
 
       <td>
         <a href='{% url 'core.schedule_edit' schedule.oid %}'>edit</a>

@@ -370,7 +370,7 @@ class CalendarSheet:
             self.off_month = off_month
 
     def __init__(self, datetime_month):
-        self.month = localtime(datetime_month).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        self.month = datetime_month.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         self.month_end = self.month + relativedelta(months=1)
 
         weekday_delta = -self.month.weekday()
@@ -404,9 +404,15 @@ def schedules(request):
     try:
         month = localtime(now()).replace(year=int(request.GET['year']), month=int(request.GET['month']), day=1)
     except (KeyError, TypeError):
-        month = now()
+        month = localtime(now())
     sheet = CalendarSheet(month)
     schedules = data_root().schedules
+
+    keep = request.GET.getlist('schedule')
+    if keep:
+        for i, schedule in reversed(list(enumerate(schedules))):
+            if str(i) not in keep:
+                del schedules[i]
 
     colors = [
         '#e6e6e6',
@@ -440,6 +446,13 @@ def schedules(request):
         'schedules': schedules,
         'prev_month': sheet.month - relativedelta(months=1),
         'next_month': sheet.month + relativedelta(months=1),
+    })
+
+
+def schedule_list(request):
+    return TemplateResponse(request, 'core/schedule/list.html', {
+        'm': Schedule,
+        'schedules': data_root().schedules,
     })
 
 
@@ -553,10 +566,3 @@ def scheduled_action_form(request):
         log.error('scheduled_action_form request for %r which is not a schedulable action', dotted_path)
         return HttpResponseBadRequest()
     return HttpResponse(cls.Form().as_table())
-
-
-def schedule_list(request):
-    return TemplateResponse(request, 'core/schedule/list.html', {
-        'm': Schedule,
-        'schedules': data_root().schedules,
-    })
