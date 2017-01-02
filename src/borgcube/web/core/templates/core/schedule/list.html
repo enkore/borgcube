@@ -24,13 +24,9 @@
 
       <!-- TODO last execution overall outcome -->
       <td>
-        {% if schedule.recurrence|recurrence_is_complicated %}
         <a href='{% url 'core.schedules' %}?schedule={{ forloop.counter0 }}'>
-        {% endif %}
-        {{ schedule.recurrence|describe_recurrence }}
-        {% if schedule.recurrence|recurrence_is_complicated %}
+          {{ schedule.recurrence|describe_recurrence }}
         </a>
-        {% endif %}
       </td>
 
       <td>

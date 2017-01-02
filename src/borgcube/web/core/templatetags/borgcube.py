@@ -154,19 +154,6 @@ def json(obj):
 
 
 @register.filter
-def recurrence_is_complicated(rec: recurrence.Recurrence):
-    if rec.rdates or rec.exdates or rec.exrules:
-        return True
-    if len(rec.rrules) > 4:
-        return True
-    for rrule in rec.rrules:
-        if rrule.interval != 1 or rrule.until or rrule.bysetpos or rrule.bymonth or rrule.bymonthday or \
-                rrule.byyearday or rrule.byweekno or rrule.byday or rrule.byhour or rrule.byminute or rrule.bysecond:
-            return True
-    return False
-
-
-@register.filter
 def describe_recurrence(rec: recurrence.Recurrence):
     if rec.rdates or rec.exdates or rec.exrules:
         return _('(complicated)')
