@@ -1,0 +1,44 @@
+{% extends 'management.html' %}
+{% load i18n %}
+{% load borgcube %}
+
+{% block title %}{% trans 'Prune preview' %}{% endblock %}
+
+{% block content %}
+  <h1>{% trans 'Prune preview' %} {{ config.name }}
+    <small>(<a href='{% url 'prune.config_edit' config.oid %}'>{% trans 'edit' %}</a>)</small>
+  </h1>
+
+  <table cellpadding='3px'>
+    <tr>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th>{% trans 'Archive fingerprint' %}</th>
+    </tr>
+    {% for delete, archive in config.apply_policy %}
+    <tr class='{% if delete %}delete{% else %}keep{% endif %}'>
+      {% if delete %}
+        <td>{% trans 'Delete' %}</td>
+      {% else %}
+        <td>{%  trans 'Keep' %}</td>
+      {% endif %}
+      <td><a href='job url i guess'>{{ archive.timestamp }}</a></td>
+      <td><a href='{{ archive.client|get_url }}'>{{ archive.name }}</a></td>
+      <td>{{ archive.id }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+{% endblock %}
+
+{% block extracss %}
+<style type='text/css'>
+  tr.delete {
+    background-color: #FFA073;
+  }
+
+  tr.keep {
+
+  }
+</style>
+{% endblock %}

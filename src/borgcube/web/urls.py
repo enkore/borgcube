@@ -14,7 +14,6 @@ Including another URLconf
     2. Add a URL to urlpatterns:  url(r'^blog/', include('blog.urls'))
 """
 from django.conf.urls import url, include
-from django.contrib import admin
 import django.views.i18n
 
 from .core import views as core_views
@@ -52,6 +51,21 @@ schedule_urls = [
     url(r'^(?P<schedule_id>\d+)/delete/$', core_views.schedule_delete, name='core.schedule_delete'),
 ]
 
+prune_urls = [
+    url(r'^$', core_views.prune, name='prune.intro'),
+    url(r'^policies/$', core_views.prune_retention_policies, name='prune.policies'),
+    url(r'^policies/add/$', core_views.prune_policy_add, name='prune.policy_add'),
+
+    url(r'^policies/(?P<policy_id>[a-f0-9]+)/edit/$', core_views.prune_policy_edit, name='prune.policy_edit'),
+    url(r'^policies/(?P<policy_id>[a-f0-9]+)/delete/$', core_views.prune_policy_delete, name='prune.policy_delete'),
+
+    url(r'^configs/$', core_views.prune_configs, name='prune.configs'),
+    url(r'^configs/add/$', core_views.prune_config_add, name='prune.config_add'),
+    url(r'^configs/(?P<config_id>[a-f0-9]+)/edit/$', core_views.prune_config_edit, name='prune.config_edit'),
+    url(r'^configs/(?P<config_id>[a-f0-9]+)/preview/$', core_views.prune_config_preview, name='prune.config_preview'),
+    url(r'^configs/(?P<config_id>[a-f0-9]+)/delete/$', core_views.prune_config_delete, name='prune.config_delete'),
+]
+
 js_info_dict = {
     'packages': ('recurrence', ),
 }
@@ -70,7 +84,9 @@ urlpatterns = [
 
     url(r'^schedules/', include(schedule_urls)),
 
-    url(r'^admin/', admin.site.urls),
+    url(r'^management/$', core_views.management, name='core.management'),
+    url(r'^management/prune/', include(prune_urls)),
+
     url(r'^javascript-i18n/$', django.views.i18n.javascript_catalog, js_info_dict),
 ]
 

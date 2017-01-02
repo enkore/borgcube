@@ -1,0 +1,61 @@
+{% extends 'management.html' %}
+{% load i18n %}
+
+{% block content %}
+  <h1>{{ title }}</h1>
+
+  <form method='POST'>
+    <table>
+      {% block form %}
+        {% csrf_token %}
+        {{ form }}
+
+      <tr>
+        <td></td>
+        <td>
+          <table class='message-warning'>
+            <tr>
+              <td class='symbol'>[!]</td>
+              <td class='body'>
+                {% blocktrans %}
+                  <p>These rules define what to <em>keep</em> (hence <em>retention policy</em>). If an archive does not
+                    fall into any of these rules, it is not kept, and putting a zero in each field means <em>nothing</em>
+                    will be retained.</p>
+
+                  <p><code>-1</code> means that everything is retained, and nothing is pruned.</p>
+
+                  <p>Retention rules are applied from shortest (secondly) to longest (yearly) interval. Every rule
+                    keeps the last <code>number</code> archives within each interval. For example, "keep daily 9"
+                    would mean that nine archives of different days are kept. Each archive selected will be the most
+                    recent (last) archive of the day. Days where no archive was created do not count.
+                  </p>
+
+                  <p>Archives already retained by previous rules do not count for following rules. For example, archives
+                    retained by a "keep daily" rule are not considered by a "keep weekly" rule. If you have daily
+                    backups and a retention policy that keeps seven daily backups and two weekly backups, then,
+                    after four weeks, you will have nine backups: seven backups of the last seven days, one backup for
+                    the last week (not this week), and one backup for the week before last.</p>
+
+                  <p>Because this is so complex and confusing (like every calculation involving time) and it will
+                    totally throw away your data if you get it wrong, there is a safe way to test your policies and
+                    configurations later on.</p>
+
+                  <p>These rules are identical to the ones used by
+                    <a href='https://borgbackup.readthedocs.io/en/stable/usage.html#borg-prune'><code>borg prune</code></a>,
+                    note however that BorgCube does not select the archives based on prefixes, but by their inherent
+                    linkage to clients.</p>
+                {% endblocktrans %}
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      {% endblock %}
+
+      <tr>
+        <td></td>
+        <td><input type='submit' value='{{ submit }}'/></td>
+      </tr>
+    </table>
+  </form>
+{% endblock %}

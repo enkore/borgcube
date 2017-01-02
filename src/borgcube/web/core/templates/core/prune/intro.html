@@ -1,0 +1,44 @@
+{% extends 'management.html' %}
+{% load i18n %}
+
+{% block title %}{% trans 'Pruning' %}{% endblock %}
+
+{% block content %}
+  <h1>{% trans 'Pruning' %}</h1>
+
+  <div class='longtext'>
+    {% url 'prune.policies' as policies_url %}
+    {% url 'prune.configs' as configs_url %}
+    {% url 'core.schedules' as schedules_url %}
+    {% blocktrans with policies_url=policies_url %}
+    <p>Pruning means to gradually thin out older backups to save disk space. In Borg this is based on
+      the notion of keeping a certain number of backups within certain intervals (usualyl days, weeks,
+      months, years). The model used in BorgCube is a direct extension of what Borg does; the core
+      rules apply in the exact same way, but the selection of archives is refined.
+    </p>
+
+    <p>To get started, first define a <a href='{{ policies_url }}'>retention policy</a><sup>[1]</sup> (which is
+      equivalent to a set of <code>--keep-daily, --keep-weekly, ...</code> options of
+      <a href='https://borgbackup.readthedocs.io/en/stable/usage.html#borg-prune'><code>borg prune</code></a>,
+      in case you have worked with that before). Then create a <a href='{{ configs_url }}'>pruning configuration</a>,
+      which tells BorgCube what retention policy should be applied to which clients and backup configurations.
+    </p>
+
+    <p>You can run a pruning configuration manually, as usual, or automatically, by adding it to a
+      <a href='{{ schedules_url }}'>schedule</a>. Before running it "for real" you can also check the exact
+      result of the configuration (pruning policy and configuration) by clicking the preview button.</p>
+
+    <p>We recommend to carefully review both configuration and preview before scheduling pruning, because
+      it cannot be undone. <strong>Pruned data is permanently removed and can only
+        be recovered by forensic means.</strong></p>
+
+    <hr>
+
+    <p>
+      [1]: Retention policies were separated from pruning configurations, because they are easy to get wrong,
+        so being able to stick a name and a description to these confusing numbers and just reusing these
+        for different sets of clients or configurations makes the whole process a bit less error prone.
+    </p>
+    {% endblocktrans %}
+  </div>
+{% endblock %}

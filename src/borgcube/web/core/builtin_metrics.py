@@ -1,7 +1,7 @@
 
 import logging
 
-from django.utils.translation import pgettext_lazy as _
+from django.utils.translation import pgettext_lazy as _, ugettext_lazy
 from django.utils import timezone
 
 from borg.helpers import format_file_size
@@ -10,6 +10,7 @@ from borgcube.core.models import Job
 from borgcube.utils import data_root
 
 from .metrics import Metric
+from . import views
 
 log = logging.getLogger(__name__)
 
@@ -40,3 +41,20 @@ class BackupsToday(Metric):
     def formatted_value(self):
         today_begin = int(timezone.now().replace(hour=0, minute=0, microsecond=0).timestamp())
         return str(len(list(data_root().jobs_by_state[Job.State.done].keys(min=today_begin))))
+
+
+def borgcube_web_management_nav(nav):
+    nav.append({
+        'view': views.prune,
+        'text': ugettext_lazy('Pruning'),
+        'items': [
+            {
+                'view': views.prune_retention_policies,
+                'text': ugettext_lazy('Retention policies'),
+            },
+            {
+                'view': views.prune_configs,
+                'text': ugettext_lazy('Configurations'),
+            }
+        ],
+    })

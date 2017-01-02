@@ -26,7 +26,7 @@ from borg.locking import LockTimeout, LockFailed, LockError, LockErrorT
 
 from borgcube.core.models import Evolvable, ScheduledAction, Job, JobExecutor, s
 from borgcube.keymgt import synthesize_client_key, SyntheticManifest
-from borgcube.utils import open_repository, tee_job_logs, data_root
+from borgcube.utils import open_repository, tee_job_logs, data_root, validate_regex
 
 log = logging.getLogger(__name__)
 
@@ -426,13 +426,6 @@ class ScheduledBackup(ScheduledAction):
                 raise ValidationError('Invalid object reference')
             data['job_config'] = o
             return data
-
-
-def validate_regex(regex):
-    try:
-        re.compile(regex, re.IGNORECASE)
-    except re.error as error:
-        raise ValidationError(error.msg)
 
 
 class RegexScheduledBackup(ScheduledAction):

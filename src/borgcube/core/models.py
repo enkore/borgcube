@@ -166,11 +166,8 @@ class Evolvable(persistent.Persistent, StringObjectID, Updateable):
         ga = persistent.Persistent.__getattribute__
         if attr.startswith(('_p_', '_v_')):
             return ga(self, attr)
-        ghost = self._p_jar is not None and self._p_changed is None
-        v = ga(self, attr)
-        if ghost:
-            self._evolve()
-        return v
+        self._p_activate()
+        return ga(self, attr)
 
     def __setattr__(self, k, v):
         ghost = self._p_jar is not None and self._p_changed is None
@@ -311,6 +308,7 @@ class DataRoot(Evolvable):
         try:
             return self.ext[name]
         except KeyError:
+            log.info('Initialized new data root for plugin %s (%s)', name, factory.__name__)
             return self.ext.setdefault(name, factory())
 
 
@@ -386,12 +384,22 @@ class Repository(Evolvable):
 
 
 class Archive(Evolvable):
-    def __init__(self, id, repository, name, client=None,
+    version = 2
+
+    @evolve(1, 2)
+    def add_timestamps(self):
+        self.timestamp = timezone.now()
+        self.timestamp_end = timezone.now()
+
+    def __init__(self, id, repository, name, client=None, job=None,
                  comment='',
                  nfiles=0, original_size=0, compressed_size=0, deduplicated_size=0,
-                 duration=datetime.timedelta()):
+                 duration=datetime.timedelta(),
+                 timestamp=None, timestamp_end=None):
         self.id = id
         self.repository = repository
+        self.client = client
+        self.job = job
         self.name = name
         self.comment = comment
         self.nfiles = nfiles
@@ -399,10 +407,24 @@ class Archive(Evolvable):
         self.compressed_size = compressed_size
         self.deduplicated_size = deduplicated_size
         self.duration = duration
+        self.timestamp = timestamp
+        self.timestamp_end = timestamp_end
         data_root().archives[id] = self
         repository.archives[id] = self
         if client:
             client.archives[id] = self
+
+    @property
+    def ts(self):
+        return self.timestamp
+
+    def delete(self, manifest, stats):
+        borg_archive = manifest.archives[self.name]
+        borg_archive.delete(stats)
+        del data_root().archives[self.id]
+        del self.repository.archives[self.id]
+        if self.client:
+            del self.client.archives[self.id]
 
 
 class RshClientConnection(Evolvable):
@@ -675,7 +697,9 @@ class Schedule(Evolvable):
             initial=timezone.now,
             help_text=_('The recurrence defined below is applied from this date and time onwards.<br/>'
                         'Eg. for daily recurrence the actions would be scheduled for the time set here.<br/>'
-                        'The set time zone is %s.') % settings.TIME_ZONE
+                        'The set time zone is %s.<br/>'
+                        'Note that this date is <em>always</em> included in the schedule, even if it '
+                        'doesn\'t match the criteria.') % settings.TIME_ZONE
         )
         recurrence = RecurrenceField()
 

@@ -558,3 +558,124 @@ def scheduled_action_form(request):
         log.error('scheduled_action_form request for %r which is not a schedulable action', dotted_path)
         return HttpResponseBadRequest()
     return HttpResponse(cls.Form().as_table())
+
+
+def management(request):
+    return TemplateResponse(request, 'management.html', {
+        'management': True
+    })
+
+from borgcube.job.prune import RetentionPolicy, PruneConfig, prune_root
+
+
+def prune(request):
+    return TemplateResponse(request, 'core/prune/intro.html', {
+        'management': True,
+    })
+
+
+def prune_retention_policies(request):
+    prune = prune_root()
+    return TemplateResponse(request, 'core/prune/retention.html', {
+        'policies': prune.policies,
+        'management': True,
+    })
+
+
+def prune_policy_add(request):
+    data = request.POST or None
+    form = RetentionPolicy.Form(data)
+    if data and form.is_valid():
+        policy = RetentionPolicy(**form.cleaned_data)
+        prune_root().policies.append(policy)
+        transaction.get().note('Added prune retention policy %s' % policy.name)
+        transaction.commit()
+        return redirect(prune_retention_policies)
+    return TemplateResponse(request, 'core/prune/policy_add.html', {
+        'form': form,
+        'title': _('Add retention policy'),
+        'submit': _('Add retention policy'),
+        'management': True,
+    })
+
+
+def prune_policy_edit(request, policy_id):
+    policy = find_oid_or_404(prune_root().policies, policy_id)
+    data = request.POST or None
+    policy._p_activate()
+    form = RetentionPolicy.Form(data, initial=policy.__dict__)
+    if data and form.is_valid():
+        policy._update(form.cleaned_data)
+        transaction.get().note('Edited prune retention policy %s' % policy.oid)
+        transaction.commit()
+        return redirect(prune_retention_policies)
+    return TemplateResponse(request, 'core/prune/policy_add.html', {
+        'form': form,
+        'title': _('Edit retention policy'),
+        'submit': _('Save changes'),
+        'management': True,
+    })
+
+
+def prune_policy_delete(request, policy_id):
+    policies = prune_root().policies
+    policy = find_oid_or_404(policies, policy_id)
+    if request.method == 'POST':
+        policies.remove(policy)
+        transaction.get().note('Deleted policy %s' % policy.oid)
+        transaction.commit()
+    return redirect(prune_retention_policies)
+
+
+def prune_configs(request):
+    configs = prune_root().configs
+    return TemplateResponse(request, 'core/prune/configs.html', {
+        'configs': configs,
+        'management': True,
+    })
+
+
+def prune_config_add(request):
+    data = request.POST or None
+    form = PruneConfig.Form(data)
+    if data and form.is_valid():
+        config = PruneConfig(**form.cleaned_data)
+        prune_root().configs.append(config)
+        transaction.get().note('Added prune config %s' % config.name)
+        transaction.commit()
+        return redirect(prune_configs)
+    return TemplateResponse(request, 'core/prune/config_add.html', {
+        'form': form,
+        'title': _('Add prune configuration'),
+        'submit': _('Add prune configuration'),
+        'management': True,
+    })
+
+
+def prune_config_edit(request, config_id):
+    config = find_oid_or_404(prune_root().configs, config_id)
+    config._p_activate()
+    data = request.POST or None
+    form = PruneConfig.Form(data, initial=config.__dict__)
+    if data and form.is_valid():
+        config._update(form.cleaned_data)
+        transaction.get().note('Edited prune config %s' % config.oid)
+        transaction.commit()
+        return redirect(prune_configs)
+    return TemplateResponse(request, 'core/prune/config_add.html', {
+        'form': form,
+        'title': _('Edit prune configuration'),
+        'submit': _('Edit prune configuration'),
+        'management': True,
+    })
+
+
+def prune_config_preview(request, config_id):
+    config = find_oid_or_404(prune_root().configs, config_id)
+    return TemplateResponse(request, 'core/prune/preview.html', {
+        'config': config,
+        'management': True,
+    })
+
+def prune_config_delete(request, config_id):
+    config = find_oid_or_404(prune_root().configs, config_id)

@@ -224,11 +224,14 @@ class ReverseRepositoryProxy(RepositoryServer):
             repository=self.job.repository,
             name=archive.name,
             client=self.job.client,
+            job=self.job,
             nfiles=stats.nfiles,
             original_size=stats.osize,
             compressed_size=stats.csize,
             deduplicated_size=stats.usize,
             duration=duration,
+            timestamp=archive.ts,
+            timestamp_end=archive.ts_end,
         )
         self.job.archive = ao
         transaction.get().note('Added completed archive %s for job %s' % (ao.id, self.job.oid))

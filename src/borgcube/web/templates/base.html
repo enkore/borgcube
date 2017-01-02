@@ -3,7 +3,7 @@
   {% load i18n %}
   <head>
     <meta charset="utf8">
-    <title>{% block fulltitle %}{% block title %}{% endblock %} - BorgCube{% endblock %}</title>
+    <title>{% block fulltitle %}{% block title %}{{ title }}{% endblock %} - BorgCube{% endblock %}</title>
     <style type="text/css">
       /* http://colorschemedesigner.com/csd-3.5/#3.31Tw0w0w0w0 */
       /* 0C5AA6        26527C        04396C        408AD2        679ED2 */
@@ -117,6 +117,12 @@
         background-repeat: repeat-x;
       }
 
+      #sidebar {
+        width: 250px;
+        float: left;
+        margin-right: 3.3em;
+      }
+
       #content {
         margin-left: 3.3em;
         /* This makes it expand in width to occupy available space */
@@ -161,6 +167,10 @@
 
       .jobs .failed {
         background-color: #FFA073;
+      }
+
+      .longtext {
+        width: 700px;
       }
 
       .message-warning {
@@ -229,13 +239,16 @@
           <li><a href='{% url 'core.schedules' %}' {% if '/schedules/' in request.path %}class='active'{% endif %}>{% trans 'Schedule' %}</a></li>
           <li><a href='{% url 'core.clients' %}' {% if '/clients/' in request.path %}class='active'{% endif %}>{% trans 'Clients' %}</a></li>
           <li><a href='{% url 'core.repositories' %}' {% if '/repositories/' in request.path %}class='active'{% endif %}>{% trans 'Repositories' %}</a></li>
-          <li><a href='/'>Management</a></li>
+          <li><a href='{% url 'core.management' %}' {% if '/management/' in request.path %}class='active'{% endif %}>Management</a></li>
 
           <li id='project-link'><a href='http://borgcube.rtfd.io/'>BorgCube</a></li>
         </ul>
       </nav>
       <div style='clear:both;'></div>
     </header>
+
+    {% block sidebarloc %}
+    {% endblock %}
 
     <div id='content'>
       {% block content %}

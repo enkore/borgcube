@@ -59,6 +59,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'borgcube.web.core.middleware.transaction_middleware',
+    'borgcube.web.core.middleware.SidebarMiddleware',
 ]
 
 ROOT_URLCONF = 'borgcube.web.urls'

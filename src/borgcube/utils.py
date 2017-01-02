@@ -1,8 +1,11 @@
 import logging
 import logging.config
+import re
 from threading import Lock, local
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.http import Http404
 
 import zmq
 
@@ -13,7 +16,6 @@ from ZODB import DB
 from borg.repository import Repository
 from borg.remote import RemoteRepository
 from borg.constants import UMASK_DEFAULT
-from django.http import Http404
 
 import borgcube
 from .vendor import pluggy
@@ -75,6 +77,13 @@ def find_oid_or_404(iterable, oid):
             return object
     else:
         raise Http404
+
+
+def validate_regex(regex):
+    try:
+        re.compile(regex, re.IGNORECASE)
+    except re.error as error:
+        raise ValidationError(error.msg)
 
 
 def open_repository(repository):
