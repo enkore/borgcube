@@ -9,10 +9,10 @@ import transaction
 from borg.archive import ArchiveChecker
 
 from borgcube.core.models import Job, Evolvable, s
-from borgcube.utils import tee_job_logs, open_repository, data_root
-from .hookspec import JobExecutor
+from borgcube.utils import tee_job_logs, open_repository
+from borgcube.daemon.hookspec import JobExecutor
 
-log = logging.getLogger('borgcubed.checkjob')
+log = logging.getLogger(__name__)
 
 
 def borgcubed_job_executor(job):
@@ -132,4 +132,3 @@ class CheckJobExecutor(JobExecutor):
         check.rebuild_refcounts(sort_by='ts')
         check.orphan_chunks_check()
         check.finish()
-

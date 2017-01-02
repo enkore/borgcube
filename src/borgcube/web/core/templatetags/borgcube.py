@@ -13,6 +13,7 @@ import recurrence
 from borg.helpers import format_file_size
 
 from borgcube.core import models
+from borgcube.job.backup import BackupConfig, BackupJob
 from borgcube.utils import hook
 from .. import views
 
@@ -52,7 +53,7 @@ def get_url(model_instance):
         return reverse(views.job_view, args=(obj.oid,))
     elif isinstance(obj, models.Client):
         return reverse(views.client_view, args=(obj.hostname,))
-    elif isinstance(obj, models.JobConfig):
+    elif isinstance(obj, BackupConfig):
         return reverse(views.client_view, args=(obj.client.hostname,)) + '#job-config-%d' % obj.oid
     elif isinstance(obj, models.Repository):
         return reverse(views.repository_view, args=(obj.oid,))
@@ -115,7 +116,7 @@ def job_outcome(job):
                 return failure_kind
         else:
             return _('Unknown error - see logs')
-    elif isinstance(job, models.BackupJob) and job.archive:
+    elif isinstance(job, BackupJob) and job.archive:
         return _('{statename} ({archive_summary})').format(
             statename=job.State.verbose_name(job.state), archive_summary=summarize_archive(job.archive))
     else:

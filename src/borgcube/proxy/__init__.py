@@ -14,7 +14,8 @@ from borg.remote import RepositoryServer, PathNotAllowed
 from borg.cache import Cache
 from borg.item import ArchiveItem
 
-from ..core.models import BackupJob, Archive
+from ..core.models import Archive
+from ..job.backup import BackupJob
 from ..keymgt import synthetic_key_from_data, synthesize_client_key, SyntheticManifest
 from ..utils import set_process_name, open_repository, data_root
 

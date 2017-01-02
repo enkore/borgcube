@@ -1,9 +1,7 @@
 import datetime
-import hmac
 import inspect
 import logging
 import re
-from hashlib import sha224
 from pathlib import Path
 
 from django.conf import settings
@@ -259,11 +257,16 @@ class DataRoot(Evolvable):
     :ivar schedules: a `PersistentList` of `Schedule` instances.
     :ivar ext: a `PersistentDict` of extension data (see `plugin_data`, **do not use directly**).
     """
-    version = 2
+    version = 3
 
     @evolve(1, 2)
     def add_ext_dict(self):
         self.ext = PersistentDict()
+
+    @evolve(2, 3)
+    def ensure_base_job_states(self):
+        for state in Job.State.STABLE:
+            self.jobs_by_state.setdefault(state, TimestampTree())
 
     def __init__(self):
         self.repositories = PersistentList()
@@ -276,6 +279,7 @@ class DataRoot(Evolvable):
         self.jobs = TimestampTree()
         # job state (str) -> TimestampTree
         self.jobs_by_state = OOBTree()
+        self.ensure_base_job_states()
 
         self.schedules = PersistentList()
 
@@ -376,6 +380,8 @@ class Repository(Evolvable):
                 raise ValidationError(self.error_messages['invalid_choice'], code='invalid_choice')
 
         def prepare_value(self, value):
+            if not value:
+                return
             return value.oid
 
 
@@ -442,9 +448,8 @@ class Client(Evolvable):
     version = 2
 
     @evolve(1, 2)
-    def add_job_configs(self, state):
-        state['job_configs'] = PersistentList()
-        return state
+    def add_job_configs(self):
+        self.job_configs = PersistentList()
 
     def __init__(self, hostname, description='', connection=None):
         self.hostname = hostname
@@ -464,28 +469,6 @@ class Client(Evolvable):
     class Form(forms.Form):
         hostname = forms.CharField(validators=[slug_validator])
         description = forms.CharField(widget=forms.Textarea, required=False, initial='')
-
-
-class JobConfig(Evolvable):
-    def __init__(self, client, label, repository):
-        self.client = client
-        self.label = label
-        self.repository = repository
-
-    def create_job(self):
-        job = BackupJob(
-            repository=self.repository,
-            client=self.client,
-            config=self,
-        )
-        transaction.get().note('Created backup job from check config %s on client %s' % (self.oid, self.client.hostname))
-        log.info('Created job for client %s, job config %s', self.client.hostname, self.oid)
-
-    def __str__(self):
-        return _('{client}: {label}').format(
-            client=self.client.hostname,
-            label=self.label,
-        )
 
 
 class s(str):
@@ -629,47 +612,6 @@ class Job(Evolvable):
 
     def __str__(self):
         return str(self.oid)
-
-
-class BackupJob(Job):
-    short_name = 'backup'
-
-    class State(Job.State):
-        # Cache is uploaded to client
-        client_preparing = s('client_preparing', _('Preparing client'))
-        # Cache upload done, borg-create will be started
-        client_prepared = s('client_prepared', _('Prepared client'))
-        # borg-create has connected to reverse proxy
-        client_in_progress = s('client_in_progress', _('In progress'))
-        # borg-create is done
-        client_done = s('client_done', _('Client is done'))
-        # Cache is removed from client
-        client_cleanup = s('client_cleanup', _('Client is cleaned up'))
-
-    def __init__(self, repository, client, config):
-        super().__init__(repository)
-        self.client = client
-        client.jobs[int(self.created.timestamp())] = self
-        self.archive = None
-        self.config = config
-        self.checkpoint_archives = PersistentList()
-
-    @property
-    def reverse_path(self):
-        return hmac.HMAC((settings.SECRET_KEY + 'BackupJob-revloc').encode(),
-                         str(self.oid).encode(),
-                         sha224).hexdigest()
-
-    @property
-    def reverse_location(self):
-        return settings.SERVER_LOGIN + ':' + self.reverse_path
-
-    @property
-    def archive_name(self):
-        return self.client.hostname + '-' + str(self.oid)
-
-    def _log_file_name(self, timestamp):
-        return '%s-%s-%s-%s' % (timestamp, self.short_name, self.client.hostname, self.oid)
 
 
 class Schedule(Evolvable):

@@ -1,18 +1,22 @@
 import configparser
 import collections
 import logging
+import hmac
 import re
 import shlex
 import shutil
 import subprocess
+from hashlib import sha224
 from pathlib import Path
 from subprocess import CalledProcessError
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.utils.translation import ugettext_lazy as _
 from django import forms
 
 import transaction
+from persistent.list import PersistentList
 
 from borg.helpers import get_cache_dir, bin_to_hex, Manifest, Location
 from borg.cache import Cache
@@ -20,37 +24,75 @@ from borg.key import PlaintextKey
 from borg.repository import Repository
 from borg.locking import LockTimeout, LockFailed, LockError, LockErrorT
 
-from borgcube.core.models import BackupJob, JobConfig, ScheduledAction
+from borgcube.core.models import Evolvable, ScheduledAction, Job, s
 from borgcube.keymgt import synthesize_client_key, SyntheticManifest
 from borgcube.utils import open_repository, tee_job_logs, data_root
-from django.core.exceptions import ValidationError
+from borgcube.daemon.hookspec import JobExecutor
 
-from .hookspec import JobExecutor
-
-log = logging.getLogger('borgcubed.backupjob')
+log = logging.getLogger(__name__)
 
 
-def check_call(*popenargs, **kwargs):
-    kwargs['stdin'] = subprocess.DEVNULL
-    return subprocess.check_call(*popenargs, **kwargs)
+class BackupJob(Job):
+    short_name = 'backup'
+
+    class State(Job.State):
+        # Cache is uploaded to client
+        client_preparing = s('client_preparing', _('Preparing client'))
+        # Cache upload done, borg-create will be started
+        client_prepared = s('client_prepared', _('Prepared client'))
+        # borg-create has connected to reverse proxy
+        client_in_progress = s('client_in_progress', _('In progress'))
+        # borg-create is done
+        client_done = s('client_done', _('Client is done'))
+        # Cache is removed from client
+        client_cleanup = s('client_cleanup', _('Client is cleaned up'))
+
+    def __init__(self, repository, client, config):
+        super().__init__(repository)
+        self.client = client
+        client.jobs[int(self.created.timestamp())] = self
+        self.archive = None
+        self.config = config
+        self.checkpoint_archives = PersistentList()
+
+    @property
+    def reverse_path(self):
+        return hmac.HMAC((settings.SECRET_KEY + 'BackupJob-revloc').encode(),
+                         str(self.oid).encode(),
+                         sha224).hexdigest()
+
+    @property
+    def reverse_location(self):
+        return settings.SERVER_LOGIN + ':' + self.reverse_path
+
+    @property
+    def archive_name(self):
+        return self.client.hostname + '-' + str(self.oid)
+
+    def _log_file_name(self, timestamp):
+        return '%s-%s-%s-%s' % (timestamp, self.short_name, self.client.hostname, self.oid)
 
 
-def borgcubed_job_executor(job):
-    if job.short_name == 'backup':
-        return BackupJobExecutor
+class BackupConfig(Evolvable):
+    def __init__(self, client, label, repository):
+        self.client = client
+        self.label = label
+        self.repository = repository
 
+    def create_job(self):
+        job = BackupJob(
+            repository=self.repository,
+            client=self.client,
+            config=self,
+        )
+        transaction.get().note('Created backup job from check config %s on client %s' % (self.oid, self.client.hostname))
+        log.info('Created job for client %s, job config %s', self.client.hostname, self.oid)
 
-def queue_backup_job_conditional(apiserver, job_config: JobConfig):
-    for state, jobs in data_root().jobs_by_state.items():
-        if state in BackupJob.State.STABLE - {BackupJob.State.job_created}:
-            continue
-        for job in jobs.values():
-            if job.config == job_config:
-                log.warning(
-                    'run_from_schedule: not triggering a new job for config %s, since job %s is queued or running',
-                    job_config.oid, job.oid)
-                return
-    job_config.create_job()
+    def __str__(self):
+        return _('{client}: {label}').format(
+            client=self.client.hostname,
+            label=self.label,
+        )
 
 
 def job_configs_as_choices():
@@ -79,7 +121,7 @@ class ScheduledBackup(ScheduledAction):
         def clean(self):
             data = super().clean()
             o = data_root()._p_jar[bytes.fromhex(data['job_config'])]
-            if not isinstance(o, JobConfig):
+            if not isinstance(o, BackupConfig):
                 raise ValidationError('Invalid object reference')
             data['job_config'] = o
             return data
@@ -127,6 +169,28 @@ class RegexScheduledBackup(ScheduledAction):
             label=_('Regex for selecting configurations'),
         )
 
+
+def check_call(*popenargs, **kwargs):
+    kwargs['stdin'] = subprocess.DEVNULL
+    return subprocess.check_call(*popenargs, **kwargs)
+
+
+def borgcubed_job_executor(job):
+    if job.short_name == 'backup':
+        return BackupJobExecutor
+
+
+def queue_backup_job_conditional(apiserver, job_config: BackupConfig):
+    for state, jobs in data_root().jobs_by_state.items():
+        if state in BackupJob.State.STABLE - {BackupJob.State.job_created}:
+            continue
+        for job in jobs.values():
+            if job.config == job_config:
+                log.warning(
+                    'run_from_schedule: not triggering a new job for config %s, since job %s is queued or running',
+                    job_config.oid, job.oid)
+                return
+    job_config.create_job()
 
 
 def cpe_means_connection_failure(called_process_error):

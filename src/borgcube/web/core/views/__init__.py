@@ -15,12 +15,14 @@ from django.utils.translation import ugettext_lazy as _
 import transaction
 
 from borgcube.core.models import Client, Repository, RshClientConnection
-from borgcube.core.models import Job, JobConfig
+from borgcube.core.models import Job
 from borgcube.core.models import Schedule, ScheduledAction
 from borgcube.daemon.client import APIClient
 from borgcube.utils import data_root, find_oid_or_404
 
-from borgcube.daemon.checkjob import CheckConfig
+from borgcube.job.backup import BackupConfig
+from borgcube.job.check import CheckConfig
+
 from ..metrics import WebData
 
 log = logging.getLogger(__name__)
@@ -31,14 +33,14 @@ def dashboard(request):
     jobs = data_root().jobs
     try:
         key = jobs.maxKey()
-    except KeyError:
+    except ValueError:
         pass
     else:
         while len(recent_jobs) < 20:
             recent_jobs.append(jobs.pop(key))
             try:
                 key = jobs.maxKey(key)
-            except KeyError:
+            except ValueError:
                 break
     transaction.abort()
 
@@ -183,7 +185,7 @@ def job_config_add(request, client_id):
         config['excludes'] = [s for s in config.get('excludes', '').split('\n') if s]
 
         repository = config.pop('repository')
-        job_config = JobConfig(client=client, repository=repository, label=config['label'])
+        job_config = BackupConfig(client=client, repository=repository, label=config['label'])
         job_config._update(config)
         client.job_configs.append(job_config)
 

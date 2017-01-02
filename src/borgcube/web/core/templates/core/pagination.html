@@ -8,7 +8,7 @@ Options:
 {% endcomment %}
 
 {% load i18n %}
-{% if page.paginator.count %}
+{% if page.paginator.num_pages > 1 %}
 <div class='pagination'>
     <span class='step-links'>
         {% if page.has_previous %}

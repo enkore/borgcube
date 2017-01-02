@@ -6,7 +6,7 @@ from django.utils import timezone
 
 from borg.helpers import format_file_size
 
-from borgcube.core.models import BackupJob
+from borgcube.core.models import Job
 from borgcube.utils import data_root
 
 from .metrics import Metric
@@ -39,4 +39,4 @@ class BackupsToday(Metric):
 
     def formatted_value(self):
         today_begin = int(timezone.now().replace(hour=0, minute=0, microsecond=0).timestamp())
-        return str(len(list(data_root().jobs_by_state[BackupJob.State.done].keys(min=today_begin))))
+        return str(len(list(data_root().jobs_by_state[Job.State.done].keys(min=today_begin))))
