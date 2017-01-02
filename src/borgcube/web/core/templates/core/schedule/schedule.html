@@ -40,13 +40,13 @@
 
     <tr class='month-header'>
       <th>{% trans 'KW' %}</th>
-      <th>{% trans 'Monday' %}</th>
-      <th>{% trans 'Tuesday' %}</th>
-      <th>{% trans 'Wednesday' %}</th>
-      <th>{% trans 'Thursday' %}</th>
-      <th>{% trans 'Friday' %}</th>
-      <th>{% trans 'Saturday' %}</th>
-      <th>{% trans 'Sunday' %}</th>
+      <th width='14%'>{% trans 'Monday' %}</th>
+      <th width='14%'>{% trans 'Tuesday' %}</th>
+      <th width='14%'>{% trans 'Wednesday' %}</th>
+      <th width='14%'>{% trans 'Thursday' %}</th>
+      <th width='14%'>{% trans 'Friday' %}</th>
+      <th width='14%'>{% trans 'Saturday' %}</th>
+      <th width='14%'>{% trans 'Sunday' %}</th>
     </tr>
 
     {% for week in calsheet.weeks %}
@@ -87,6 +87,23 @@
       {% endfor %}
     </ul>
   {% endfor %}
+
+  <script type='application/javascript'>
+    window.addEventListener('load', function() {
+      var days = document.querySelectorAll('.calendar .day');
+      var heightus_longus = 0;
+      days.forEach(function(day) {
+        var height = day.offsetHeight;  /* ... I believe */
+        if (height > heightus_longus) {
+          heightus_longus = height;
+        }
+      });
+      heightus_longus = heightus_longus + 1 + 'px';
+      days.forEach(function(day){
+        day.style.height = heightus_longus;
+      });
+    });
+  </script>
 {% endblock %}
 
 {% block extracss %}
