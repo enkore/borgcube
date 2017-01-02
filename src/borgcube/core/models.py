@@ -428,6 +428,8 @@ class RshClientConnection(Evolvable):
         self.remote_cache_dir = remote_cache_dir
 
     class Form(forms.Form):
+        prefix = 'connection'
+
         remote = forms.CharField()
         rsh = forms.CharField(initial='ssh')
         rsh_options = forms.CharField(required=False)
@@ -506,12 +508,11 @@ class Job(Evolvable):
     Steps to implement a Job class:
 
     1. Derive from this
-    2. Define additional states, if necessary, by deriving the State class in your model from Job.State
-    3. borgcubed needs to know how to run the job, therefore implement the borgcubed_job_executor hook.
-       Also, implement the required JobExecutor class.
-    4. You also want to implement a borgcubed command through borgcubed_handle_request to actually queue
-       your job for execution (unless it always runs off a schedule).
-    5. Other relevant hooks: borgcube_job_blocked, borgcubed_job_exit.
+    2. Define additional states, if necessary, by deriving the State class in your model from `Job.State`
+    3. borgcubed needs to know how to run the job, therefore implement the
+       `borgcubed_job_executor <hookspec.borgcubed_job_executor>` hook.
+       Also, implement the required `JobExecutor` class.
+    4. Other relevant hooks: `borgcube_job_blocked`, `borgcubed_job_exit`.
     """
     short_name = 'job'
 
@@ -644,7 +645,6 @@ class BackupJob(Job):
         client_done = s('client_done', _('Client is done'))
         # Cache is removed from client
         client_cleanup = s('client_cleanup', _('Client is cleaned up'))
-
 
     def __init__(self, repository, client, config):
         super().__init__(repository)

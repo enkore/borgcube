@@ -382,9 +382,6 @@ class CalendarSheet:
             # Don't append a full week of the following month
             self.sheet_end += relativedelta(days=weekday_delta)
 
-        log.debug('calendar from %s to %s', self.month, self.month_end)
-        log.debug('the sheet will start on %s and end on %s', self.sheet_begin, self.sheet_end)
-
         self.weeks = []
         current = self.sheet_begin
 
