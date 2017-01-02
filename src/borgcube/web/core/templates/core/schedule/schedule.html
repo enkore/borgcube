@@ -60,7 +60,7 @@
           </span><br>
 
           {% for schedule in day.schedules %}
-            <a href='{% url 'core.schedule_edit' schedule.oid %}'
+            <a href='{% url 'core.schedule_edit' schedule.id %}'
                class='schedule-link'
                style='background-color: {{ schedule.color }};'
                title='{{ schedule.occurs }}
@@ -77,7 +77,7 @@
 
   {% for item in schedules %}
     <h2 id='item-{{ item.oid }}'>{{ item.name }}
-      <small>(<a href='{% url 'core.schedule_edit' item.oid %}'>{% trans 'edit' %}</a>)</small></h2>
+      <small>(<a href='{% url 'core.schedule_edit' item.id %}'>{% trans 'edit' %}</a>)</small></h2>
 
     <p>{{ item.description }}</p>
 

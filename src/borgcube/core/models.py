@@ -688,6 +688,17 @@ class Schedule(Evolvable):
 
         self.actions = PersistentList()
 
+    @property
+    def id(self):
+        return data_root().schedules.index(self)
+
+    @classmethod
+    def id_get(cls, id):
+        try:
+            return data_root().schedules[int(id)]
+        except IndexError:
+            raise Http404
+
     class Form(forms.Form):
         name = forms.CharField()
         description = forms.CharField(required=False, initial='', widget=forms.Textarea)

@@ -533,11 +533,7 @@ def schedule_add(request):
 
 
 def schedule_edit(request, schedule_id):
-    for schedule in data_root().schedules:
-        if schedule.oid == schedule_id:
-            break
-    else:
-        raise Http404
+    schedule = Schedule.id_get(schedule_id)
     data = request.POST or None
     return schedule_add_and_edit(request, data, schedule, context={
         'title': _('Edit schedule {}').format(schedule.name),
@@ -547,11 +543,7 @@ def schedule_edit(request, schedule_id):
 
 
 def schedule_delete(request, schedule_id):
-    for schedule in data_root().schedules:
-        if schedule.oid == schedule_id:
-            break
-    else:
-        raise Http404
+    schedule = Schedule.id_get(schedule_id)
     if request.method == 'POST':
         data_root().schedules.remove(schedule)
         transaction.get().note('Deleted schedule %s' % schedule.oid)
