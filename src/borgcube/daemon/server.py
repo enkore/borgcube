@@ -202,6 +202,7 @@ class APIServer(BaseServer):
         else:
             from wsgiref.simple_server import make_server
             from borgcube.web.wsgi import get_wsgi_application
+            from .utils import ThreadPoolWSGIServer
             host, port = settings.BUILTIN_WEB.rsplit(':', maxsplit=1)
 
             set_process_name('borgcubed [web process]')
@@ -215,8 +216,11 @@ class APIServer(BaseServer):
                     log.error('DEBUG mode is not possible for non-local host %s', host)
                     sys.exit(1)
 
-            httpd = make_server(host, int(port), get_wsgi_application())
-            httpd.serve_forever()
+            httpd = make_server(host, int(port), get_wsgi_application(), server_class=ThreadPoolWSGIServer)
+            try:
+                httpd.serve_forever()
+            finally:
+                httpd.join()
 
     def handle_request(self, request):
         command = request['command']
