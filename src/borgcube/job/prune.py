@@ -76,6 +76,7 @@ class RetentionPolicy(Evolvable):
         if self.keep_yearly:
             keep.update(prune_split(archives, '%Y', self.keep_yearly, keep))
 
+        archives.sort(key=lambda archive: archive.timestamp)
         archives = [(archive not in keep, archive) for archive in archives]
         return archives
 
