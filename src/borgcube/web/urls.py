@@ -14,9 +14,10 @@ Including another URLconf
     2. Add a URL to urlpatterns:  url(r'^blog/', include('blog.urls'))
 """
 from django.conf.urls import url, include
-import django.views.i18n
+from django.views import i18n
 
 from .core import views as core_views
+from .core.views import staticfiles
 from borgcube.utils import hook
 
 client_urls = [
@@ -70,6 +71,7 @@ js_info_dict = {
     'packages': ('recurrence', ),
 }
 
+
 urlpatterns = [
     url(r'^$', core_views.dashboard, name='core.dashboard'),
     url(r'^clients/$', core_views.clients, name='core.clients'),
@@ -87,7 +89,8 @@ urlpatterns = [
     url(r'^management/$', core_views.management, name='core.management'),
     url(r'^management/prune/', include(prune_urls)),
 
-    url(r'^javascript-i18n/$', django.views.i18n.javascript_catalog, js_info_dict),
+    url(r'^javascript-i18n/$', i18n.javascript_catalog, js_info_dict),
+    url(r'^static/(?P<file>[a-zA-Z0-9\.]+)$', staticfiles.staticfiles),
 ]
 
 hook.borgcube_web_urlpatterns(urlpatterns=urlpatterns, js_info_dict=js_info_dict)
