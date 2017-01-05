@@ -85,7 +85,6 @@ class RetentionPolicy(Evolvable):
         if self.keep_yearly:
             keep.update(mark(_('yearly'), prune_split(archives, '%Y', self.keep_yearly, keep)))
 
-        archives.sort(key=lambda archive: archive.timestamp)
         archives = [(archive not in keep, archive) for archive in archives]
         return archives
 
@@ -145,21 +144,22 @@ class PruneConfig(Evolvable):
             log.debug('Matched client %s to pattern %r', hostname, self.client_re)
             yield client
 
-    def archives(self):
-        for client in self.clients():
-            yield from client.archives.values()
-
     def apply_policy(self, keep_mark=False):
-        archives = list(self.archives())
-        return self.retention_policy.apply(archives, keep_mark=keep_mark)
+        archives = []
+        for client in self.clients():
+            client_archives = self.retention_policy.apply(client.archives.values(), keep_mark=keep_mark)
+            archives.extend(client_archives)
+        archives.sort(key=lambda tup: tup[1].timestamp)
+        return archives
 
     def prune(self):
         all_archives = self.apply_policy()
         stats = {}
 
-        for archives in groupby(all_archives, lambda archive: archive.repository):
+        for archives in groupby(all_archives, lambda tup: tup[1].repository):
             archives = list(archives)
-            repository = archives[0].repository
+            keep, first_archive = archives[0]
+            repository = first_archive.repository
             stats[repository] = self.prune_archives(archives, repository)
 
         return stats
