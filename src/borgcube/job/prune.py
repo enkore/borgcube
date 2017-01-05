@@ -175,6 +175,7 @@ class PruneConfig(Evolvable):
 
         Return `Statistics`.
         """
+        # TODO Maybe commit some stuff here after a while, because this can seriously take some time.
         stats = Statistics()
         with open_repository(repository) as borg_repository:
             manifest, key = Manifest.load(borg_repository)
