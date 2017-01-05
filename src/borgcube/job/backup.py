@@ -81,6 +81,8 @@ class BackupJobExecutor(JobExecutor):
         self.repository = job.repository
 
         self.remote_cache_dir = self.find_remote_cache_dir()
+        log.debug('remote_cache_dir is %r', self.remote_cache_dir)
+        self.remote_security_dir = self.find_remote_cache_dir(suffix='faux-security')
         self.cache_path = Path(get_cache_dir()) / self.repository.repository_id
         log.debug('local cache is %s', self.cache_path)
 
@@ -242,6 +244,7 @@ class BackupJobExecutor(JobExecutor):
             command_line.append(connection.rsh_options)
         command_line.append(connection.remote)
         command_line.append('BORG_CACHE_DIR=' + self.remote_cache_dir)
+        command_line.append('BORG_SECURITY_DIR=' + self.remote_security_dir)
         command_line.append(connection.remote_borg)
         command_line.append('create')
         command_line.append(self.job.reverse_location + '::' + self.job.archive_name)
@@ -321,14 +324,15 @@ class BackupJobExecutor(JobExecutor):
                 cache.commit()
             self.check_archive_chunks_cache()
 
-    def find_remote_cache_dir(self):
+    def find_remote_cache_dir(self, suffix=''):
         remote_cache_dir = (self.client.connection.remote_cache_dir or '.cache/borg/')
         escape = not self.client.connection.remote_cache_dir
         if remote_cache_dir[-1] != '/':
             remote_cache_dir += '/'
+        if suffix:
+            remote_cache_dir += suffix
         if escape:
             remote_cache_dir = shlex.quote(remote_cache_dir)
-        log.debug('remote_cache_dir is %r', remote_cache_dir)
         return remote_cache_dir
 
 
