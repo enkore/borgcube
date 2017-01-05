@@ -670,8 +670,10 @@ def prune_config_edit(request, config_id):
 
 def prune_config_preview(request, config_id):
     config = find_oid_or_404(prune_root().configs, config_id)
+    archives = config.apply_policy(keep_mark=True)
     return TemplateResponse(request, 'core/prune/preview.html', {
         'config': config,
+        'archives': archives,
         'management': True,
     })
 

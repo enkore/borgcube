@@ -48,7 +48,7 @@ class RetentionPolicy(Evolvable):
     def __str__(self):
         return self.name
 
-    def apply(self, archives):
+    def apply(self, archives, keep_mark=False):
         """
         Apply this policy to a list of `Archives <Archive>`.
 
@@ -60,21 +60,30 @@ class RetentionPolicy(Evolvable):
 
         # Note: archives does not contain checkpoints, which simplifies this quite a bit.
 
+        if keep_mark:
+            def mark(mark, archives):
+                for archive in archives:
+                    archive.keep_mark = mark
+                return archives
+        else:
+            def mark(mark, archives):
+                return archives
+
         keep = set()
         if self.keep_secondly:
-            keep.update(prune_split(archives, '%Y-%m-%d %H:%M:%S', self.keep_secondly, keep))
+            keep.update(mark(_('secondly'), prune_split(archives, '%Y-%m-%d %H:%M:%S', self.keep_secondly, keep)))
         if self.keep_minutely:
-            keep.update(prune_split(archives, '%Y-%m-%d %H:%M', self.keep_minutely, keep))
+            keep.update(mark(_('minutely'), prune_split(archives, '%Y-%m-%d %H:%M', self.keep_minutely, keep)))
         if self.keep_hourly:
-            keep.update(prune_split(archives, '%Y-%m-%d %H', self.keep_hourly, keep))
+            keep.update(mark(_('hourly'), prune_split(archives, '%Y-%m-%d %H', self.keep_hourly, keep)))
         if self.keep_daily:
-            keep.update(prune_split(archives, '%Y-%m-%d', self.keep_daily, keep))
+            keep.update(mark(_('daily'), prune_split(archives, '%Y-%m-%d', self.keep_daily, keep)))
         if self.keep_weekly:
-            keep.update(prune_split(archives, '%G-%V', self.keep_weekly, keep))
+            keep.update(mark(_('weekly'), prune_split(archives, '%G-%V', self.keep_weekly, keep)))
         if self.keep_monthly:
-            keep.update(prune_split(archives, '%Y-%m', self.keep_monthly, keep))
+            keep.update(mark(_('monthly'), prune_split(archives, '%Y-%m', self.keep_monthly, keep)))
         if self.keep_yearly:
-            keep.update(prune_split(archives, '%Y', self.keep_yearly, keep))
+            keep.update(mark(_('yearly'), prune_split(archives, '%Y', self.keep_yearly, keep)))
 
         archives.sort(key=lambda archive: archive.timestamp)
         archives = [(archive not in keep, archive) for archive in archives]
@@ -140,9 +149,9 @@ class PruneConfig(Evolvable):
         for client in self.clients():
             yield from client.archives.values()
 
-    def apply_policy(self):
+    def apply_policy(self, keep_mark=False):
         archives = list(self.archives())
-        return self.retention_policy.apply(archives)
+        return self.retention_policy.apply(archives, keep_mark=keep_mark)
 
     def prune(self):
         all_archives = self.apply_policy()
