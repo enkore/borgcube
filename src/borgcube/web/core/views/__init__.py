@@ -429,6 +429,13 @@ def schedules(request):
         for day in week.days:
             day.schedules = []
             for schedule in schedules:
+                # Even with the cache there is still a scalability problem here in that rrule evaluation is
+                # strictly linear, so the further you go from DTSTART the more intermediary occurences are computed,
+                # so it'll only get slower (this is pretty much irrelevant for hourly and slower recurrence, so somewhat
+                # academic). It's *probably* possible to give an algorithm that calculates a new DTSTART for infinite
+                # recurrences that doesn't otherwise change the recurrence series, but I can't even begin to formulate
+                # one. However, there are certain trivial cases where such an algorithm would be trivial as well, so
+                # that'd be your solution right there.
                 occurences = schedule.recurrence.between(day.begin, day.end, cache=True, inc=True)
                 if occurences:
                     occurs = []
