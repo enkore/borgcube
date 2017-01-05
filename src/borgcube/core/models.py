@@ -637,21 +637,21 @@ class Job(Evolvable):
             data_root().jobs_by_state[self.state][self.id] = self
             self._check_set_start_timestamp(previous)
             self._check_set_end_timestamp()
-            log.debug('%s: phase %s -> %s', self.oid, previous, to)
-            txn.note('Job %s state update: %s -> %s' % (self.oid, previous, to))
+            log.debug('%s: phase %s -> %s', self.id, previous, to)
+            txn.note('Job %s state update: %s -> %s' % (self.id, previous, to))
         borgcube.utils.hook.borgcube_job_post_state_update(job=self, prior_state=previous, current_state=to)
 
     def force_state(self, state):
         with transaction.manager as txn:
             if self.state == state:
                 return False
-            log.debug('%s: Forced state %s -> %s', self.oid, self.state, state)
+            log.debug('%s: Forced state %s -> %s', self.id, self.state, state)
             self._check_set_start_timestamp(self.state)
             del data_root().jobs_by_state[self.state][self.id]
             self.state = state
             data_root().jobs_by_state[self.state][self.id] = self
             self._check_set_end_timestamp()
-            txn.note('Job %s forced to state %s' % (self.oid, state))
+            txn.note('Job %s forced to state %s' % (self.id, state))
         borgcube.utils.hook.borgcube_job_post_force_state(job=self, forced_state=state)
         return True
 
@@ -662,7 +662,7 @@ class Job(Evolvable):
             'kind': kind,
         }
         self.failure_cause.update(kwargs)
-        transaction.get().note('Set failure cause of job %s to %s' % (self.oid, kind))
+        transaction.get().note('Set failure cause of job %s to %s' % (self.id, kind))
         transaction.commit()
 
     def log_path(self):
@@ -673,7 +673,7 @@ class Job(Evolvable):
         return logs_path / file
 
     def _log_file_name(self, timestamp):
-        return '%s-%s-%s' % (timestamp, self.short_name, self.oid)
+        return '%s-%s-%s' % (timestamp, self.short_name, self.id)
 
     def delete(self, using=None, keep_parents=False):
         borgcube.utils.hook.borgcube_job_pre_delete(job=self)
@@ -686,15 +686,15 @@ class Job(Evolvable):
     def _check_set_start_timestamp(self, from_state):
         if from_state == self.State.job_created:
             self.timestamp_start = timezone.now()
-            log.debug('%s: Recording %s as start time', self.oid, self.timestamp_start.isoformat())
+            log.debug('%s: Recording %s as start time', self.id, self.timestamp_start.isoformat())
 
     def _check_set_end_timestamp(self):
         if self.state in self.State.STABLE:
             self.timestamp_end = timezone.now()
-            log.debug('%s: Recording %s as end time', self.oid, self.timestamp_end.isoformat())
+            log.debug('%s: Recording %s as end time', self.id, self.timestamp_end.isoformat())
 
     def __str__(self):
-        return str(self.oid)
+        return str(self.id)
 
 
 class Schedule(Evolvable):

@@ -359,7 +359,7 @@ class BackupJob(Job):
     @property
     def reverse_path(self):
         return hmac.HMAC((settings.SECRET_KEY + 'BackupJob-revloc').encode(),
-                         str(self.oid).encode(),
+                         str(self.id).encode(),
                          sha224).hexdigest()
 
     @property
@@ -368,10 +368,10 @@ class BackupJob(Job):
 
     @property
     def archive_name(self):
-        return self.client.hostname + '-' + str(self.oid)
+        return '%s-%05d' % (self.client.hostname, self.id)
 
     def _log_file_name(self, timestamp):
-        return '%s-%s-%s-%s' % (timestamp, self.short_name, self.client.hostname, self.oid)
+        return '%s-%s-%s-%05d' % (timestamp, self.short_name, self.client.hostname, self.id)
 
 
 class BackupConfig(Evolvable):
