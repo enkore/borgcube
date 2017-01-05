@@ -7,6 +7,7 @@ from django import forms
 from django.core.exceptions import ValidationError
 from django.utils.translation import ugettext_lazy as _
 
+import transaction
 from persistent.list import PersistentList
 
 from borg.archive import Statistics
@@ -152,15 +153,19 @@ class PruneConfig(Evolvable):
         archives.sort(key=lambda tup: tup[1].timestamp)
         return archives
 
-    def prune(self):
-        all_archives = self.apply_policy()
+    def yield_archives_by_repository(self, archives):
+        for repository, group in groupby(archives, lambda tup: tup[1].repository):
+            group = list(group)
+            if not any(delete for delete, archive in group):
+                # skip entirely
+                continue
+            yield repository, group
+
+    def prune(self, archives):
         stats = {}
 
-        for archives in groupby(all_archives, lambda tup: tup[1].repository):
-            archives = list(archives)
-            keep, first_archive = archives[0]
-            repository = first_archive.repository
-            stats[repository] = self.prune_archives(archives, repository)
+        for repository, archive_group in self.yield_archives_by_repository(archives):
+            stats[repository] = self.prune_archives(archive_group, repository)
 
         return stats
 
@@ -177,15 +182,21 @@ class PruneConfig(Evolvable):
                 for delete, archive in archives:
                     assert archive.repository == repository
                     if delete:
-                        log.info('Deleting archive %s [%s]', archive.name, archive.fpr)
-                        archive.delete(manifest)
+                        log.info('Deleting archive %s [%s]', archive.name, archive.id)
+                        archive.delete(manifest, stats, cache)
                     else:
-                        log.info('Skipping archive %s [%s]', archive.name, archive.fpr)
+                        log.info('Skipping archive %s [%s]', archive.name, archive.id)
                 manifest.write()
-                repository.commit()
+                borg_repository.commit()
                 cache.commit()
+                transaction.commit()
         log.error(stats.summary.format(label='Deleted data:', stats=stats))
         return stats
+
+    def create_job(self):
+        job = PruneJob(config=self)
+        transaction.get().note('Created prune job from config %s' % self.oid)
+        log.info('Created prune job for config %s', self.oid)
 
     class Form(forms.Form):
         name = forms.CharField()
@@ -203,11 +214,9 @@ class PruneConfig(Evolvable):
 class PruneJobExecutor(JobExecutor):
     @classmethod
     def run(cls, job):
-        executor = cls(job)
-        executor.execute(job)
-
-    def execute(self, job):
-        pass
+        job.find_archives()
+        transaction.commit()
+        job.execute()
 
 
 class PruneJob(Job):
@@ -215,4 +224,32 @@ class PruneJob(Job):
     executor = PruneJobExecutor
 
     class State(Job.State):
+        discovering = s('discovering', _('Discovering archives to prune'))
         prune = s('prune', _('Pruning archives'))
+
+    def __init__(self, config: PruneConfig):
+        super().__init__()
+        self.config = config
+        self.repositories = PersistentList()
+
+    def find_archives(self):
+        self.update_state(self.State.job_created, self.State.discovering)
+        self.archives = self.config.apply_policy()
+        for repository, _ in self.config.yield_archives_by_repository(self.archives):
+            self.repositories.append(repository)
+            repository.jobs[self.id] = self
+
+    def execute(self):
+        self.update_state(self.State.discovering, self.State.prune)
+        self.config.prune(self.archives)
+        self.update_state(self.State.prune, self.State.done)
+        log.info('Job %s completed successfully', self.id)
+
+
+# TODO: maybe Job.blocks(other) would be better
+
+def borgcube_job_blocked(job, blocking_jobs):
+    for state in (PruneJob.State.discovering, PruneJob.State.prune):
+        for other in data_root().jobs_by_state[state]:
+            if other.short_name == 'prune' and job.repository in other.repositories:
+                blocking_jobs.append(other)

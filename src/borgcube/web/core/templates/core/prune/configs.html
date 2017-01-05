@@ -23,6 +23,11 @@
       <td>
         <a href='{% url 'prune.config_edit' config.oid %}'>edit</a>
         <a href='{% url 'prune.config_preview' config.oid %}'>preview</a>
+
+        {% url 'prune.config_trigger' config.oid as url %}
+        {% trans 'trigger' as label %}
+        {% include 'core/post_link.html' with url=url label=label %}
+
         {% url 'prune.config_delete' config.oid as url %}
         {% trans 'delete' as label %}
         {% trans 'Are you sure you want to delete this prune configuration?' as confirm %}

@@ -22,6 +22,7 @@ from persistent.dict import PersistentDict
 
 from recurrence.forms import RecurrenceField
 
+import borg.archive
 from borg.helpers import Location
 
 import borgcube
@@ -455,8 +456,8 @@ class Archive(Evolvable):
     def ts(self):
         return self.timestamp
 
-    def delete(self, manifest, stats):
-        borg_archive = manifest.archives[self.name]
+    def delete(self, manifest, stats, cache):
+        borg_archive = borg.archive.Archive(manifest.repository, manifest.key, manifest, self.name, cache=cache)
         borg_archive.delete(stats)
         del data_root().archives[self.id]
         del self.repository.archives[self.id]

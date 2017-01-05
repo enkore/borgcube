@@ -684,5 +684,14 @@ def prune_config_preview(request, config_id):
         'management': True,
     })
 
+
+def prune_config_trigger(request, config_id):
+    config = find_oid_or_404(prune_root().configs, config_id)
+    if request.method == 'POST':
+        job = config.create_job()
+        transaction.commit()
+    return redirect(prune_configs)
+
+
 def prune_config_delete(request, config_id):
     config = find_oid_or_404(prune_root().configs, config_id)

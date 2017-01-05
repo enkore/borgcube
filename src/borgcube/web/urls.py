@@ -64,6 +64,7 @@ prune_urls = [
     url(r'^configs/add/$', core_views.prune_config_add, name='prune.config_add'),
     url(r'^configs/(?P<config_id>[a-f0-9]+)/edit/$', core_views.prune_config_edit, name='prune.config_edit'),
     url(r'^configs/(?P<config_id>[a-f0-9]+)/preview/$', core_views.prune_config_preview, name='prune.config_preview'),
+    url(r'^configs/(?P<config_id>[a-f0-9]+)/trigger/$', core_views.prune_config_trigger, name='prune.config_trigger'),
     url(r'^configs/(?P<config_id>[a-f0-9]+)/delete/$', core_views.prune_config_delete, name='prune.config_delete'),
 ]
 
