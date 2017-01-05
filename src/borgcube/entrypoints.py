@@ -63,5 +63,7 @@ def manage():
     except IndexError:
         db = True
     _set_db_uri()
+    logging.getLogger('borg.output.progress').setLevel('INFO')
+    logging.getLogger('borg.output.stats').setLevel('INFO')
     hook.borgcube_startup(db=db, process='manage')
     sys.exit(execute_from_command_line())
