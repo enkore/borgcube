@@ -145,10 +145,10 @@ class APIServer(BaseServer):
                     continue
                 for job in jobs.values():
                     job.set_failure_cause('borgcubed-restart')
-                    txn.note(' - Failing previously running job %s due to restart' % job.oid)
+                    txn.note(' - Failing previously running job %s due to restart' % job.id)
             for job in db.jobs_by_state.get(Job.State.job_created, {}).values():
                 self.queue_job(job)
-                txn.note(' - Queuing job %s' % job.oid)
+                txn.note(' - Queuing job %s' % job.id)
 
     def launch_builtin_zeo(self):
         received = False
@@ -255,7 +255,7 @@ class APIServer(BaseServer):
         """
         executor_class = job.executor
         self.queue.append((executor_class, job))
-        log.debug('Enqueued job %s', job.oid)
+        log.debug('Enqueued job %s', job.id)
 
     def queue_new_jobs(self):
         for job in data_root().jobs_by_state.get(Job.State.job_created, {}).values():
@@ -263,12 +263,11 @@ class APIServer(BaseServer):
 
     def cmd_cancel_job(self, request):
         try:
-            job_id = bytes.fromhex(request['job_id'])
-            job = data_root()._p_jar[job_id]
-            # if int(job.created.timestamp()) not in data_root().jobs:
-            #  abort
-        except KeyError as ke:
+            job_id = int(request['job_id'])
+        except (ValueError, KeyError) as ke:
             return self.error('Missing parameter %r', ke.args[0])
+        try:
+            job = data_root().jobs[job_id]
         except KeyError:
             return self.error('No such job')
         log.info('Cancelling job %s', job_id)
@@ -343,7 +342,7 @@ class APIServer(BaseServer):
                     # Uh-oh
                     log.error('waitpid(2) failed with ECHILD, but we thought we had children')
                     for pid, (command, job) in self.children.items():
-                        log.error('I am missing child %d, command %s %s', pid, command, job.oid)
+                        log.error('I am missing child %d, command %s %s', pid, command, job.id)
                     self.children.clear()
                     break
             if not pid:
@@ -361,7 +360,7 @@ class APIServer(BaseServer):
                 logger('Child was service process %s', service)
                 continue
             command, job = self.children.pop(pid)
-            logger('Command was: %s %r', command, job.oid)
+            logger('Command was: %s %r', command, job.id)
             if code or signo:
                 if job.state not in job.State.STABLE or job.state == job.State.job_created:
                     job.force_state(job.State.failed)
@@ -380,11 +379,11 @@ class APIServer(BaseServer):
             try:
                 executor_class.prefork(job)
             except Exception:
-                log.exception('Unhandled exception in %s.prefork(%s)', executor_class.__name__, job.oid)
+                log.exception('Unhandled exception in %s.prefork(%s)', executor_class.__name__, job.id)
                 job.force_state(job.State.failed)
                 continue
 
-            oid = job.oid
+            id = job.id
             pid = self.fork()
             if pid:
                 # Parent, gotta watch the kids
@@ -396,9 +395,9 @@ class APIServer(BaseServer):
                 # a fork.
                 # (Technically *job* was live and loaded, so we could use it here, but to make this more explicit
                 # we don't).
-                set_process_name('borgcubed [%s %s]' % (executor_class.name, oid))
+                set_process_name('borgcubed [%s %s]' % (executor_class.name, id))
                 reset_db_connection()
-                job = data_root()._p_jar[bytes.fromhex(oid)]
+                job = data_root().jobs[id]
                 executor_class.run(job)
                 sys.exit(0)
         self.queue.extend(nope)

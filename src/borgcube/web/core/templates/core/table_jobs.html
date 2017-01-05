@@ -63,7 +63,7 @@ Options:
     <td></td>
     {% else %}
     <td><em>{{ job.duration|format_timedelta }}</em></td>
-    <td><a href='{% url 'core.job_cancel' job.oid %}'>C</a></td>
+    <td><a href='{% url 'core.job_cancel' job.id %}'>C</a></td>
     {% endif %}
     </tr>
   {% endfor %}

@@ -50,7 +50,7 @@ def get_url(model_instance):
     if not obj:
         return ''
     if isinstance(obj, models.Job):
-        return reverse(views.job_view, args=(obj.oid,))
+        return reverse(views.job_view, args=(obj.id,))
     elif isinstance(obj, models.Client):
         return reverse(views.client_view, args=(obj.hostname,))
     elif isinstance(obj, BackupConfig):

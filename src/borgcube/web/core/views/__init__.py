@@ -122,9 +122,7 @@ def job_view(request, job_id):
 
 
 def job_cancel(request, job_id):
-    job = data_root()._p_jar[bytes.fromhex(job_id)]
-    if int(job.created.timestamp()) not in data_root().jobs:
-        raise Http404
+    job = data_root().jobs[int(job_id)]
     daemon = APIClient()
     daemon.cancel_job(job)
     return redirect(client_view, job.client.hostname)

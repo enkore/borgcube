@@ -44,13 +44,13 @@ class APIClient:
     def cancel_job(self, job):
         self.socket.send_json({
             'command': 'cancel-job',
-            'job_id': job.oid,
+            'job_id': job.id,
         })
         reply = self.socket.recv_json()
         if not reply['success']:
-            log.error('APIClient.cancel_job(%r) failed: %s', job.oid, reply['message'])
+            log.error('APIClient.cancel_job(%r) failed: %s', job.id, reply['message'])
             raise APIError(reply['message'])
-        log.info('Cancelled job %s', job.oid)
+        log.info('Cancelled job %s', job.id)
 
     def zodburi(self):
         self.socket.send_json({

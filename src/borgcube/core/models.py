@@ -15,6 +15,7 @@ from django import forms
 import persistent
 import transaction
 from BTrees.LOBTree import LOBTree as TimestampTree
+from BTrees.LOBTree import LOBTree
 from BTrees.OOBTree import OOBTree
 from persistent.list import PersistentList
 from persistent.dict import PersistentDict
@@ -34,6 +35,18 @@ slug_validator = validators.RegexValidator(
     message=_('Enter a valid identifier consisting of letters, numbers, dashes, underscores or dots (._-).'),
     code='invalid'
 )
+
+
+class NumberTree(LOBTree):
+    def insert(self, value):
+        try:
+            key = self.maxKey()
+        except ValueError:
+            # empty
+            key = 0
+        key += 1
+        super().insert(key, value)
+        return key
 
 
 class PersistentDefaultDict(PersistentDict):
@@ -267,7 +280,7 @@ class DataRoot(Evolvable):
     :ivar schedules: a `PersistentList` of `Schedule` instances.
     :ivar ext: a `PersistentDict` of extension data (see `plugin_data`, **do not use directly**).
     """
-    version = 4
+    version = 5
 
     @evolve(1, 2)
     def add_ext_dict(self):
@@ -275,12 +288,19 @@ class DataRoot(Evolvable):
 
     @evolve(2, 3)
     def ensure_base_job_states(self):
-        for state in Job.State.STABLE:
-            self.jobs_by_state.setdefault(state, TimestampTree())
+        pass  # superseded
 
     @evolve(3, 4)
     def defaultdict(self):
         self.jobs_by_state = PersistentDefaultDict(self.jobs_by_state, factory=TimestampTree)
+
+    @evolve(4, 5)
+    def numbered_jobs(self):
+        self.jobs = NumberTree(self.jobs)
+        for state in self.jobs_by_state:
+            self.jobs_by_state[state] = LOBTree()
+            for id, job in self.jobs.items():
+                self.jobs_by_state[state][id] = job
 
     def __init__(self):
         self.repositories = PersistentList()
@@ -289,12 +309,11 @@ class DataRoot(Evolvable):
         # client hostname -> Client
         self.clients = OOBTree()
 
-        # job timestamp -> Job
-        self.jobs = TimestampTree()
-        # job state (str) -> TimestampTree
-        self.jobs_by_state = PersistentDefaultDict(self.jobs_by_state, factory=TimestampTree)
-
-        self.ensure_base_job_states()
+        # job number -> Job
+        # note: this tree is the canonical source of job numbers.
+        self.jobs = NumberTree()
+        # job state (str) -> NumberTree
+        self.jobs_by_state = PersistentDefaultDict(factory=LOBTree)
 
         self.schedules = PersistentList()
 
@@ -343,7 +362,7 @@ class Repository(Evolvable):
         self.description = description
         self.repository_id = repository_id
         self.remote_borg = remote_borg
-        self.jobs = TimestampTree()
+        self.jobs = LOBTree()
         self.archives = OOBTree()
         self.job_configs = PersistentList()
 
@@ -495,7 +514,7 @@ class Client(Evolvable):
         self.hostname = hostname
         self.description = description
         self.connection = connection
-        self.jobs = TimestampTree()
+        self.jobs = LOBTree()
         self.archives = OOBTree()
         self.job_configs = PersistentList()
         data_root().clients[hostname] = self
@@ -535,7 +554,7 @@ class JobExecutor:
                 hook.borgcube_job_blocked(job=job, blocking_jobs=blocking_jobs)
         if blocking_jobs:
             log.debug('Job %s blocked by running backup jobs: %s',
-                      job.oid, ' '.join('{} ({})'.format(job.oid, job.state) for job in blocking_jobs))
+                      job.id, ' '.join('{} ({})'.format(job.id, job.state) for job in blocking_jobs))
         return not blocking_jobs
 
     @classmethod
@@ -583,12 +602,10 @@ class Job(Evolvable):
         self.timestamp_start = None
         self.repository = repository
         self.state = self.State.job_created
-        key = int(self.created.timestamp())
+        self.id = data_root().jobs.insert(self)
         if repository:
-            # TODO better (more resolution, unique)
-            repository.jobs[key] = self
-        data_root().jobs[key] = self
-        data_root().jobs_by_state.setdefault(self.state, TimestampTree())[key] = self
+            repository.jobs[self.id] = self
+        data_root().jobs_by_state[self.state][self.id] = self
 
     @property
     def duration(self):
@@ -615,9 +632,9 @@ class Job(Evolvable):
                 raise ValueError('Cannot transition job state from %r to %r, because current state is %r'
                                  % (previous, to, self.state))
             borgcube.utils.hook.borgcube_job_pre_state_update(job=self, current_state=previous, target_state=to)
-            del data_root().jobs_by_state[self.state][int(self.created.timestamp())]
+            del data_root().jobs_by_state[self.state][self.id]
             self.state = to
-            data_root().jobs_by_state.setdefault(self.state, TimestampTree())[int(self.created.timestamp())] = self
+            data_root().jobs_by_state[self.state][self.id] = self
             self._check_set_start_timestamp(previous)
             self._check_set_end_timestamp()
             log.debug('%s: phase %s -> %s', self.oid, previous, to)
@@ -630,9 +647,9 @@ class Job(Evolvable):
                 return False
             log.debug('%s: Forced state %s -> %s', self.oid, self.state, state)
             self._check_set_start_timestamp(self.state)
-            del data_root().jobs_by_state[self.state][int(self.created.timestamp())]
+            del data_root().jobs_by_state[self.state][self.id]
             self.state = state
-            data_root().jobs_by_state.setdefault(self.state, TimestampTree())[int(self.created.timestamp())] = self
+            data_root().jobs_by_state[self.state][self.id] = self
             self._check_set_end_timestamp()
             txn.note('Job %s forced to state %s' % (self.oid, state))
         borgcube.utils.hook.borgcube_job_post_force_state(job=self, forced_state=state)

@@ -6,7 +6,7 @@ import pytest
 
 import transaction
 
-from .models import Client, Repository, Job, PersistentDefaultDict
+from .models import Client, Repository, Job, PersistentDefaultDict, NumberTree
 from ..utils import data_root
 
 
@@ -125,3 +125,17 @@ class TestPersistentDefaultDict:
         d = PersistentDefaultDict(factory=None)
         d['foo'] = 1
         assert d['foo'] == 1
+
+
+class TestNumberTree:
+    def test_insert(self):
+        t = NumberTree()
+        assert t.insert('foo') == 1
+        assert t.insert('bar') == 2
+        assert t.insert('baz') == 3
+        assert t[1] == 'foo'
+        assert t[2] == 'bar'
+        assert t[3] == 'baz'
+
+        t[1] = 'umph'
+        assert t[1] == 'umph'

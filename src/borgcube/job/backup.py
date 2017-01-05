@@ -44,7 +44,7 @@ def queue_backup_job_conditional(apiserver, job_config):
             if job.config == job_config:
                 log.warning(
                     'run_from_schedule: not triggering a new job for config %s, since job %s is queued or running',
-                    job_config.oid, job.oid)
+                    job_config.oid, job.id)
                 return
     job_config.create_job()
 
@@ -94,21 +94,21 @@ class BackupJobExecutor(JobExecutor):
             self.remote_create(self.create_command_line())
             self.client_cleanup()
             self.job.update_state(BackupJob.State.client_cleanup, BackupJob.State.done)
-            log.info('Job %s completed successfully', self.job.oid)
+            log.info('Job %s completed successfully', self.job.id)
         except CalledProcessError as cpe:
             self.job.force_state(BackupJob.State.failed)
             if not self.analyse_job_process_error(cpe):
                 raise
         except Repository.DoesNotExist:
             self.job.set_failure_cause('repository-does-not-exist')
-            log.error('Job %s failed because the repository %r does not exist', self.job.oid, self.repository.url)
+            log.error('Job %s failed because the repository %r does not exist', self.job.id, self.repository.url)
         except Repository.CheckNeeded:
             # TODO: schedule check automatically?
             self.job.set_failure_cause('repository-check-needed')
-            log.error('Job %s failed because the repository %r needs a check run', self.job.oid, self.repository.url)
+            log.error('Job %s failed because the repository %r needs a check run', self.job.id, self.repository.url)
         except Repository.InsufficientFreeSpaceError:
             self.job.set_failure_cause('repository-enospc')
-            log.error('Job %s failed because the repository %r had not enough free space', self.job.oid, self.repository.url)
+            log.error('Job %s failed because the repository %r had not enough free space', self.job.id, self.repository.url)
         except LockTimeout as lock_error:
             if get_cache_dir() in lock_error.args[0]:
                 self.job.set_failure_cause('cache-lock-timeout')
@@ -138,7 +138,7 @@ class BackupJobExecutor(JobExecutor):
         log.error('%s', called_process_error.output)
         if cpe_means_connection_failure(called_process_error):
             self.job.set_failure_cause('client-connection-failed', command=called_process_error.cmd, exit_code=called_process_error.returncode)
-            log.error('Job %s failed due to client connection failure', self.job.oid)
+            log.error('Job %s failed due to client connection failure', self.job.id)
             return True
         if 'A newer version is required to access this repository.' in called_process_error.output and called_process_error.returncode == 2:
             self.job.set_failure_cause('client-borg-outdated', output=called_process_error.output)
@@ -160,7 +160,7 @@ class BackupJobExecutor(JobExecutor):
             client_manifest = SyntheticManifest(client_key, repository.id)
             job.client_manifest_data = bin_to_hex(client_manifest.write())
             job.client_manifest_id_str = client_manifest.id_str
-            transaction.get().note('Synthesized crypto for job %s' % job.oid)
+            transaction.get().note('Synthesized crypto for job %s' % job.id)
             transaction.commit()
 
     def transfer_cache(self, job_cache_path):
@@ -184,7 +184,7 @@ class BackupJobExecutor(JobExecutor):
 
     def create_job_cache(self, cache_path):
         self.ensure_cache(cache_path)
-        job_cache_path = cache_path / str(self.job.oid)
+        job_cache_path = cache_path / str(self.job.id)
         job_cache_path.mkdir()
         log.debug('create_job_cache: path is %r', job_cache_path)
 
@@ -278,7 +278,7 @@ class BackupJobExecutor(JobExecutor):
                 log.debug('remote create finished (warning)')
                 with transaction.manager as txn:
                     self.job.borg_warning = True
-                    txn.note('Set borg warning flag on job %s' % self.job.oid)
+                    txn.note('Set borg warning flag on job %s' % self.job.id)
             else:
                 raise
         else:
@@ -298,7 +298,7 @@ class BackupJobExecutor(JobExecutor):
         except AttributeError:
             pass
 
-        transaction.get().note('Deleted client keys of job %s' % self.job.oid)
+        transaction.get().note('Deleted client keys of job %s' % self.job.id)
         transaction.commit()
         # TODO delete checkpoints
 
@@ -351,7 +351,7 @@ class BackupJob(Job):
     def __init__(self, repository, client, config):
         super().__init__(repository)
         self.client = client
-        client.jobs[int(self.created.timestamp())] = self
+        client.jobs[self.id] = self
         self.archive = None
         self.config = config
         self.checkpoint_archives = PersistentList()
