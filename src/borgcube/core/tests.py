@@ -4,7 +4,10 @@ from subprocess import check_call
 
 import pytest
 
-from .models import Client, ClientConnection, BackupJob, Repository, Job
+import transaction
+
+from .models import Client, Repository, Job, PersistentDefaultDict
+from ..utils import data_root
 
 
 @pytest.fixture
@@ -108,3 +111,17 @@ def test_job_data_refs_int_keys(job):
     job.refresh_from_db()
     # Take careful note: JSON keys are always strings. non-str keys are converted to a string.
     assert job.data['d'] == {'a': 1, '1': 2}
+
+
+class TestPersistentDefaultDict:
+    def test_changed(self):
+        with transaction.manager:
+            d = data_root().thing = PersistentDefaultDict(factory=list)
+        assert type(d['foo']) == list
+        assert d._p_changed
+        assert d['foo'] is d['foo']
+
+    def test_no_insert(self):
+        d = PersistentDefaultDict(factory=None)
+        d['foo'] = 1
+        assert d['foo'] == 1

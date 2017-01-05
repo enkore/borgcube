@@ -3,6 +3,7 @@ from django.conf import settings
 
 import pytest
 
+import borgcube.entrypoints
 from borgcube.utils import configure_plugins, reset_db_connection, data_root
 
 

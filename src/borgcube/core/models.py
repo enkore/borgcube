@@ -36,6 +36,19 @@ slug_validator = validators.RegexValidator(
 )
 
 
+class PersistentDefaultDict(PersistentDict):
+    def __init__(self, *args, factory):
+        super().__init__(*args)
+        self.factory = factory
+
+    def __getitem__(self, item):
+        try:
+            return super().__getitem__(item)
+        except KeyError:
+            v = self[item] = self.factory()
+            return v
+
+
 class StringObjectID:
     @property
     def oid(self):
@@ -254,7 +267,7 @@ class DataRoot(Evolvable):
     :ivar schedules: a `PersistentList` of `Schedule` instances.
     :ivar ext: a `PersistentDict` of extension data (see `plugin_data`, **do not use directly**).
     """
-    version = 3
+    version = 4
 
     @evolve(1, 2)
     def add_ext_dict(self):
@@ -264,6 +277,10 @@ class DataRoot(Evolvable):
     def ensure_base_job_states(self):
         for state in Job.State.STABLE:
             self.jobs_by_state.setdefault(state, TimestampTree())
+
+    @evolve(3, 4)
+    def defaultdict(self):
+        self.jobs_by_state = PersistentDefaultDict(self.jobs_by_state, factory=TimestampTree)
 
     def __init__(self):
         self.repositories = PersistentList()
@@ -275,7 +292,8 @@ class DataRoot(Evolvable):
         # job timestamp -> Job
         self.jobs = TimestampTree()
         # job state (str) -> TimestampTree
-        self.jobs_by_state = OOBTree()
+        self.jobs_by_state = PersistentDefaultDict(self.jobs_by_state, factory=TimestampTree)
+
         self.ensure_base_job_states()
 
         self.schedules = PersistentList()
