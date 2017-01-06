@@ -18,7 +18,7 @@ log = logging.getLogger(__name__)
 
 logger.configured = True
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'borgcube.web.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'borgcube.conf')
 django.setup()
 
 os.environ.setdefault('BORG_HOSTNAME_IS_UNIQUE', 'yes')
