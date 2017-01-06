@@ -57,7 +57,7 @@ TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [
-            str(Path(__file__).parent / 'templates'),
+            str(Path(__file__).parent / 'web' / 'templates'),
         ],
         'APP_DIRS': True,
         'OPTIONS': {
@@ -115,7 +115,7 @@ USE_TZ = True
 STATIC_URL = '/static/'
 
 STATICFILES_DIRS = [
-    str(Path(__file__).parent / 'static'),
+    str(Path(__file__).parent / 'web' / 'static'),
 ]
 
 
