@@ -59,6 +59,7 @@ setup(
             'borgcubed = borgcube.entrypoints:daemon',
             'borgcube-proxy = borgcube.entrypoints:proxy',
             'borgcube-manage = borgcube.entrypoints:manage',
+            'borgcube-gandalf = borgcube.gandalf:_gandalf',
         ],
         'borgcube0': [
             'web_builtin_metrics = borgcube.web.core.builtin_metrics',
