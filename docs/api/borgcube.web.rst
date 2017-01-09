@@ -1,9 +1,35 @@
 borgcube.web package
 ====================
 
-Subpackages
------------
+borgcube.web.core.hookspec module
+---------------------------------
 
-.. toctree::
+.. automodule:: borgcube.web.core.hookspec
+    :members:
+    :undoc-members:
+    :show-inheritance:
 
-    borgcube.web.core
+borgcube.web.core.metrics module
+--------------------------------
+
+.. automodule:: borgcube.web.core.metrics
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+borgcube.web.core.middleware module
+-----------------------------------
+
+.. automodule:: borgcube.web.core.middleware
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+
+borgcube.web.core.templatetags.borgcube module
+----------------------------------------------
+
+.. automodule:: borgcube.web.core.templatetags.borgcube
+    :members:
+    :undoc-members:
+    :show-inheritance:

@@ -1,9 +1,6 @@
 borgcube.core package
 =====================
 
-Submodules
-----------
-
 borgcube.core.hookspec module
 -----------------------------
 

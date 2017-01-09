@@ -125,6 +125,7 @@ def job_outcome(job):
 
 @register.filter
 def format_timedelta(td):
+    """Format a `datetime.timedelta` instance to a human-friendly format."""
     ts = td.total_seconds()
     s = ts % 60
     m = int(ts / 60) % 60
@@ -150,12 +151,18 @@ def get(obj, attr):
 
 @register.filter
 def json(obj):
-    """Return safe JSON serialization of *obj*."""
+    """Return safe JSON serialization (as in: use in <script>-tags) of *obj*."""
     return mark_safe(dumps(obj, cls=DjangoJSONEncoder))
 
 
 @register.filter
 def describe_recurrence(rec: recurrence.Recurrence):
+    """
+    Describe a `recurrence.Recurrence` object in human terms.
+
+    Due to the possible complexities of recurrences this only works for simple recurrences,
+    complex ones will return a non-descript description.
+    """
     if rec.rdates or rec.exdates or rec.exrules:
         return _('(complicated)')
     output = []
