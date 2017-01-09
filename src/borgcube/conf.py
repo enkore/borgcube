@@ -205,7 +205,10 @@ def conf():
     return os.path.join(base, 'borgcube', 'conf.py')
 
 
-if not os.environ.get('BORGCUBE_IGNORE_CONF'):
+if os.environ.get('BORGCUBE_IGNORE_CONF'):
+    # Building the docs on RTD
+    SECRET_KEY = '123456789'
+else:
     try:
         with open(conf()) as fd:
             code = compile(fd.read(), conf(), 'exec')
