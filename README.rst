@@ -2,8 +2,12 @@
 BorgCube
 ========
 
-NOTE: This is a work in progress. It is exceedingly likely that from this point in development to a release
-no upgrade path will be provided. This software is NOT READY FOR PRODUCTION USE. A lot of functionality is missing,
+.. image:: https://readthedocs.org/projects/borgcube/badge/?version=latest
+   :target: http://borgcube.readthedocs.io/en/latest/?badge=latest
+   :alt: Documentation Status
+
+**WARNING: This is a work in progress.** It is exceedingly likely that from this point in development to a release
+no upgrade path will be provided. This software is **NOT READY FOR PRODUCTION USE**. A lot of functionality is missing,
 and a lot of tests aren't written yet. There is NO SECURITY IMPLEMENTED yet in the web console.
 
 NOTE: At this time I will not take pull requests.
