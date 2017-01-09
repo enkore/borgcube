@@ -40,7 +40,7 @@ def _set_db_uri():
 def daemon():
     from .daemon.server import APIServer
     from .utils import hook
-    hook.borgcube_startup(db=True, process='borgcubed')
+    hook.borgcube_startup(process='borgcubed')
     server = APIServer(settings.DAEMON_ADDRESS)
     server.main_loop()
 
@@ -50,7 +50,7 @@ def proxy():
     from .utils import log_to_daemon, hook
     with log_to_daemon():
         _set_db_uri()
-        hook.borgcube_startup(db=True, process='proxy')
+        hook.borgcube_startup(process='proxy')
         proxy = ReverseRepositoryProxy()
         proxy.serve()
 
@@ -58,12 +58,8 @@ def proxy():
 def manage():
     from django.core.management import execute_from_command_line
     from .utils import hook
-    try:
-        db = sys.argv[1] not in ('makemigrations', 'migrate')
-    except IndexError:
-        db = True
     _set_db_uri()
     logging.getLogger('borg.output.progress').setLevel('INFO')
     logging.getLogger('borg.output.stats').setLevel('INFO')
-    hook.borgcube_startup(db=db, process='manage')
+    hook.borgcube_startup(process='manage')
     sys.exit(execute_from_command_line())

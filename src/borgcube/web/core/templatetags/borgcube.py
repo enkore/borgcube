@@ -32,20 +32,15 @@ def field_name(obj, field):
     if name == field:
         return pretty_name(name)
     return name
-    # legacy, django orm:
-    #name = model_instance._meta.get_field(field).verbose_name
-    #if name == field.replace('_', ' '):
-    #    return name.title()
-    #return name
-
-
-@register.filter
-def help_text(model_instance, field):
-    return model_instance._meta.get_field(field).help_text
 
 
 @register.filter
 def get_url(model_instance):
+    """
+    Return URL for *model_instance*.
+
+    This has some core classes coded in and otherwise works through `hookspec.borgcube_web_get_url`.
+    """
     obj = model_instance
     if not obj:
         return ''
