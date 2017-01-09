@@ -8,12 +8,7 @@ Subpackages
 
     borgcube.core
     borgcube.daemon
-    borgcube.job
-    borgcube.proxy
     borgcube.web
-
-Submodules
-----------
 
 borgcube.keymgt module
 ----------------------
