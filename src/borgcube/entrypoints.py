@@ -21,7 +21,7 @@ logger.configured = True
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'borgcube.conf')
 django.setup()
 
-os.environ.setdefault('BORG_HOSTNAME_IS_UNIQUE', 'yes')
+os.environ['BORG_HOSTNAME_IS_UNIQUE'] = 'yes'
 
 from .utils import configure_plugins
 configure_plugins()
@@ -48,11 +48,11 @@ def daemon():
 def proxy():
     from .proxy import ReverseRepositoryProxy
     from .utils import log_to_daemon, hook
-    _set_db_uri()
-    hook.borgcube_startup(db=True, process='proxy')
-    #with log_to_daemon():
-    proxy = ReverseRepositoryProxy()
-    proxy.serve()
+    with log_to_daemon():
+        _set_db_uri()
+        hook.borgcube_startup(db=True, process='proxy')
+        proxy = ReverseRepositoryProxy()
+        proxy.serve()
 
 
 def manage():

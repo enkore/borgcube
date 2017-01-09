@@ -12,10 +12,9 @@ import zodburi
 import transaction
 
 from django.conf import settings
-from django.core.exceptions import ObjectDoesNotExist
 
 from ..core.models import Job
-from ..utils import set_process_name, hook, data_root, reset_db_connection
+from ..utils import set_process_name, hook, data_root, reset_db_connection, log_to_daemon
 
 log = logging.getLogger('borgcubed')
 
@@ -395,6 +394,7 @@ class APIServer(BaseServer):
                 # a fork.
                 # (Technically *job* was live and loaded, so we could use it here, but to make this more explicit
                 # we don't).
+                log_to_daemon()
                 set_process_name('borgcubed [%s %s]' % (executor_class.name, id))
                 reset_db_connection()
                 job = data_root().jobs[id]

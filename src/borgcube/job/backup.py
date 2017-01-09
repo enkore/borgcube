@@ -215,7 +215,7 @@ class BackupJobExecutor(JobExecutor):
 
         stderr_tail = collections.deque(maxlen=100)
         stdout_tail = collections.deque(maxlen=100)
-        with subprocess.Popen(command_line, stdout=subprocess.PIPE, stderr=None, stdin=subprocess.DEVNULL, universal_newlines=True) as p:
+        with subprocess.Popen(command_line, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.DEVNULL, universal_newlines=True) as p:
             try:
                 stderr, stdout = p.communicate()
                 if not stderr and not stdout:

@@ -168,15 +168,13 @@ class log_to_daemon:
         handler = logging.getLogger('').handlers[-1]
         handler.socket.close()
 
+    __call__ = __enter__
+
 
 def tee_job_logs(job):
     logfile = str(job.log_path())
-    loggers = logging.Logger.manager.loggerDict
     handler = logging.FileHandler(logfile)
-    for name, logger in loggers.items():
-        if isinstance(logger, logging.PlaceHolder):
-            logger = logging.getLogger(name)
-        logger.addHandler(handler)
+    logging.root.addHandler(handler)
 
 
 class LazyHook:
