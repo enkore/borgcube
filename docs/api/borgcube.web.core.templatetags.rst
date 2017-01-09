@@ -11,12 +11,3 @@ borgcube.web.core.templatetags.borgcube module
     :members:
     :undoc-members:
     :show-inheritance:
-
-
-Module contents
----------------
-
-.. automodule:: borgcube.web.core.templatetags
-    :members:
-    :undoc-members:
-    :show-inheritance:

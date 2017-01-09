@@ -4,22 +4,6 @@ borgcube.daemon package
 Submodules
 ----------
 
-borgcube.daemon.backupjob module
---------------------------------
-
-.. automodule:: borgcube.daemon.backupjob
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-borgcube.daemon.checkjob module
--------------------------------
-
-.. automodule:: borgcube.daemon.checkjob
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
 borgcube.daemon.client module
 -----------------------------
 
@@ -48,6 +32,14 @@ borgcube.daemon.server module
 -----------------------------
 
 .. automodule:: borgcube.daemon.server
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+borgcube.daemon.utils module
+----------------------------
+
+.. automodule:: borgcube.daemon.utils
     :members:
     :undoc-members:
     :show-inheritance:

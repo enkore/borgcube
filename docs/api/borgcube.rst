@@ -8,20 +8,12 @@ Subpackages
 
     borgcube.core
     borgcube.daemon
+    borgcube.job
     borgcube.proxy
-    borgcube.vendor
     borgcube.web
 
 Submodules
 ----------
-
-borgcube.entrypoints module
----------------------------
-
-.. automodule:: borgcube.entrypoints
-    :members:
-    :undoc-members:
-    :show-inheritance:
 
 borgcube.keymgt module
 ----------------------
@@ -31,27 +23,10 @@ borgcube.keymgt module
     :undoc-members:
     :show-inheritance:
 
-borgcube.manage module
-----------------------
-
-.. automodule:: borgcube.manage
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
 borgcube.utils module
 ---------------------
 
 .. automodule:: borgcube.utils
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-
-Module contents
----------------
-
-.. automodule:: borgcube
     :members:
     :undoc-members:
     :show-inheritance:
