@@ -1,12 +1,14 @@
 
 import logging
 
+import transaction
+
 from django.utils.translation import pgettext_lazy as _, ugettext_lazy
 from django.utils import timezone
 
 from borg.helpers import format_file_size
 
-from borgcube.core.models import Job
+from borgcube.core.models import Job, NumberTree
 from borgcube.utils import data_root
 
 from .metrics import Metric
@@ -39,8 +41,14 @@ class BackupsToday(Metric):
     label = _('BackupsToday metric label', 'backups today')
 
     def formatted_value(self):
-        today_begin = int(timezone.now().replace(hour=0, minute=0, microsecond=0).timestamp())
-        return str(len(list(data_root().jobs_by_state[Job.State.done].keys(min=today_begin))))
+        today_begin = timezone.now().replace(hour=0, minute=0, microsecond=0)
+        jobs = 0
+        for job in NumberTree.reversed(data_root().jobs_by_state[Job.State.done]):
+            if job.created < today_begin:
+                break
+            jobs += 1
+        transaction.abort()
+        return str(jobs)
 
 
 def borgcube_web_management_nav(nav):

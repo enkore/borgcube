@@ -1,4 +1,5 @@
 import logging
+import itertools
 import json
 
 from django import forms
@@ -29,21 +30,7 @@ log = logging.getLogger(__name__)
 
 
 def dashboard(request):
-    recent_jobs = []
-    jobs = data_root().jobs
-    try:
-        key = jobs.maxKey()
-    except ValueError:
-        pass
-    else:
-        while len(recent_jobs) < 20:
-            recent_jobs.append(jobs.pop(key))
-            try:
-                key = jobs.maxKey(key)
-            except ValueError:
-                break
-    transaction.abort()
-
+    recent_jobs = itertools.islice(reversed(data_root().jobs), 20)
     return TemplateResponse(request, 'core/dashboard.html', {
         'metrics': data_root().plugin_data('web', WebData).metrics,
         'recent_jobs': recent_jobs,

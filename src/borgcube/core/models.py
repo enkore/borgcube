@@ -49,6 +49,17 @@ class NumberTree(LOBTree):
         super().insert(key, value)
         return key
 
+    def __reversed__(self):
+        key = 2**63
+        while True:
+            try:
+                key = self.maxKey(key - 1)
+            except ValueError:
+                return
+            yield self[key]
+
+    reversed = __reversed__
+
 
 class PersistentDefaultDict(PersistentDict):
     def __init__(self, *args, factory):
