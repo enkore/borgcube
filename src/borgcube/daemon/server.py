@@ -14,6 +14,7 @@ import transaction
 
 from django.conf import settings
 
+import borgcube
 from ..core.models import Job
 from ..utils import set_process_name, hook, data_root, reset_db_connection, log_to_daemon
 from .utils import get_socket_addr
@@ -42,9 +43,10 @@ def exit_by_exception():
 
 class BaseServer:
     def __init__(self, address, context=None):
+        log.info('borgcubed %s starting', borgcube.__version__)
         self.socket = (context or zmq.Context.instance()).socket(zmq.REP)
         self.socket.bind(address)
-        log.info('bound to %s', address)
+        log.debug('bound to %s', address)
 
         self.shutdown = False
         signal.signal(signal.SIGTERM, self.signal_terminate)
@@ -63,6 +65,7 @@ class BaseServer:
         signal.signal(signum, signal.SIG_IGN)
 
     def main_loop(self):
+        log.info('Daemon reporting for duty.')
         while not self.shutdown:
             self.idle()
             last_idle = time.perf_counter()
