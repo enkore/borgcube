@@ -343,16 +343,9 @@ class APIServer(BaseServer):
             'success': True,
         }
 
-    def cmd_zodburi(self, request):
-        return {
-            'success': True,
-            'uri': settings.DB_URI,
-        }
-
     commands = {
         'cancel-job': cmd_cancel_job,
         'log': cmd_log,
-        'zodburi': cmd_zodburi,
     }
 
     def check_children(self):

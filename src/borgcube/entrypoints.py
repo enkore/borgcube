@@ -8,6 +8,7 @@ It also does the initialization of the various subsystems (Django, Logging, Plug
 import os
 import logging
 import sys
+from urllib.parse import urlunsplit
 
 import django
 from django.conf import settings
@@ -30,10 +31,9 @@ configure_plugins()
 def _set_db_uri():
     if not settings.BUILTIN_ZEO:
         return
-    from .daemon.client import APIClient
-    client = APIClient()
-    settings.DB_URI = client.zodburi()
-    log.debug('Received DB_URI=%r from daemon', settings.DB_URI)
+    from .daemon.utils import get_socket_addr
+    settings.DB_URI = urlunsplit(('zeo', '', get_socket_addr('zeo'), '', ''))
+    log.debug('Real DB_URI (at daemon) is %r', settings.DB_URI)
 
 
 def daemon():
