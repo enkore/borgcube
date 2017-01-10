@@ -179,8 +179,6 @@ SERVER_PROXY_PATH = None
 # yourself or use eg. RelStorage, turn this off.
 BUILTIN_ZEO = True
 
-SOCKET_PREFIX = '/run/user/{euid}/borgcube'
-
 # zodburi ( http://docs.pylonsproject.org/projects/zodburi/en/latest/ ) of the DB to use
 # note: file:// paths are always absolute.
 DB_URI = 'file:///var/...somewhere...'

@@ -1,4 +1,5 @@
 import os
+import tempfile
 import threading
 from queue import Queue, Empty
 from wsgiref.simple_server import WSGIServer
@@ -69,4 +70,10 @@ class ThreadPoolWSGIServer(WSGIServer):
 
 
 def get_socket_addr(suffix):
-    return settings.SOCKET_PREFIX.format(euid=os.geteuid()) + '-' + suffix
+    try:
+        dir = os.environ['XDG_RUNTIME_DIR']
+    except KeyError:
+        dir = '/run/user/%s/' % os.geteuid()
+        if not os.path.isdir(dir):
+            dir = tempfile.mkdtemp(prefix='borgcube')
+    return os.path.join(dir, 'borgcube-' + suffix)
