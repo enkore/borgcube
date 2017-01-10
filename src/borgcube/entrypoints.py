@@ -32,7 +32,7 @@ def _set_db_uri():
     if not settings.BUILTIN_ZEO:
         return
     from .daemon.utils import get_socket_addr
-    settings.DB_URI = urlunsplit(('zeo', '', get_socket_addr('zeo'), '', ''))
+    settings.DB_URI = urlunsplit(('zeo', '', get_socket_addr('zeo'), 'wait_timeout=5', ''))
     log.debug('Real DB_URI (at daemon) is %r', settings.DB_URI)
 
 

@@ -47,6 +47,7 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'borgcube.web.core.middleware.ZODBErrorMiddleware',
     'borgcube.web.core.middleware.transaction_middleware',
     'borgcube.web.core.middleware.SidebarMiddleware',
 ]

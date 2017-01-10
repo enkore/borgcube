@@ -117,6 +117,7 @@ class CheckJobExecutor(JobExecutor):
 
 class CheckJob(Job):
     short_name = 'check'
+    verbose_name = _('Check data')
     executor = CheckJobExecutor
 
     class State(Job.State):

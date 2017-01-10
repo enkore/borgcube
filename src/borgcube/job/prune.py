@@ -222,6 +222,7 @@ class PruneJobExecutor(JobExecutor):
 
 class PruneJob(Job):
     short_name = 'prune'
+    verbose_name = _('Prune archives')
     executor = PruneJobExecutor
 
     class State(Job.State):
