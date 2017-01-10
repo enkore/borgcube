@@ -121,36 +121,19 @@ class BaseServer:
         return pid
 
 
-class APIServer(BaseServer):
-    def __init__(self, address, context=None):
-        super().__init__(address, context)
-        # PID -> (command, params...)
-        self.children = {}
-        # PID -> type-of-service
-        self.services = {}
-        self.queue = []
-        set_process_name('borgcubed [main process]')
-        if settings.BUILTIN_ZEO:
-            self.launch_builtin_zeo()
-        if settings.BUILTIN_WEB:
-            self.launch_builtin_web()
+class Service:
+    def __init__(self, fork):
+        self.fork = fork
 
-        hook.borgcubed_startup(apiserver=self)
-        db = data_root()
+    def __str__(self):
+        return self.__class__.__name__
 
-        with transaction.manager as txn:
-            txn.note('borgcubed starting')
-            for state, jobs in db.jobs_by_state.items():
-                if state in Job.State.STABLE:
-                    continue
-                for job in jobs.values():
-                    job.set_failure_cause('borgcubed-restart')
-                    txn.note(' - Failing previously running job %s due to restart' % job.id)
-            for job in db.jobs_by_state.get(Job.State.job_created, {}).values():
-                self.queue_job(job)
-                txn.note(' - Queuing job %s' % job.id)
+    def launch(self):
+        raise NotImplementedError
 
-    def launch_builtin_zeo(self):
+
+class ZEOService(Service):
+    def launch(self):
         received = False
 
         def set_received(*_):
@@ -158,12 +141,13 @@ class APIServer(BaseServer):
             received = True
 
         signal.signal(signal.SIGUSR1, set_received)
-        self.fork_zeo()
+        pid = self.fork_zeo()
         if not received:
             assert signal.sigtimedwait([signal.SIGUSR1], 20), 'database server failed to start'
 
         settings.DB_URI = urlunsplit(('zeo', '', self.zeo_path, '', ''))
         log.debug('Launched built-in ZEO')
+        return pid
 
     def fork_zeo(self):
         self.zeo_path = get_socket_addr('zeo')
@@ -173,7 +157,7 @@ class APIServer(BaseServer):
             pass
         pid = self.fork()
         if pid:
-            self.services[pid] = 'zeo'
+            return pid
         else:
             from ZEO.StorageServer import StorageServer
             set_process_name('borgcubed [database process]')
@@ -195,10 +179,12 @@ class APIServer(BaseServer):
                 server.close()
                 sys.exit(0)
 
-    def launch_builtin_web(self):
+
+class WebService(Service):
+    def launch(self):
         pid = self.fork()
         if pid:
-            self.services[pid] = 'web'
+            return pid
         else:
             from wsgiref.simple_server import make_server
             from borgcube.web.wsgi import get_wsgi_application
@@ -221,6 +207,42 @@ class APIServer(BaseServer):
                 httpd.serve_forever()
             finally:
                 httpd.join()
+                sys.exit(0)
+
+
+class APIServer(BaseServer):
+    def __init__(self, address, context=None):
+        super().__init__(address, context)
+        # PID -> (command, params...)
+        self.children = {}
+        # PID -> service instance
+        self.services = {}
+        self.queue = []
+        set_process_name('borgcubed [main process]')
+        if settings.BUILTIN_ZEO:
+            self.launch_service(ZEOService)
+        if settings.BUILTIN_WEB:
+            self.launch_service(WebService)
+
+        hook.borgcubed_startup(apiserver=self)
+        db = data_root()
+
+        with transaction.manager as txn:
+            txn.note('borgcubed starting')
+            for state, jobs in db.jobs_by_state.items():
+                if state in Job.State.STABLE:
+                    continue
+                for job in jobs.values():
+                    job.set_failure_cause('borgcubed-restart')
+                    txn.note(' - Failing previously running job %s due to restart' % job.id)
+            for job in db.jobs_by_state.get(Job.State.job_created, {}).values():
+                self.queue_job(job)
+                txn.note(' - Queuing job %s' % job.id)
+
+    def launch_service(self, service):
+        inst = service(self.fork)
+        pid = inst.launch()
+        self.services[pid] = inst
 
     def handle_request(self, request):
         command = request['command']
