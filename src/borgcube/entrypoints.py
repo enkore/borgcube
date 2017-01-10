@@ -8,7 +8,10 @@ It also does the initialization of the various subsystems (Django, Logging, Plug
 import os
 import logging
 import sys
+from functools import wraps
 from urllib.parse import urlunsplit
+
+from zmq.error import Again
 
 import django
 from django.conf import settings
@@ -36,6 +39,17 @@ def _set_db_uri():
     log.debug('Real DB_URI (at daemon) is %r', settings.DB_URI)
 
 
+def errhandler(func):
+    @wraps(func)
+    def wrapper():
+        try:
+            return func()
+        except Again:
+            print('Couldn\'t connect to the borgcube daemon. Is it running?', file=sys.stderr)
+            return 1
+    return wrapper
+
+
 def daemon():
     from .daemon.server import APIServer
     from .daemon.utils import get_socket_addr
@@ -45,6 +59,7 @@ def daemon():
     server.main_loop()
 
 
+@errhandler
 def proxy():
     from .proxy import ReverseRepositoryProxy
     from .utils import log_to_daemon, hook
@@ -55,6 +70,7 @@ def proxy():
         proxy.serve()
 
 
+@errhandler
 def manage():
     from django.core.management import execute_from_command_line
     from .utils import hook
