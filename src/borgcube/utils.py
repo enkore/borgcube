@@ -146,6 +146,7 @@ class DaemonLogHandler(logging.Handler):
 
 class log_to_daemon:
     def __enter__(self):
+        from .daemon.utils import get_socket_addr
         logging_config = settings.LOGGING
         logging_config.update({
             'handlers': {
@@ -153,7 +154,7 @@ class log_to_daemon:
                     'level': 'DEBUG',
                     'class': 'borgcube.utils.DaemonLogHandler',
                     'formatter': 'standard',
-                    'addr_or_socket': settings.DAEMON_ADDRESS,
+                    'addr_or_socket': 'ipc://' + get_socket_addr('daemon'),
                 },
             },
             'formatters': {

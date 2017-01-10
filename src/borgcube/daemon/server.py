@@ -143,7 +143,11 @@ class ZEOService(Service):
         signal.signal(signal.SIGUSR1, set_received)
         pid = self.fork_zeo()
         if not received:
-            assert signal.sigtimedwait([signal.SIGUSR1], 20), 'database server failed to start'
+            while not signal.sigtimedwait([signal.SIGUSR1], 1):
+                pid, waitres = os.waitpid(pid, os.WNOHANG)
+                if pid:
+                    log.error('Database server failed to start (check log above).')
+                    sys.exit(1)
 
         settings.DB_URI = urlunsplit(('zeo', '', self.zeo_path, '', ''))
         log.debug('Launched built-in ZEO')
