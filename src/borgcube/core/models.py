@@ -756,8 +756,10 @@ class Schedule(Evolvable):
                 self.initial['recurrence_start'] = self.initial['recurrence'].dtstart
 
         def clean(self):
-            dtstart = self.cleaned_data.pop('recurrence_start')
-            self.cleaned_data['recurrence'].dtstart = dtstart
+            super().clean()
+            if not self.errors:
+                dtstart = self.cleaned_data.pop('recurrence_start')
+                self.cleaned_data['recurrence'].dtstart = dtstart
             return self.cleaned_data
 
 
