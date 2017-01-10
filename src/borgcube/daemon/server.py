@@ -5,6 +5,7 @@ import sys
 import time
 import os
 from urllib.parse import urlunsplit
+from collections import defaultdict
 
 import zmq
 
@@ -48,6 +49,13 @@ class BaseServer:
         self.shutdown = False
         signal.signal(signal.SIGTERM, self.signal_terminate)
         signal.signal(signal.SIGINT, self.signal_terminate)
+
+        self.stats = defaultdict(int)
+        self.up = time.monotonic()
+
+    @property
+    def uptime(self):
+        return time.monotonic() - self.up
 
     def signal_terminate(self, signum, stack_frame):
         log.info('Received signal %d, initiating exorcism', signum)
@@ -104,6 +112,7 @@ class BaseServer:
         Log error *message* formatted (%) with *parameters*. Return response dictionary.
         """
         log.error('Request failed: ' + message, *parameters)
+        self.stats['failed_requests'] += 1
         return {
             'success': False,
             'message': message % parameters
@@ -113,6 +122,7 @@ class BaseServer:
         pid = os.fork()
         if pid:
             log.debug('Forked worker PID is %d', pid)
+            self.stats['forks'] += 1
         else:
             os.setpgrp()
             self.socket.close()
@@ -250,6 +260,7 @@ class APIServer(BaseServer):
 
     def handle_request(self, request):
         command = request['command']
+        self.stats['requests'] += 1
         if command in self.commands:
             return self.commands[command](self, request)
         return hook.borgcubed_handle_request(apiserver=self, request=request)
@@ -347,9 +358,18 @@ class APIServer(BaseServer):
             'success': True,
         }
 
+    def cmd_stats(self, request):
+        stats = dict(self.stats)
+        stats['uptime'] = self.uptime
+        return {
+            'stats': stats,
+            'success': True,
+        }
+
     commands = {
         'cancel-job': cmd_cancel_job,
         'log': cmd_log,
+        'stats': cmd_stats,
     }
 
     def check_children(self):
@@ -369,6 +389,10 @@ class APIServer(BaseServer):
             signo = waitres & 0xFF
             code = (waitres & 0xFF00) >> 8
             failure = signo or code
+            if failure:
+                self.stats['job_failures'] += 1
+            else:
+                self.stats['job_successes'] += 1
             logger = log.error if failure else log.debug
             if signo:
                 logger('Child %d exited with code %d on signal %d', pid, code, signo)
