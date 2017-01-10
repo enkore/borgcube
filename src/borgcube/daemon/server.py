@@ -15,6 +15,7 @@ from django.conf import settings
 
 from ..core.models import Job
 from ..utils import set_process_name, hook, data_root, reset_db_connection, log_to_daemon
+from .utils import get_socket_addr
 
 log = logging.getLogger('borgcubed')
 
@@ -165,7 +166,7 @@ class APIServer(BaseServer):
         log.debug('Launched built-in ZEO')
 
     def fork_zeo(self):
-        self.zeo_path = settings.SOCKET_PREFIX.format(euid=os.geteuid()) + '-zeo'
+        self.zeo_path = get_socket_addr('zeo')
         try:
             os.unlink(self.zeo_path)
         except OSError:

@@ -1,6 +1,9 @@
+import os
 import threading
 from queue import Queue, Empty
 from wsgiref.simple_server import WSGIServer
+
+from django.conf import settings
 
 
 class ThreadPoolWSGIServer(WSGIServer):
@@ -63,3 +66,7 @@ class ThreadPoolWSGIServer(WSGIServer):
         # down the workers.
         self._request_queue.join()
         self._shutdown_event.set()
+
+
+def get_socket_addr(suffix):
+    return settings.SOCKET_PREFIX.format(euid=os.geteuid()) + '-' + suffix

@@ -175,8 +175,6 @@ SERVER_LOGIN = 'mabe@localhost'
 # (This is then passed as the --remote-path option to the Borg running on the client)
 SERVER_PROXY_PATH = None
 
-DAEMON_ADDRESS = 'tcp://127.0.0.1:58123'
-
 # By default borgcubed will run a DB server. If you want to provide the DB server
 # yourself or use eg. RelStorage, turn this off.
 BUILTIN_ZEO = True

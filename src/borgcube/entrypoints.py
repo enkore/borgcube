@@ -28,7 +28,6 @@ configure_plugins()
 
 
 def _set_db_uri():
-    from django.conf import settings
     if not settings.BUILTIN_ZEO:
         return
     from .daemon.client import APIClient
@@ -39,9 +38,10 @@ def _set_db_uri():
 
 def daemon():
     from .daemon.server import APIServer
+    from .daemon.utils import get_socket_addr
     from .utils import hook
     hook.borgcube_startup(process='borgcubed')
-    server = APIServer(settings.DAEMON_ADDRESS)
+    server = APIServer('ipc://' + get_socket_addr('daemon'))
     server.main_loop()
 
 
