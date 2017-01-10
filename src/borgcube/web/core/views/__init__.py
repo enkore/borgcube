@@ -468,45 +468,38 @@ def schedule_add_and_edit(request, data, schedule=None, context=None):
 
     if data:
         actions_data = json.loads(data['actions-data'])
-
         all_valid = form.is_valid()
+        txn = transaction.get()
 
-        class AbortTransaction(Exception):
-            pass
+        if all_valid:
+            if schedule:
+                schedule.actions.clear()
+                schedule._update(form.cleaned_data)
+                txn.note('Edited schedule %s' % schedule.oid)
+            else:
+                schedule = Schedule(**form.cleaned_data)
+                data_root().schedules.append(schedule)
+                txn.note('Added schedule %s' % schedule.name)
 
-        try:
-            with transaction.manager as txn:
-                if all_valid:
-                    if schedule:
-                        schedule.actions.clear()
-                        schedule._update(form.cleaned_data)
-                        txn.note('Edited schedule %s' % schedule.oid)
-                    else:
-                        schedule = Schedule(**form.cleaned_data)
-                        data_root().schedules.append(schedule)
-                        txn.note('Added schedule %s' % schedule.name)
+        for serialized_action in actions_data:
+            dotted_path = serialized_action.pop('class')
+            action = ScheduledAction.get_class(dotted_path)
+            if not action:
+                log.error('invalid/unknown schedulable action %r, ignoring', dotted_path)
+                continue
+            action_form = action.form(serialized_action)
 
-                for serialized_action in actions_data:
-                    dotted_path = serialized_action.pop('class')
-                    action = ScheduledAction.get_class(dotted_path)
-                    if not action:
-                        log.error('invalid/unknown schedulable action %r, ignoring', dotted_path)
-                        continue
-                    action_form = action.form(serialized_action)
+            valid = action_form.is_valid()
+            all_valid &= valid
+            if all_valid:
+                scheduled_action = action(schedule, **action_form.cleaned_data)
+                schedule.actions.append(scheduled_action)
+                txn.note(' - Added scheduled action %s' % scheduled_action.dotted_path())
+            action_forms.append(action_form)
 
-                    valid = action_form.is_valid()
-                    all_valid &= valid
-                    if all_valid:
-                        scheduled_action = action(schedule, **action_form.cleaned_data)
-                        schedule.actions.append(scheduled_action)
-                        txn.note(' - Added scheduled action %s' % scheduled_action.dotted_path())
-                    action_forms.append(action_form)
-
-                if not all_valid:
-                    raise AbortTransaction
-                return redirect(schedules)
-        except AbortTransaction:
-            pass
+        if all_valid:
+            txn.commit()
+            return redirect(schedules)
     context = dict(context or {})
     context.update({
         'form': form,
