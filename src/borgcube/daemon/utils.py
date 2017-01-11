@@ -79,6 +79,11 @@ class NoSocketDir(Error):
 
 
 def get_socket_addr(suffix):
+    """
+    Return a socket address (normally a string for UDS) unique to this user and *suffix*.
+
+    This might raise `NoSocketDir`.
+    """
     try:
         dir = os.environ['XDG_RUNTIME_DIR']
         if not os.access(dir, os.W_OK|os.R_OK):
@@ -92,10 +97,18 @@ def get_socket_addr(suffix):
             os.mkdir(dir, 0o700)
         except FileExistsError:
             pass
+            # This is okay, because we might have been restarted and all. This also
+            # opens a principial race condition, which we'll try to remedy below,
+            # read on...
         except OSError as ose:
             raise NoSocketDir(ose)
         try:
+            # First we try to chown() the directory. This always suceeds if we
+            # created it successfully above or we created it earlier, but fails
+            # if someone else raced our mkdir() call.
             os.chown(dir, os.geteuid(), os.getegid())
+            # Then we clear the permission bits, which would fail if we were
+            # not the owner anymore.
             os.chmod(dir, 0o700)
         except OSError as ose:
             raise NoSocketDir(ose)
