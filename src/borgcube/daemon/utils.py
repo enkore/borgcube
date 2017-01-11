@@ -4,6 +4,8 @@ import threading
 from queue import Queue, Empty
 from wsgiref.simple_server import WSGIServer
 
+from borg.helpers import Error
+
 from django.conf import settings
 
 
@@ -69,11 +71,32 @@ class ThreadPoolWSGIServer(WSGIServer):
         self._shutdown_event.set()
 
 
+class NoSocketDir(Error):
+    """Could not get a directory to create sockets: {}
+
+    Make sure that any of /run/user/$UID, /tmp, $XDG_RUNTIME_DIR, $TEMP
+    exist and are writable by the current user."""
+
+
 def get_socket_addr(suffix):
     try:
         dir = os.environ['XDG_RUNTIME_DIR']
+        if not os.access(dir, os.W_OK|os.R_OK):
+            # Invalid XDG_RUNTIME_DIR, try proper one first before falling back to /tmp
+            dir = '/run/user/%s/' % os.geteuid()
     except KeyError:
         dir = '/run/user/%s/' % os.geteuid()
-        if not os.path.isdir(dir):
-            dir = tempfile.mkdtemp(prefix='borgcube')
+    if not os.path.isdir(dir) or not os.access(dir, os.W_OK|os.R_OK):
+        dir = os.path.join(tempfile.gettempdir(), 'borgcube-%s' % os.geteuid())
+        try:
+            os.mkdir(dir, 0o700)
+        except FileExistsError:
+            pass
+        except OSError as ose:
+            raise NoSocketDir(ose)
+        try:
+            os.chown(dir, os.geteuid(), os.getegid())
+            os.chmod(dir, 0o700)
+        except OSError as ose:
+            raise NoSocketDir(ose)
     return os.path.join(dir, 'borgcube-' + suffix)
