@@ -1,5 +1,6 @@
 import os
 import tempfile
+import textwrap
 import threading
 from queue import Queue, Empty
 from wsgiref.simple_server import WSGIServer
@@ -72,10 +73,12 @@ class ThreadPoolWSGIServer(WSGIServer):
 
 
 class NoSocketDir(Error):
-    """Could not get a directory to create sockets: {}
+    __doc__ = textwrap.dedent(
+        """
+        Could not get a directory to create sockets: {}
 
-    Make sure that any of /run/user/$UID, /tmp, $XDG_RUNTIME_DIR, $TEMP
-    exist and are writable by the current user."""
+        Make sure that any of /run/user/$UID, /tmp, $XDG_RUNTIME_DIR, $TEMP
+        exist and are writable by the current user ({}).""").strip()
 
 
 def get_socket_addr(suffix):
@@ -101,7 +104,7 @@ def get_socket_addr(suffix):
             # opens a principial race condition, which we'll try to remedy below,
             # read on...
         except OSError as ose:
-            raise NoSocketDir(ose)
+            raise NoSocketDir(ose, os.geteuid())
         try:
             # First we try to chown() the directory. This always suceeds if we
             # created it successfully above or we created it earlier, but fails
@@ -111,5 +114,5 @@ def get_socket_addr(suffix):
             # not the owner anymore.
             os.chmod(dir, 0o700)
         except OSError as ose:
-            raise NoSocketDir(ose)
+            raise NoSocketDir(ose, os.geteuid())
     return os.path.join(dir, 'borgcube-' + suffix)

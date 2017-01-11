@@ -8,6 +8,7 @@ It also does the initialization of the various subsystems (Django, Logging, Plug
 import os
 import logging
 import sys
+import traceback
 from functools import wraps
 from urllib.parse import urlunsplit
 
@@ -17,6 +18,7 @@ import django
 from django.conf import settings
 
 from borg import logger
+from borg.helpers import Error
 
 log = logging.getLogger(__name__)
 
@@ -42,14 +44,33 @@ def _set_db_uri():
 def errhandler(func):
     @wraps(func)
     def wrapper():
+        exit_code = 1
+        tb_log_level = logging.DEBUG
+
         try:
             return func()
         except Again:
             print('Couldn\'t connect to the borgcube daemon. Is it running?', file=sys.stderr)
             return 1
+        except Error as e:
+            msg = e.get_message()
+            if e.traceback:
+                tb_log_level = logging.ERROR
+            tb = traceback.format_exc()
+            exit_code = e.exit_code
+        except KeyboardInterrupt:
+            msg = 'Keyboard interrupt'
+            tb = traceback.format_exc()
+
+        if msg:
+            log.error(msg)
+        if tb:
+            log.log(tb_log_level, tb)
+        return exit_code
     return wrapper
 
 
+@errhandler
 def daemon():
     from .daemon.server import APIServer
     from .daemon.utils import get_socket_addr
