@@ -29,7 +29,7 @@ class PruneRoot(Evolvable):
 
 
 def prune_root():
-    return data_root().plugin_data('prune', PruneRoot)
+    return data_root().plugin_data(PruneRoot)
 
 
 class RetentionPolicy(Evolvable):

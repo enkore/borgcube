@@ -331,13 +331,15 @@ class DataRoot(Evolvable):
 
         self.ext = PersistentDict()
 
-    def plugin_data(self, name, factory):
+    def plugin_data(self, factory):
         """
-        Return an instance generated (at some point in time) by *factory*, indexed by *name*.
+        Return an instance generated (at some point in time) by *factory*.
 
         This should be used for storing plugin data, eg.::
 
             class AwesomePluginData(Evolvable):
+                name = 'awesome-plugin'
+
                 def __init__(self):
                     self.some_data = OOBTree()
 
@@ -345,19 +347,27 @@ class DataRoot(Evolvable):
 
             def show_some_data(request):
                 # You might want to just put this in a separate helper (below)
-                plugdat = data_root().plugin_data('awesome-plugin', AwesomePluginData)
+                plugdat = data_root().plugin_data(AwesomePluginData)
                 return TemplateResponse(...)
 
             # A sample helper
             def plugin_root():
-                return data_root().plugin_data('awesome-plugin', AwesomePluginData)
+                return data_root().plugin_data(AwesomePluginData)
 
         A good *name* would be the entrypoint name of your plugin, or it's root module/package name.
+
+        The *name* attribute on *factory* is not mandatory.
+        If it is not present the qualified class name is used instead
+        (eg. ``awesomeplugin.data.AwesomePluginData``)
         """
+        try:
+            name = factory.name
+        except AttributeError:
+            name = factory.__module__ + '.' + factory.__qualname__
         try:
             return self.ext[name]
         except KeyError:
-            log.info('Initialized new data root for plugin %s (%s)', name, factory.__name__)
+            log.info('Initialized new data root for plugin %s', name)
             return self.ext.setdefault(name, factory())
 
 

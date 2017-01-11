@@ -32,7 +32,7 @@ log = logging.getLogger(__name__)
 def dashboard(request):
     recent_jobs = itertools.islice(reversed(data_root().jobs), 20)
     return TemplateResponse(request, 'core/dashboard.html', {
-        'metrics': data_root().plugin_data('web', WebData).metrics,
+        'metrics': data_root().plugin_data(WebData).metrics,
         'recent_jobs': recent_jobs,
     })
 
