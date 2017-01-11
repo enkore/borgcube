@@ -423,6 +423,14 @@ class ScheduledBackup(ScheduledAction):
     class Form(forms.Form):
         job_config = forms.ChoiceField(choices=job_configs_as_choices)
 
+        def __init__(self, *args, **kwargs):
+            try:
+                kwargs['initial'] = initial = dict(kwargs['initial'])
+                initial['job_config'] = initial['job_config'].oid
+            except KeyError:
+                pass
+            super().__init__(*args, **kwargs)
+
         def clean(self):
             data = super().clean()
             o = data_root()._p_jar[bytes.fromhex(data['job_config'])]
