@@ -1,10 +1,11 @@
 import errno
 import logging
 import signal
+import stat
 import sys
 import time
 import os
-from urllib.parse import urlunsplit
+from urllib.parse import urlunsplit, urlsplit
 from collections import defaultdict
 
 import zmq
@@ -144,6 +145,8 @@ class Service:
 
 class ZEOService(Service):
     def launch(self):
+        self.check()
+
         received = False
 
         def set_received(*_):
@@ -162,6 +165,38 @@ class ZEOService(Service):
         settings.DB_URI = urlunsplit(('zeo', '', self.zeo_path, '', ''))
         log.debug('Launched built-in ZEO')
         return pid
+
+    def check(self):
+        """Verify correct permissions and ownership of database files."""
+        scheme, _, file, _, _ = urlsplit(settings.DB_URI)
+        if scheme != 'file':
+            log.warning('DB_URI does not point to a file but %s -- forgot to set "BUILTIN_ZEO = False"?', scheme)
+            return
+
+        try:
+            st = os.stat(file)
+        except FileNotFoundError:
+            # Database not created yet, not an error.
+            return
+
+        error = False
+        if st.st_uid != os.geteuid():
+            log.error('Database file %s has wrong owner: %d (file) vs %d (daemon user)', file, st.st_uid, os.geteuid())
+            error = True
+        if st.st_gid != os.getegid():
+            log.error('Database file %s has wrong group: %d (file) vs %d (daemon user)', file, st.st_gid, os.getegid())
+            # not a critical error, could be, theoretically, on purpose
+        if error:
+            sys.exit(1)
+
+        # Fix perms, if any
+        perms = stat.S_IMODE(st.st_mode)
+        perms_should_be = perms & ~stat.S_IRWXO
+        if perms != perms_should_be:
+            try:
+                os.chmod(file, perms_should_be)
+            except OSError as ose:
+                log.debug('Tried to fix permissions on database file, but it didn\'t work: %s', file, ose)
 
     def fork_zeo(self):
         self.zeo_path = get_socket_addr('zeo')
