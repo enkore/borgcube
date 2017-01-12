@@ -328,6 +328,9 @@ class APIServer(BaseServer):
         """
         Enqueue *job* instance for execution.
         """
+        for executor_class, qjob in self.queue:
+            if qjob == job:
+                return
         executor_class = job.executor
         self.queue.append((executor_class, job))
         log.debug('Enqueued job %s', job.id)
