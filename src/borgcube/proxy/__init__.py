@@ -80,24 +80,13 @@ class ReverseRepositoryProxy(RepositoryServer):
             raise ValueError('BorgCube: illegal open(create=True)')
         log.debug('ReverseRepositoryProxy lock_wait=%s, lock=%s, exclusive=%s, append_only=%s, path=%r',
                   lock_wait, lock, exclusive, append_only, path)
-        try:
-            path = path.decode()
-        except ValueError:
-            raise PathNotAllowed(path)
 
-        for job in data_root().jobs_by_state[BackupJob.State.client_prepared].values():
-            if job.reverse_path == path:
-                self.job = job
-                break
-        else:
-            raise PathNotAllowed(path)
-
+        self.job = self._get_job(path)
         self.job.update_state(previous=BackupJob.State.client_prepared, to=BackupJob.State.client_in_progress)
         set_process_name('borgcube-proxy [job %s]' % self.job.id)
 
         log.info('Opening repository for job %s', self.job.id)
-        location = self.job.repository.location
-        self._real_open(location)
+        self._real_open()
         self._load_repository_key()
         self._load_client_key()
         self._load_cache()
@@ -106,18 +95,19 @@ class ReverseRepositoryProxy(RepositoryServer):
         log.debug('Repository ID is %r', self.job.repository.repository_id)
         return unhexlify(self.job.repository.repository_id)
 
-    def get_free_nonce(self):
-        return 0
+    def _get_job(self, path):
+        try:
+            path = path.decode()
+        except ValueError:
+            raise PathNotAllowed(path)
 
-    def commit_nonce_reservation(self, next_unreserved, start_nonce):
-        pass
+        for job in data_root().jobs_by_state[BackupJob.State.client_prepared].values():
+            if job.reverse_path == path:
+                return job
+        else:
+            raise PathNotAllowed(path)
 
-    def _add_checkpoint(self, id):
-        self.job.checkpoint_archives.append(bin_to_hex(id))
-        transaction.get().note('Added checkpoint archive %s for job %s' % (bin_to_hex(id), self.job.id))
-        transaction.commit()
-
-    def _real_open(self, location):
+    def _real_open(self):
         self.repository = open_repository(self.job.repository)
         # RepositoryServer.serve() handles this
         self.repository.__enter__()
@@ -147,7 +137,20 @@ class ReverseRepositoryProxy(RepositoryServer):
         self._cache.begin_txn()
         log.debug('Loaded cache')
 
+    def _add_checkpoint(self, id):
+        self.job.checkpoint_archives.append(bin_to_hex(id))
+        transaction.get().note('Added checkpoint archive %s for job %s' % (bin_to_hex(id), self.job.id))
+        transaction.commit()
+
+    def get_free_nonce(self):
+        """API"""
+        return 0
+
+    def commit_nonce_reservation(self, next_unreserved, start_nonce):
+        """API"""
+
     def load_key(self):
+        """API"""
         log.debug('Client requested repokey')
         # Note: the .encode() is technically not necessary as msgpack would turn it into ASCII-bytes anyway,
         #       but it makes testing easier, since it doesn't need to rely on that implementation detail.
@@ -167,17 +170,20 @@ class ReverseRepositoryProxy(RepositoryServer):
 
     @doom_on_exception()
     def get(self, id):
+        """API"""
         repo_data = self.repository.get(id)
         client_data = self._repo_to_client(id, repo_data)
         return client_data
 
     @doom_on_exception()
     def get_many(self, ids, is_preloaded=False):
+        """API"""
         for id, repo_data in zip(ids, self.repository.get_many(ids, is_preloaded)):
             yield self._repo_to_client(id, repo_data)
 
     @doom_on_exception()
     def put(self, id, data, wait=True):
+        """API"""
         client_data = data
         is_manifest = id == Manifest.MANIFEST_ID
         try:
@@ -200,6 +206,7 @@ class ReverseRepositoryProxy(RepositoryServer):
 
     @doom_on_exception()
     def delete(self, id, wait=True):
+        """API"""
         if bin_to_hex(id) not in self.job.checkpoint_archives:
             raise ValueError('BorgCube: illegal delete(id=%s), not a checkpoint archive ID', bin_to_hex(id))
         self.repository.delete(id, wait)
@@ -209,9 +216,11 @@ class ReverseRepositoryProxy(RepositoryServer):
 
     @doom_on_exception()
     def rollback(self):
+        """API"""
         self.job.update_state(BackupJob.State.client_in_progress, BackupJob.State.failed)
         log.error('Job failed due to client rollback.')
         self._doomed = True
+        self._cache.close()
         self.repository.rollback()
 
     def _add_completed_archive(self):
@@ -240,6 +249,7 @@ class ReverseRepositoryProxy(RepositoryServer):
 
     @doom_on_exception()
     def commit(self, save_space=False):
+        """API"""
         if not self._got_archive:
             raise ValueError('BorgCube: Cannot commit without adding the archive we wanted')
         log.debug('Client initiated commit')
