@@ -209,3 +209,36 @@ Note how some functions bring their own transactions, eg. `Job.force_state` or `
 
 .. [#] We can also associate a user with a transaction, which is done by `borgcube.web` (TODO).
         This makes the transaction log of the ZODB similar to a free audit log.
+
+Execution model
+---------------
+
+Now what's *that* you might ask? Since one of the main responsibilities of BC is to run
+long-running tasks like creating, checking and pruning backups a component that orchestrates
+this is needed. In BC this is done by a two-tiered approach:
+
+The schedule
+
+   It defines what should happen when on a calendric basis, eg. making daily backups.
+   Internally this is implemented through `ScheduledActions <ScheduledAction>`, which
+   usually create `Jobs <Job>`.
+
+   Schedules are stored in the database and can be edited by administrators.
+
+The queue
+
+   It is a list of jobs that should run *right now*, it is never stored in the database
+   and is, as an object, privately owned by the daemon process. It cannot be altered,
+   except for cancelling jobs -- if a job is only queued, but not running yet, it is
+   removed from the queue.
+
+   The daemon ensures that new jobs added to the database are added to the queue as well,
+   by checking for new jobs in every idle iteration.
+
+   .. this could be done more efficiently (on-demand) by leveraging Z caches, but
+      that would also mean re-doing the schedule evaluation (which *is* a TODO, actually),
+      cf. seconds_until_next_occurence, which would also need to hook into the cache for
+      schedule updates.
+
+   The daemon performs a conflict check (whether a job can run given the set of currently
+   running jobs) in FIFO order, and forks a worker for each job that can run.
