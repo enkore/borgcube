@@ -677,3 +677,34 @@ def prune_config_trigger(request, config_id):
 
 def prune_config_delete(request, config_id):
     config = find_oid_or_404(prune_root().configs, config_id)
+
+
+def object_publisher(request, path):
+    path_segments = path.split('/')
+    path_segments.reverse()
+    if any(segment.startswith('_') for segment in path_segments):
+        raise Http404
+
+    def resolve(path_segments, current_object):
+        try:
+            segment = path_segments.pop()
+        except IndexError:
+            return current_object.view
+        if segment not in current_object.published:
+            raise Http404
+        try:
+            resolver = current_object.get_child
+        except AttributeError:
+            resolver = current_object.__getitem__
+        try:
+            current_object = resolver(segment)
+        except KeyError:
+            try:
+                segment = segment.replace('-', '_')
+                current_object = getattr(current_object, segment)()
+            except AttributeError:
+                raise Http404
+        return resolve(path_segments, current_object)
+
+    view = resolve(path_segments, data_root())
+    return view(request)
