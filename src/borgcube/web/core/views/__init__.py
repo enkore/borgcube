@@ -30,11 +30,7 @@ log = logging.getLogger(__name__)
 
 
 def dashboard(request):
-    recent_jobs = itertools.islice(reversed(data_root().jobs), 20)
-    return TemplateResponse(request, 'core/dashboard.html', {
-        'metrics': data_root().plugin_data(WebData).metrics,
-        'recent_jobs': recent_jobs,
-    })
+    pass
 
 
 def clients(request):
@@ -679,32 +675,175 @@ def prune_config_delete(request, config_id):
     config = find_oid_or_404(prune_root().configs, config_id)
 
 
+from functools import partial
+
+
+class Publisher:
+    companion = 'companion'
+
+    @classmethod
+    def factory(cls, companion):
+        return partial(cls, companion)
+
+    def __init__(self, companion):
+        setattr(self, type(self).companion, companion)
+
+    def children(self):
+        """
+        Return a mapping of child names to child publishers or factories.
+        """
+        return {}
+
+    def __getitem__(self, item):
+        """
+        Return published child object or raise KeyError
+
+        Call `children` and index return value with *item* by default.
+        """
+        v = self.children()[item]
+        try:
+            return v()
+        except TypeError:
+            return v
+
+    def view(self, request):
+        """
+        The default view of this object.
+        """
+
+
+class RootPublisher(Publisher):
+    companion = 'dr'
+    views = ()
+
+    def children(self):
+        return {
+            'clients': ClientsPublisher.factory(self.dr.clients),
+            'schedules': SchedulesPublisher.factory(self.dr.schedules),
+            'repositories': RepositoriesPublisher.factory(self.dr.repositories),
+            'management': ManagementPublisher.factory(self.dr.ext),
+        }
+
+    def view(self, request):
+        recent_jobs = itertools.islice(reversed(self.dr.jobs), 20)
+        return TemplateResponse(request, 'core/dashboard.html', {
+            'metrics': self.dr.plugin_data(WebData).metrics,
+            'recent_jobs': recent_jobs,
+        })
+
+
+class ClientsPublisher(Publisher):
+    companion = 'clients'
+
+    def __getitem__(self, hostname):
+        client = self.clients[hostname]
+        return ClientPublisher(client)
+
+    def view(self, request):
+        return TemplateResponse(request, 'core/client/list.html', {
+            'm': Client,
+            'clients': self.clients.values(),
+        })
+
+
+class ClientPublisher(Publisher):
+    companion = 'client'
+    views = ('add', 'edit')
+
+    def view(self, request):
+        jobs = paginate(request, self.client.jobs.values(), prefix='jobs')
+
+        return TemplateResponse(request, 'core/client/view.html', {
+            'client': self.client,
+            'jobs': jobs,
+        })
+
+    def add_view(self, request):
+        data = request.POST or None
+        client_form = Client.Form(data)
+        connection_form = RshClientConnection.Form(data)
+        if data and client_form.is_valid() and connection_form.is_valid():
+            connection = RshClientConnection(**connection_form.cleaned_data)
+            client = Client(connection=connection, **client_form.cleaned_data)
+            transaction.get().note('Added client %s' % client.hostname)
+            transaction.commit()
+            return redirect(client_view, client.hostname)
+        return TemplateResponse(request, 'core/client/add.html', {
+            'client_form': client_form,
+            'connection_form': connection_form,
+        })
+
+    def edit_view(self, request):
+        client = self.client
+        data = request.POST or None
+        client.connection._p_activate()
+        client_form = Client.Form(data, initial=client.__dict__)
+        del client_form.fields['hostname']
+        connection_form = RshClientConnection.Form(data, initial=client.connection.__dict__)
+        if data and client_form.is_valid() and connection_form.is_valid():
+            client._update(client_form.cleaned_data)
+            client.connection._update(connection_form.cleaned_data)
+            transaction.get().note('Edited client %s' % client.hostname)
+            transaction.commit()
+            return redirect(client_view, client.hostname)
+        return TemplateResponse(request, 'core/client/edit.html', {
+            'client': client,
+            'client_form': client_form,
+            'connection_form': connection_form,
+        })
+
+
+class SchedulesPublisher(Publisher):
+    pass
+
+
+class RepositoriesPublisher(Publisher):
+    pass
+
+
+class ManagementPublisher(Publisher):
+    pass
+
+
 def object_publisher(request, path):
     path_segments = path.split('/')
+    log.warning('%r %r', path, path_segments)
     path_segments.reverse()
-    if any(segment.startswith('_') for segment in path_segments):
-        raise Http404
 
-    def resolve(path_segments, current_object):
+    def resolve(path_segments, publisher):
+        log.warning('Resolving %s', path_segments)
         try:
             segment = path_segments.pop()
+            if not segment:
+                return publisher.view
         except IndexError:
-            return current_object.view
-        if segment not in current_object.published:
-            raise Http404
+            # End of the path -> default view
+            log.exception('indexerror %r', publisher)
+            return publisher.view
+        log.warning('  Segment: %s', segment)
         try:
-            resolver = current_object.get_child
-        except AttributeError:
-            resolver = current_object.__getitem__
-        try:
-            current_object = resolver(segment)
+            publisher = publisher[segment]
         except KeyError:
+            # This segment is not published, it might be a view of the publisher
+            log.exception('keyerror %r', publisher)
             try:
+                # Canonicalize the view name, replacing HTTP-style dashes with underscores,
+                # eg. /client/foo/latest-job => /client/foo/latest_job
                 segment = segment.replace('-', '_')
-                current_object = getattr(current_object, segment)()
-            except AttributeError:
+                # Append view_ namespace eg. latest_job_view
+                view_name = segment + '_view'
+                # Make sure that this is an intentionally accessible view, not some coincidentally
+                # named method.
+                publisher.views.index(view_name)
+                return getattr(publisher, view_name)
+            except IndexError:
+                log.exception('attrerror %r', publisher)
+                # If the segment is also not a view of the publisher, it does not exist.
                 raise Http404
-        return resolve(path_segments, current_object)
+        # Recursively resolve until done.
+        return resolve(path_segments, publisher)
 
-    view = resolve(path_segments, data_root())
+    root_publisher = RootPublisher(data_root())
+    view = resolve(path_segments, root_publisher)
+    log.warning('Resolved view: %r', view)
     return view(request)

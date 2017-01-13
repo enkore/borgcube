@@ -314,8 +314,6 @@ class DataRoot(Evolvable):
             for id, job in self.jobs.items():
                 self.jobs_by_state[state][id] = job
 
-    published = {'repositories', 'clients'}
-
     def __init__(self):
         self.repositories = PersistentList()
         # hex archive id -> Archive
@@ -371,8 +369,6 @@ class DataRoot(Evolvable):
         except KeyError:
             log.debug('Initialized new data root for plugin %s', name)
             return self.ext.setdefault(name, factory())
-
-    __getitem__ = plugin_data
 
 
 class Repository(Evolvable):

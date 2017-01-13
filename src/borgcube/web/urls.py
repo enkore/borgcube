@@ -93,7 +93,8 @@ urlpatterns = [
     url(r'^javascript-i18n/$', i18n.javascript_catalog, js_info_dict),
     url(r'^static/(?P<file>[a-zA-Z0-9\.]+)$', staticfiles.staticfiles),
 
-    url(r'^(.*)/$', core_views.object_publisher),
+    url(r'^pub/$', core_views.object_publisher, kwargs={'path': '/'}),
+    url(r'^pub/(.*)/$', core_views.object_publisher),
 ]
 
 hook.borgcube_web_urlpatterns(urlpatterns=urlpatterns, js_info_dict=js_info_dict)
