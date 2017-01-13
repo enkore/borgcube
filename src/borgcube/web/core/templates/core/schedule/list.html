@@ -25,7 +25,11 @@
       <!-- TODO last execution overall outcome -->
       <td>
         <a href='{% url 'core.schedules' %}?schedule={{ forloop.counter0 }}'>
+          {% if schedule.recurrence_enabled %}
           {{ schedule.recurrence|describe_recurrence }}
+          {% else %}
+          {% trans 'recurrence disabled' %}
+          {% endif %}
         </a>
       </td>
 

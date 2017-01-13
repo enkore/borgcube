@@ -398,6 +398,8 @@ def schedules(request):
             if str(i) not in keep:
                 del schedules[i]
 
+    schedules = [schedule for schedule in schedules if schedule.recurrence_enabled]
+
     colors = [
         '#e6e6e6',
         '#d4c5f9',

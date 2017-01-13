@@ -49,8 +49,8 @@ class Command(BaseCommand):
 
                 pi = ProgressIndicatorPercent(msg='Importing archives %4.1f %%: %s', total=len(names), step=0.1)
                 for name in names:
-                    pi.show(info=[name])
                     imported += self.import_archive(manifest, cache, repository, name, client)
+                    pi.show(info=[name])
                 pi.finish()
 
         print('Imported %d archives.' % imported, file=sys.stderr)

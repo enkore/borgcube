@@ -764,10 +764,10 @@ class Schedule(Evolvable):
                         'Note that this date is <em>always</em> included in the schedule, even if it '
                         'doesn\'t match the criteria.') % settings.TIME_ZONE
         )
-        recurrence = RecurrenceField()
+        recurrence = RecurrenceField(required=False)
 
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, **kwargs)
+        def __init__(self, data, *args, **kwargs):
+            super().__init__(data, *args, **kwargs)
             if 'recurrence' in self.initial:
                 self.initial['recurrence_start'] = self.initial['recurrence'].dtstart
 
