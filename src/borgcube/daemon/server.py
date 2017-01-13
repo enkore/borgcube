@@ -454,12 +454,12 @@ class APIServer(BaseServer):
         if self.shutdown:
             self.queue.clear()
             return
-        nope = []
-        while self.queue:
-            executor_class, job = self.queue.pop()
+        queue = []
+        for executor_class, job in self.queue:
             if not executor_class.can_run(job):
-                nope.append((executor_class, job))
+                queue.append((executor_class, job))
                 continue
+
             try:
                 executor_class.prefork(job)
             except Exception:
@@ -485,4 +485,4 @@ class APIServer(BaseServer):
                 job = data_root().jobs[id]
                 executor_class.run(job)
                 sys.exit(0)
-        self.queue.extend(nope)
+        self.queue = queue
