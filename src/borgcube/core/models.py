@@ -367,7 +367,7 @@ class DataRoot(Evolvable):
         try:
             return self.ext[name]
         except KeyError:
-            log.info('Initialized new data root for plugin %s', name)
+            log.debug('Initialized new data root for plugin %s', name)
             return self.ext.setdefault(name, factory())
 
 
@@ -720,18 +720,23 @@ class Job(Evolvable):
 
 
 class Schedule(Evolvable):
-    version = 2
+    version = 3
 
     @evolve(1, 2)
     def make_dtstart_implicit(self):
         self.recurrence.dtstart = self.recurrence_start
         del self.recurrence_start
 
-    def __init__(self, name, recurrence, description=''):
+    @evolve(2, 3)
+    def add_recurrence_enabled(self):
+        self.recurrence_enabled = True
+
+    def __init__(self, name, recurrence, recurrence_enabled=True, description=''):
         self.name = name
         self.description = description
 
         self.recurrence = recurrence
+        self.recurrence_enabled = recurrence_enabled
 
         self.actions = PersistentList()
 
@@ -750,6 +755,7 @@ class Schedule(Evolvable):
         name = forms.CharField()
         description = forms.CharField(required=False, initial='', widget=forms.Textarea)
 
+        recurrence_enabled = forms.BooleanField(required=False, initial=True)
         recurrence_start = forms.DateTimeField(
             initial=timezone.now,
             help_text=_('The recurrence defined below is applied from this date and time onwards.<br/>'
