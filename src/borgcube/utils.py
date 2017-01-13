@@ -193,12 +193,12 @@ def configure_plugins():
     global pm
     global hook
     import borgcube.core.hookspec
-    import borgcube.web.core.hookspec
+    import borgcube.web.hookspec
     import borgcube.daemon.hookspec
 
     pm = pluggy.PluginManager(project_name='borgcube', implprefix='borgcube')
     pm.add_hookspecs(borgcube.core.hookspec)
-    pm.add_hookspecs(borgcube.web.core.hookspec)
+    pm.add_hookspecs(borgcube.web.hookspec)
     pm.add_hookspecs(borgcube.daemon.hookspec)
     pm.load_setuptools_entrypoints('borgcube0')
     hook = pm.hook
