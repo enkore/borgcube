@@ -743,6 +743,20 @@ class Publisher:
     decouples components very efficiently, since URLs are both resolved and generated
     by the hierarchy, so plugins can just "hook into" the system and don't need to
     bother defining URLs that don't conflict with core URLs.
+
+    .. rubric:: Extra views
+
+    Additional views can be added by adding *something_view* methods and adding it to
+    the `views` property::
+
+        class MyPublisher(Publisher):
+            views = ('edit', )
+
+            def view(self, request):
+                ...
+
+            def edit_view(self, request):
+                ...
     """
     companion = 'companion'
     views = ()
