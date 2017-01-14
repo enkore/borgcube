@@ -786,6 +786,50 @@ class Publisher:
             path += view + '/'
         return path
 
+    def resolve(self, path_segments):
+        """
+        Resolve reversed *path_segments* to a view or raise `Http404`.
+
+        Note: *path_segments* can be destroyed.
+        """
+        try:
+            segment = path_segments.pop()
+            if not segment:
+                return self.view
+        except IndexError:
+            # End of the path -> default view
+            return self.view
+
+        try:
+            child = self[segment]
+            child.segment = segment
+            return child.resolve(path_segments)
+        except KeyError:
+            # This segment is not published, it might be a view of the publisher
+
+            # Canonicalize the view name, replacing HTTP-style dashes with underscores,
+            # eg. /client/foo/latest-job => /client/foo/latest_job
+            segment = segment.replace('-', '_')
+
+            try:
+                # Make sure that this is an intentionally accessible view, not some coincidentally
+                # named method.
+                self.views.index(segment)
+            except ValueError:
+                # If the segment is not a view of the publisher, it does not exist in it,
+                # but a plugin might have something.
+                child = hook.borgcube_web_publish(publisher=self, segment=segment)
+                if child:
+                    # A plugin publisher is mounted here, resolve further.
+                    return child.resolve(path_segments)
+                else:
+                    # No matches at all -> 404.
+                    raise Http404
+
+            # Append view_ namespace eg. latest_job_view
+            view_name = segment + '_view'
+            return True, getattr(self, view_name)
+
     def view(self, request):
         """
         The default view of this object.
@@ -1056,6 +1100,11 @@ class RepositoriesPublisher(Publisher):
 class ManagementPublisher(Publisher):
     name = 'management'
 
+    def view(self, request):
+        return TemplateResponse(request, 'management.html', {
+            'management': True
+        })
+
 
 def resolve(path_segments, publisher):
     """
@@ -1116,5 +1165,5 @@ def object_publisher(request, path):
     path_segments.reverse()
 
     root_publisher = RootPublisher(data_root())
-    view = resolve(path_segments, root_publisher)
+    view = root_publisher.resolve(path_segments)
     return view(request)
