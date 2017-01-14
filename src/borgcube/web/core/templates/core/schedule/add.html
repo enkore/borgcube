@@ -47,12 +47,14 @@
           <hr style='margin-top: 2em; margin-left: 1em;'>
           <div style='clear:both;'></div>
 
-          {% blocktrans %}
-          <p>In this area you can setup what will happen on this schedule by adding separate actions,
-            typically initiating a backup, repository check or similar. All actions will be scheduled at
-            the time indicated above and the order presented here and will be processed by the system
-            as soon as possible.</p>
-          {% endblocktrans %}
+          <div class='longtext'>
+            {% blocktrans %}
+            <p>In this area you can setup what will happen on this schedule by adding separate actions,
+              typically initiating a backup, repository check or similar. All actions will be scheduled at
+              the time indicated above and the order presented here and will be processed by the system
+              as soon as possible.</p>
+            {% endblocktrans %}
+          </div>
 
           <select name='_doesntmatter' id='action-selector' size=1>
             {% for class, name in classes.items %}

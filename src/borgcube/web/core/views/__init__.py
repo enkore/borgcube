@@ -2,6 +2,8 @@ import logging
 import itertools
 import json
 
+from urllib.parse import quote as urlquote, unquote as urlunquote
+
 from django import forms
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.http import Http404
@@ -683,11 +685,13 @@ class Publisher:
     views = ()
 
     @classmethod
-    def factory(cls, companion):
-        return partial(cls, companion)
+    def factory(cls, companion, parent=None):
+        return partial(cls, companion, parent)
 
-    def __init__(self, companion):
+    def __init__(self, companion, parent=None, segment=None):
         setattr(self, type(self).companion, companion)
+        self.parent = parent
+        self.segment = segment
 
     def children(self):
         """
@@ -707,6 +711,16 @@ class Publisher:
         except TypeError:
             return v
 
+    def reverse(self, view=None):
+        assert self.parent, 'Cannot reverse Publisher without a parent'
+        path = self.parent.reverse()
+        assert path.endswith('/'), 'Incorrect Publisher.reverse result: did not end in a slash?'
+        path += urlquote(self.segment) + '/'
+        if view:
+            view = view.replace('_', '-')
+            path += view + '/'
+        return path
+
     def view(self, request):
         """
         The default view of this object.
@@ -719,10 +733,10 @@ class RootPublisher(Publisher):
 
     def children(self):
         return {
-            'clients': ClientsPublisher.factory(self.dr.clients),
-            'schedules': SchedulesPublisher.factory(self.dr.schedules),
-            'repositories': RepositoriesPublisher.factory(self.dr.repositories),
-            'management': ManagementPublisher.factory(self.dr.ext),
+            'clients': ClientsPublisher.factory(self.dr.clients, self),
+            'schedules': SchedulesPublisher.factory(self.dr.schedules, self),
+            'repositories': RepositoriesPublisher.factory(self.dr.repositories, self),
+            'management': ManagementPublisher.factory(self.dr.ext, self),
         }
 
     def view(self, request):
@@ -732,6 +746,9 @@ class RootPublisher(Publisher):
             'recent_jobs': recent_jobs,
         })
 
+    def reverse(self, view=None):
+        return '/pub/'
+
 
 class ClientsPublisher(Publisher):
     companion = 'clients'
@@ -739,7 +756,7 @@ class ClientsPublisher(Publisher):
 
     def __getitem__(self, hostname):
         client = self.clients[hostname]
-        return ClientPublisher(client)
+        return ClientPublisher(client, self)
 
     def view(self, request):
         return TemplateResponse(request, 'core/client/list.html', {
@@ -865,7 +882,7 @@ class SchedulesPublisher(Publisher):
             schedule = self.schedules[int(index)]
         except ValueError:
             raise KeyError(index)
-        return SchedulePublisher(schedule)
+        return SchedulePublisher(schedule, self)
 
     def view(self, request):
         try:
@@ -989,6 +1006,8 @@ def object_publisher(request, path):
             return publisher.view
         try:
             publisher = publisher[segment]
+            publisher.segment = segment
+            log.error('Publisher %s -> %s', publisher, publisher.reverse())
         except KeyError:
             # This segment is not published, it might be a view of the publisher
 
@@ -1003,6 +1022,8 @@ def object_publisher(request, path):
             except ValueError:
                 # If the segment is not a view of the publisher, it does not exist.
                 raise Http404
+
+            log.error('Publisher %s -> %s', publisher, publisher.reverse(view=segment))
 
             # Append view_ namespace eg. latest_job_view
             view_name = segment + '_view'
