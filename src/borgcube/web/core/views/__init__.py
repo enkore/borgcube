@@ -680,6 +680,11 @@ def prune_config_delete(request, config_id):
 from functools import partial
 
 
+class PublisherMenu:
+    menu_descend = False
+    menu_text = ''
+
+
 class Publisher:
     """
     Core class of the object publishing system.
