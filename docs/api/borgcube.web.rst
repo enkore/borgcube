@@ -39,5 +39,4 @@ borgcube.web.core.views module
 
 .. automodule:: borgcube.web.core.views
     :members:
-    :undoc-members:
     :show-inheritance:

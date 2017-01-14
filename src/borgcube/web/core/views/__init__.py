@@ -21,7 +21,7 @@ from borgcube.core.models import Client, Repository, RshClientConnection
 from borgcube.core.models import Job
 from borgcube.core.models import Schedule, ScheduledAction
 from borgcube.daemon.client import APIClient
-from borgcube.utils import data_root, find_oid_or_404
+from borgcube.utils import data_root, find_oid_or_404, hook
 
 from borgcube.job.backup import BackupConfig
 from borgcube.job.check import CheckConfig
@@ -751,6 +751,13 @@ class Publisher:
         self.parent = parent
         self.segment = segment
 
+    @property
+    def name(self):
+        """
+        Name of the publisher for hookspec purposes. Defaults to *self.companion*.
+        """
+        return self.companion
+
     def children(self):
         """
         Return a mapping of child names to child publishers or factories.
@@ -1047,7 +1054,7 @@ class RepositoriesPublisher(Publisher):
 
 
 class ManagementPublisher(Publisher):
-    pass
+    name = 'management'
 
 
 def resolve(path_segments, publisher):
@@ -1081,8 +1088,15 @@ def resolve(path_segments, publisher):
             # named method.
             publisher.views.index(segment)
         except ValueError:
-            # If the segment is not a view of the publisher, it does not exist.
-            raise Http404
+            # If the segment is not a view of the publisher, it does not exist in it,
+            # but a plugin might have something.
+            publisher = hook.borgcube_web_publish(publisher=publisher, segment=segment)
+            if publisher:
+                # A plugin publisher is mounted here, resolve further.
+                return resolve(path_segments, publisher)
+            else:
+                # No matches at all -> 404.
+                raise Http404
 
         log.error('Publisher %s -> %s', publisher, publisher.reverse(view=segment))
 
