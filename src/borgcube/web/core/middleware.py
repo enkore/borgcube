@@ -7,6 +7,7 @@ import transaction
 from ZODB.POSException import StorageError
 
 from borgcube import utils
+from borgcube.web.core.views import RootPublisher
 
 log = logging.getLogger(__name__)
 
@@ -45,9 +46,28 @@ class SidebarMiddleware:
         except (AttributeError, KeyError):
             return response
 
-        context['management'] = nav = []
-        utils.hook.borgcube_web_management_nav(nav=nav)
-        self.process_menu_items(nav)
+        mp = RootPublisher(utils.data_root()).resolve(['management'])
+
+        def construct(pub):
+            try:
+                descend = pub.menu_descend
+            except AttributeError:
+                descend = False
+            if not descend:
+                return
+            text = pub.menu_text
+            items = []
+            for pub in pub.children().values():
+                e = construct(pub)
+                if e:
+                    items.append(e)
+            return {
+                'text': text,
+                'items': items,
+            }
+
+        context['management'] = construct(mp)
+
         return response
 
 

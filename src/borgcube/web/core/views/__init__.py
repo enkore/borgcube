@@ -1111,57 +1111,6 @@ class ManagementPublisher(Publisher):
         })
 
 
-def resolve(path_segments, publisher):
-    """
-    Resolve a reversed list of *path_segments* to a view, starting from *publisher*.
-
-    To eg. resolve '/much/foo/bar' the path has to be split and then reversed, to
-    get `(bar, foo, much)`. The resolver then recursively resolves each segment,
-    either terminating and returning a view or raising `Http404`.
-    """
-    try:
-        segment = path_segments.pop()
-        if not segment:
-            return publisher.view
-    except IndexError:
-        # End of the path -> default view
-        return publisher.view
-    try:
-        publisher = publisher[segment]
-        publisher.segment = segment
-        log.error('Publisher %s -> %s', publisher, publisher.reverse())
-    except KeyError:
-        # This segment is not published, it might be a view of the publisher
-
-        # Canonicalize the view name, replacing HTTP-style dashes with underscores,
-        # eg. /client/foo/latest-job => /client/foo/latest_job
-        segment = segment.replace('-', '_')
-
-        try:
-            # Make sure that this is an intentionally accessible view, not some coincidentally
-            # named method.
-            publisher.views.index(segment)
-        except ValueError:
-            # If the segment is not a view of the publisher, it does not exist in it,
-            # but a plugin might have something.
-            publisher = hook.borgcube_web_publish(publisher=publisher, segment=segment)
-            if publisher:
-                # A plugin publisher is mounted here, resolve further.
-                return resolve(path_segments, publisher)
-            else:
-                # No matches at all -> 404.
-                raise Http404
-
-        log.error('Publisher %s -> %s', publisher, publisher.reverse(view=segment))
-
-        # Append view_ namespace eg. latest_job_view
-        view_name = segment + '_view'
-        return getattr(publisher, view_name)
-
-    # Recursively resolve until done.
-    return resolve(path_segments, publisher)
-
-
 def object_publisher(request, path):
     """
     Renders a *path* against the *RootPublisher*.

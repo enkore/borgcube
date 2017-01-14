@@ -77,7 +77,7 @@ from borgcube.job.prune import prune_root, RetentionPolicy
 class PrunePublisher(Publisher, PublisherMenu):
     companion = 'pr'
     menu_descend = True
-    menu_title = ugettext_lazy('Pruning')
+    menu_text = ugettext_lazy('Pruning')
 
     def children(self):
         return {
@@ -95,7 +95,7 @@ class PoliciesPublisher(Publisher, PublisherMenu):
     companion = 'policies'
     views = ('add', )
     menu_descend = False
-    menu_title = ugettext_lazy('Retention policies')
+    menu_text = ugettext_lazy('Retention policies')
 
     def children(self):
         return {policy.oid: PolicyPublisher(policy, self) for policy in self.policies}
