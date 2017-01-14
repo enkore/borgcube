@@ -680,6 +680,7 @@ from functools import partial
 
 class Publisher:
     companion = 'companion'
+    views = ()
 
     @classmethod
     def factory(cls, companion):
@@ -734,6 +735,7 @@ class RootPublisher(Publisher):
 
 class ClientsPublisher(Publisher):
     companion = 'clients'
+    views = ('add',)
 
     def __getitem__(self, hostname):
         client = self.clients[hostname]
@@ -743,19 +745,6 @@ class ClientsPublisher(Publisher):
         return TemplateResponse(request, 'core/client/list.html', {
             'm': Client,
             'clients': self.clients.values(),
-        })
-
-
-class ClientPublisher(Publisher):
-    companion = 'client'
-    views = ('add', 'edit')
-
-    def view(self, request):
-        jobs = paginate(request, self.client.jobs.values(), prefix='jobs')
-
-        return TemplateResponse(request, 'core/client/view.html', {
-            'client': self.client,
-            'jobs': jobs,
         })
 
     def add_view(self, request):
@@ -771,6 +760,19 @@ class ClientPublisher(Publisher):
         return TemplateResponse(request, 'core/client/add.html', {
             'client_form': client_form,
             'connection_form': connection_form,
+        })
+
+
+class ClientPublisher(Publisher):
+    companion = 'client'
+    views = ('edit',)
+
+    def view(self, request):
+        jobs = paginate(request, self.client.jobs.values(), prefix='jobs')
+
+        return TemplateResponse(request, 'core/client/view.html', {
+            'client': self.client,
+            'jobs': jobs,
         })
 
     def edit_view(self, request):
@@ -793,8 +795,176 @@ class ClientPublisher(Publisher):
         })
 
 
+def schedule_add_and_edit(request, data, schedule=None, context=None):
+    if schedule:
+        schedule._p_activate()
+        form = Schedule.Form(data, initial=schedule.__dict__)
+    else:
+        form = Schedule.Form(data)
+    action_forms = []
+
+    # This generally works since pluggy loads plugin modules for us.
+    classes = ScheduledAction.__subclasses__()
+    log.debug('Discovered schedulable actions: %s', ', '.join(cls.dotted_path() for cls in classes))
+
+    if schedule:
+        for scheduled_action in schedule.actions:
+            scheduled_action._p_activate()
+            action_form = scheduled_action.form(initial=scheduled_action.__dict__)
+            action_forms.append(action_form)
+
+    if data:
+        actions_data = json.loads(data['actions-data'])
+        all_valid = form.is_valid()
+        txn = transaction.get()
+
+        if all_valid:
+            if schedule:
+                schedule.actions.clear()
+                schedule._update(form.cleaned_data)
+                txn.note('Edited schedule %s' % schedule.oid)
+            else:
+                schedule = Schedule(**form.cleaned_data)
+                data_root().schedules.append(schedule)
+                txn.note('Added schedule %s' % schedule.name)
+
+        for serialized_action in actions_data:
+            dotted_path = serialized_action.pop('class')
+            action = ScheduledAction.get_class(dotted_path)
+            if not action:
+                log.error('invalid/unknown schedulable action %r, ignoring', dotted_path)
+                continue
+            action_form = action.form(serialized_action)
+
+            valid = action_form.is_valid()
+            all_valid &= valid
+            if all_valid:
+                scheduled_action = action(schedule, **action_form.cleaned_data)
+                schedule.actions.append(scheduled_action)
+                txn.note(' - Added scheduled action %s' % scheduled_action.dotted_path())
+            action_forms.append(action_form)
+
+        if all_valid:
+            txn.commit()
+            return redirect(schedules)
+    context = dict(context or {})
+    context.update({
+        'form': form,
+        'classes': {cls.dotted_path(): cls.name for cls in classes},
+        'action_forms': action_forms,
+    })
+    return TemplateResponse(request, 'core/schedule/add.html', context)
+
+
 class SchedulesPublisher(Publisher):
-    pass
+    companion = 'schedules'
+    views = ('list', )
+
+    def __getitem__(self, index):
+        try:
+            schedule = self.schedules[int(index)]
+        except ValueError:
+            raise KeyError(index)
+        return SchedulePublisher(schedule)
+
+    def view(self, request):
+        try:
+            month = localtime(now()).replace(year=int(request.GET['year']), month=int(request.GET['month']), day=1)
+        except (KeyError, TypeError):
+            month = localtime(now())
+        sheet = CalendarSheet(month)
+        schedules = self.schedules
+
+        keep = request.GET.getlist('schedule')
+        if keep:
+            for i, schedule in reversed(list(enumerate(schedules))):
+                if str(i) not in keep:
+                    del schedules[i]
+
+        schedules = [schedule for schedule in schedules if schedule.recurrence_enabled]
+
+        colors = [
+            '#e6e6e6',
+            '#d4c5f9',
+            '#fef2c0',
+            '#f9d0c4',
+        ]
+
+        if len(schedules) > 1:
+            for schedule in schedules:
+                try:
+                    schedule.color = colors.pop()
+                except IndexError:
+                    schedule.color = None
+
+        for week in sheet.weeks:
+            for day in week.days:
+                day.schedules = []
+                for schedule in schedules:
+                    # Even with the cache there is still a scalability problem here in that rrule evaluation is
+                    # strictly linear, so the further you go from DTSTART the more intermediary occurences are computed,
+                    # so it'll only get slower (this is pretty much irrelevant for hourly and slower recurrence, so somewhat
+                    # academic). It's *probably* possible to give an algorithm that calculates a new DTSTART for infinite
+                    # recurrences that doesn't otherwise change the recurrence series, but I can't even begin to formulate
+                    # one. However, there are certain trivial cases where such an algorithm would be trivial as well, so
+                    # that'd be your solution right there.
+                    occurences = schedule.recurrence.between(day.begin, day.end, cache=True, inc=True)
+                    if occurences:
+                        occurs = []
+                        for occurence in occurences[:5]:
+                            occurs.append(occurence.time().strftime('%X'))
+                        if len(occurences) > 5:
+                            occurs.append('…')
+                        schedule.occurs = ', '.join(occurs)
+                        day.schedules.append(schedule)
+
+        return TemplateResponse(request, 'core/schedule/schedule.html', {
+            'calsheet': sheet,
+            'schedules': schedules,
+            'prev_month': sheet.month - relativedelta(months=1),
+            'next_month': sheet.month + relativedelta(months=1),
+        })
+
+    def list_view(self, request):
+        return TemplateResponse(request, 'core/schedule/list.html', {
+            'm': Schedule,
+            'schedules': self.schedules,
+        })
+
+    def add_view(self, request):
+        data = request.POST or None
+        return schedule_add_and_edit(request, data, context={
+            'title': _('Add schedule'),
+            'submit': _('Add schedule'),
+        })
+
+
+class SchedulePublisher(Publisher):
+    companion = 'schedule'
+    views = ('delete', 'action_form', )
+
+    def view(self, request):
+        data = request.POST or None
+        return schedule_add_and_edit(request, data, self.schedule, context={
+            'title': _('Edit schedule {}').format(self.schedule.name),
+            'submit': _('Save changes'),
+            'schedule': self.schedule,
+        })
+
+    def delete_view(self, request):
+        if request.method == 'POST':
+            data_root().schedules.remove(self.schedule)
+            transaction.get().note('Deleted schedule %s' % self.schedule.oid)
+            transaction.commit()
+        return redirect(schedules)
+
+    def action_form_view(self, request):
+        dotted_path = request.GET.get('class')
+        cls = ScheduledAction.get_class(dotted_path)
+        if not cls:
+            log.error('scheduled_action_form request for %r which is not a schedulable action', dotted_path)
+            return HttpResponseBadRequest()
+        return HttpResponse(cls.Form().as_table())
 
 
 class RepositoriesPublisher(Publisher):
@@ -807,43 +977,40 @@ class ManagementPublisher(Publisher):
 
 def object_publisher(request, path):
     path_segments = path.split('/')
-    log.warning('%r %r', path, path_segments)
     path_segments.reverse()
 
     def resolve(path_segments, publisher):
-        log.warning('Resolving %s', path_segments)
         try:
             segment = path_segments.pop()
             if not segment:
                 return publisher.view
         except IndexError:
             # End of the path -> default view
-            log.exception('indexerror %r', publisher)
             return publisher.view
-        log.warning('  Segment: %s', segment)
         try:
             publisher = publisher[segment]
         except KeyError:
             # This segment is not published, it might be a view of the publisher
-            log.exception('keyerror %r', publisher)
+
+            # Canonicalize the view name, replacing HTTP-style dashes with underscores,
+            # eg. /client/foo/latest-job => /client/foo/latest_job
+            segment = segment.replace('-', '_')
+
             try:
-                # Canonicalize the view name, replacing HTTP-style dashes with underscores,
-                # eg. /client/foo/latest-job => /client/foo/latest_job
-                segment = segment.replace('-', '_')
-                # Append view_ namespace eg. latest_job_view
-                view_name = segment + '_view'
                 # Make sure that this is an intentionally accessible view, not some coincidentally
                 # named method.
-                publisher.views.index(view_name)
-                return getattr(publisher, view_name)
-            except IndexError:
-                log.exception('attrerror %r', publisher)
-                # If the segment is also not a view of the publisher, it does not exist.
+                publisher.views.index(segment)
+            except ValueError:
+                # If the segment is not a view of the publisher, it does not exist.
                 raise Http404
+
+            # Append view_ namespace eg. latest_job_view
+            view_name = segment + '_view'
+            return getattr(publisher, view_name)
+
         # Recursively resolve until done.
         return resolve(path_segments, publisher)
 
     root_publisher = RootPublisher(data_root())
     view = resolve(path_segments, root_publisher)
-    log.warning('Resolved view: %r', view)
     return view(request)
