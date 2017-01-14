@@ -757,6 +757,9 @@ class Publisher:
 
             def edit_view(self, request):
                 ...
+
+    In the URL hierarchy these are rendered as a segment starting with a colon and
+    continuing with the view name, eg. */clients/foo/:edit*.
     """
     companion = 'companion'
     views = ()
@@ -802,7 +805,7 @@ class Publisher:
         path += urlquote(self.segment) + '/'
         if view:
             view = view.replace('_', '-')
-            path += view + '/'
+            path += ':' + view + '/'
         return path
 
     def resolve(self, path_segments):
@@ -811,6 +814,18 @@ class Publisher:
 
         Note: *path_segments* can be destroyed.
         """
+
+        def out_of_hierarchy(segment):
+            # If the segment is not a view of the publisher, it does not exist in it,
+            # but a plugin might have something.
+            child = hook.borgcube_web_publish(publisher=self, segment=segment)
+            if child:
+                # A plugin publisher is mounted here, resolve further.
+                return child.resolve(path_segments)
+            else:
+                # No matches at all -> 404.
+                raise Http404
+
         try:
             segment = path_segments.pop()
             if not segment:
@@ -819,35 +834,29 @@ class Publisher:
             # End of the path -> default view
             return self.view
 
-        try:
-            child = self[segment]
-            child.segment = segment
-            return child.resolve(path_segments)
-        except KeyError:
-            # This segment is not published, it might be a view of the publisher
-
+        if segment.startswith(':'):
             # Canonicalize the view name, replacing HTTP-style dashes with underscores,
             # eg. /client/foo/latest-job => /client/foo/latest_job
-            segment = segment.replace('-', '_')
+            segment = segment[1:].replace('-', '_')
 
             try:
                 # Make sure that this is an intentionally accessible view, not some coincidentally
                 # named method.
                 self.views.index(segment)
             except ValueError:
-                # If the segment is not a view of the publisher, it does not exist in it,
-                # but a plugin might have something.
-                child = hook.borgcube_web_publish(publisher=self, segment=segment)
-                if child:
-                    # A plugin publisher is mounted here, resolve further.
-                    return child.resolve(path_segments)
-                else:
-                    # No matches at all -> 404.
-                    raise Http404
+                return out_of_hierarchy(segment)
 
             # Append view_ namespace eg. latest_job_view
             view_name = segment + '_view'
-            return True, getattr(self, view_name)
+            return getattr(self, view_name)
+        else:
+            try:
+                child = self[segment]
+                child.segment = segment
+                return child.resolve(path_segments)
+            except KeyError:
+                # This segment is not published, it might be a view of the publisher
+                return out_of_hierarchy(segment)
 
     def view(self, request):
         """
