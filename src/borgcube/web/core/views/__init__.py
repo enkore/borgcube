@@ -681,6 +681,64 @@ from functools import partial
 
 
 class Publisher:
+    """
+    Core class of the object publishing system.
+
+    Since the core of BorgCube is not tied to the web interface, objects do not directly
+    implement object publishing protocols like usually done in eg. Zope or Pyramid.
+
+    Instead a second hierarchy of object exists, the *publishers*, that only contain web-
+    related functionality. Every publisher instance is bound to a *companion*, the core
+    object that it renders. The `companion` attribute defines how the instance attribute
+    shall be named.
+
+    A publisher can have multiple views, but by default only has it's default view.
+
+    A publisher can either have a "relatively static" number of children, by implementing
+    `children` and returning a mapping of segments to child publisher instances or factories,
+    or a "rather dynamic" number of children, by implementing `__getitem__`.
+
+    The first case is usually used if the children are static, eg. the `RootPublisher`
+    has fixed children (`ClientsPublisher`, `SchedulesPublisher`, ...), while the second
+    case is best applied if the children are sourced from the database, since
+    only one publisher, for the requested child, needs to be constructed.
+
+    An example best illustrates this::
+
+        class RootPublisher(Publisher):
+            companion = 'dr'
+
+            def children(self):
+                return {
+                    'clients': ClientsPublisher.factory(self.dr.clients, self),
+                    'schedules': SchedulesPublisher.factory(self.dr.schedules, self),
+                    # ...
+                }
+
+    Note how `Publisher.factory` directly provides a factory.
+
+    On the other hand, here is how `ClientsPublisher` handles it's children::
+
+        class ClientsPublisher(Publisher):
+            companion = 'clients'
+
+            def __getitem__(self, hostname):
+                client = self.clients[hostname]
+                return ClientPublisher(client, self)
+
+    Note that, since `ClientsPublisher` was provided by `RootPublisher` the companion
+    of `ClientsPublisher` is `data_root().clients` -- so `__getitem__` here only
+    loads the required client from the database.
+
+    Also note how no extra error handling is required: *clients* is already a mapping
+    itself, so if no client with *hostname* exists it will raise `KeyError`.
+
+    This might seem a bit confusing and convoluted, however, it allows implicit
+    URL generation and avoids having to define many URL patterns by hand. It also
+    decouples components very efficiently, since URLs are both resolved and generated
+    by the hierarchy, so plugins can just "hook into" the system and don't need to
+    bother defining URLs that don't conflict with core URLs.
+    """
     companion = 'companion'
     views = ()
 
@@ -992,45 +1050,56 @@ class ManagementPublisher(Publisher):
     pass
 
 
+def resolve(path_segments, publisher):
+    """
+    Resolve a reversed list of *path_segments* to a view, starting from *publisher*.
+
+    To eg. resolve '/much/foo/bar' the path has to be split and then reversed, to
+    get `(bar, foo, much)`. The resolver then recursively resolves each segment,
+    either terminating and returning a view or raising `Http404`.
+    """
+    try:
+        segment = path_segments.pop()
+        if not segment:
+            return publisher.view
+    except IndexError:
+        # End of the path -> default view
+        return publisher.view
+    try:
+        publisher = publisher[segment]
+        publisher.segment = segment
+        log.error('Publisher %s -> %s', publisher, publisher.reverse())
+    except KeyError:
+        # This segment is not published, it might be a view of the publisher
+
+        # Canonicalize the view name, replacing HTTP-style dashes with underscores,
+        # eg. /client/foo/latest-job => /client/foo/latest_job
+        segment = segment.replace('-', '_')
+
+        try:
+            # Make sure that this is an intentionally accessible view, not some coincidentally
+            # named method.
+            publisher.views.index(segment)
+        except ValueError:
+            # If the segment is not a view of the publisher, it does not exist.
+            raise Http404
+
+        log.error('Publisher %s -> %s', publisher, publisher.reverse(view=segment))
+
+        # Append view_ namespace eg. latest_job_view
+        view_name = segment + '_view'
+        return getattr(publisher, view_name)
+
+    # Recursively resolve until done.
+    return resolve(path_segments, publisher)
+
+
 def object_publisher(request, path):
+    """
+    Renders a *path* against the *RootPublisher*.
+    """
     path_segments = path.split('/')
     path_segments.reverse()
-
-    def resolve(path_segments, publisher):
-        try:
-            segment = path_segments.pop()
-            if not segment:
-                return publisher.view
-        except IndexError:
-            # End of the path -> default view
-            return publisher.view
-        try:
-            publisher = publisher[segment]
-            publisher.segment = segment
-            log.error('Publisher %s -> %s', publisher, publisher.reverse())
-        except KeyError:
-            # This segment is not published, it might be a view of the publisher
-
-            # Canonicalize the view name, replacing HTTP-style dashes with underscores,
-            # eg. /client/foo/latest-job => /client/foo/latest_job
-            segment = segment.replace('-', '_')
-
-            try:
-                # Make sure that this is an intentionally accessible view, not some coincidentally
-                # named method.
-                publisher.views.index(segment)
-            except ValueError:
-                # If the segment is not a view of the publisher, it does not exist.
-                raise Http404
-
-            log.error('Publisher %s -> %s', publisher, publisher.reverse(view=segment))
-
-            # Append view_ namespace eg. latest_job_view
-            view_name = segment + '_view'
-            return getattr(publisher, view_name)
-
-        # Recursively resolve until done.
-        return resolve(path_segments, publisher)
 
     root_publisher = RootPublisher(data_root())
     view = resolve(path_segments, root_publisher)

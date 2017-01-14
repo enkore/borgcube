@@ -33,3 +33,11 @@ borgcube.web.core.templatetags.borgcube module
     :members:
     :undoc-members:
     :show-inheritance:
+
+borgcube.web.core.views module
+------------------------------
+
+.. automodule:: borgcube.web.core.views
+    :members:
+    :undoc-members:
+    :show-inheritance:
