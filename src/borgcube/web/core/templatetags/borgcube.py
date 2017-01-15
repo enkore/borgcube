@@ -139,8 +139,11 @@ def format_timedelta(td):
 def get(obj, attr):
     """Look value of an object up through a variable (instead of a fixed name as in obj.a)"""
     try:
-        return obj.get(attr)
-    except AttributeError:
+        try:
+            return obj.get(attr)
+        except AttributeError:
+            return obj[attr]
+    except TypeError:
         return getattr(obj, attr)
 
 

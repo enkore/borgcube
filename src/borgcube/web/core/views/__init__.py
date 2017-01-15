@@ -798,8 +798,12 @@ class Publisher:
         except TypeError:
             return v
 
+    def redirect_to(self, view=None):
+        return redirect(self.reverse(view))
+
     def reverse(self, view=None):
         assert self.parent, 'Cannot reverse Publisher without a parent'
+        assert self.segment, 'Cannot reverse Publisher without segment'
         path = self.parent.reverse()
         assert path.endswith('/'), 'Incorrect Publisher.reverse result: did not end in a slash?'
         path += urlquote(self.segment) + '/'
@@ -910,7 +914,7 @@ class ClientsPublisher(Publisher):
             client = Client(connection=connection, **client_form.cleaned_data)
             transaction.get().note('Added client %s' % client.hostname)
             transaction.commit()
-            return redirect(client_view, client.hostname)
+            return self.redirect_to()
         return TemplateResponse(request, 'core/client/add.html', {
             'client_form': client_form,
             'connection_form': connection_form,
@@ -923,7 +927,6 @@ class ClientPublisher(Publisher):
 
     def view(self, request):
         jobs = paginate(request, self.client.jobs.values(), prefix='jobs')
-
         return TemplateResponse(request, 'core/client/view.html', {
             'client': self.client,
             'jobs': jobs,
@@ -941,7 +944,7 @@ class ClientPublisher(Publisher):
             client.connection._update(connection_form.cleaned_data)
             transaction.get().note('Edited client %s' % client.hostname)
             transaction.commit()
-            return redirect(client_view, client.hostname)
+            return self.redirect_to()
         return TemplateResponse(request, 'core/client/edit.html', {
             'client': client,
             'client_form': client_form,
@@ -1000,7 +1003,7 @@ def schedule_add_and_edit(request, data, schedule=None, context=None):
 
         if all_valid:
             txn.commit()
-            return redirect(schedules)
+            return request.publisher.redirect_to()
     context = dict(context or {})
     context.update({
         'form': form,
@@ -1110,6 +1113,7 @@ class SchedulePublisher(Publisher):
             data_root().schedules.remove(self.schedule)
             transaction.get().note('Deleted schedule %s' % self.schedule.oid)
             transaction.commit()
+            return self.parent.redirect_to()
         return redirect(schedules)
 
     def action_form_view(self, request):
@@ -1143,4 +1147,11 @@ def object_publisher(request, path):
 
     root_publisher = RootPublisher(data_root())
     view = root_publisher.resolve(path_segments)
+
+    try:
+        request.publisher = view.__self__
+    except AttributeError:
+        # We don't explicitly prohibit the resolver to return a view callable that isn't
+        # part of a publisher.
+        pass
     return view(request)
