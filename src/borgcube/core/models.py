@@ -407,7 +407,7 @@ class Repository(Evolvable):
             if repository.oid == oid:
                 return repository
         else:
-            raise Http404
+            raise KeyError
 
     class Form(forms.Form):
         name = forms.CharField()

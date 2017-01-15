@@ -74,6 +74,12 @@ js_info_dict = {
 
 
 urlpatterns = [
+    url(r'^javascript-i18n/$', i18n.javascript_catalog, js_info_dict),
+    url(r'^static/(?P<file>[a-zA-Z0-9\.]+)$', staticfiles.staticfiles),
+
+    url(r'^$', core_views.object_publisher, kwargs={'path': '/'}),
+    url(r'^(.*)/$', core_views.object_publisher),
+
     url(r'^$', core_views.dashboard, name='core.dashboard'),
     url(r'^clients/$', core_views.clients, name='core.clients'),
     url(r'^clients/add/$', core_views.client_add, name='core.client_add'),
@@ -90,11 +96,6 @@ urlpatterns = [
     url(r'^management/$', core_views.management, name='core.management'),
     url(r'^management/prune/', include(prune_urls)),
 
-    url(r'^javascript-i18n/$', i18n.javascript_catalog, js_info_dict),
-    url(r'^static/(?P<file>[a-zA-Z0-9\.]+)$', staticfiles.staticfiles),
-
-    url(r'^pub/$', core_views.object_publisher, kwargs={'path': '/'}),
-    url(r'^pub/(.*)/$', core_views.object_publisher),
 ]
 
 hook.borgcube_web_urlpatterns(urlpatterns=urlpatterns, js_info_dict=js_info_dict)

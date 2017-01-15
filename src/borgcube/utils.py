@@ -76,7 +76,7 @@ def find_oid_or_404(iterable, oid):
         if object.oid == oid:
             return object
     else:
-        raise Http404
+        raise KeyError
 
 
 def validate_regex(regex):
