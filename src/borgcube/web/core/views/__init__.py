@@ -794,6 +794,12 @@ class Publisher:
         return self.children_hook({})
 
     def children_hook(self, children):
+        """
+        Post-process result of `children`.
+
+        This adds plugin children via `borgcube_web_children` and ensures that all
+        children know their parent and segment.
+        """
         list_of_children = hook.borgcube_web_children(publisher=self, children=children)
         for c in list_of_children:
             for k, v in c.items():
@@ -876,12 +882,13 @@ class Publisher:
             child.segment = segment
             return child.resolve(path_segments, view)
         except KeyError:
-            # This segment is not published, it might be a view of the publisher
             return out_of_hierarchy(segment)
 
     def view(self, request):
         """
         The default view of this object.
+
+        This implementation raises `Http404`.
         """
         raise Http404
 
