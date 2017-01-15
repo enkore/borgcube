@@ -49,3 +49,10 @@ def borgcube_web_resolve(publisher, segment):
     """
 
     """
+
+
+@hookspec
+def borgcube_web_children(publisher, children):
+    """
+
+    """

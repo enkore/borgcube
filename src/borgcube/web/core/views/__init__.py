@@ -783,8 +783,28 @@ class Publisher:
     def children(self):
         """
         Return a mapping of child names to child publishers or factories.
+
+        Make sure to call into `children_hook`, like so::
+
+            def children(self):
+                return self.children_hook({
+                    ...
+                })
         """
-        return {}
+        return self.children_hook({})
+
+    def children_hook(self, children):
+        list_of_children = hook.borgcube_web_children(publisher=self, children=children)
+        for c in list_of_children:
+            for k, v in c.items():
+                if k in children:
+                    log.warning('%s: duplicate child %s (%s)', self, k, v)
+                    continue
+            children.update(c)
+        for k, v in children.items():
+            v.segment = k
+            v.parent = self
+        return children
 
     def __getitem__(self, item):
         """
@@ -871,12 +891,12 @@ class RootPublisher(Publisher):
     views = ()
 
     def children(self):
-        return {
+        return self.children_hook({
             'clients': ClientsPublisher.factory(self.dr.clients, self),
             'schedules': SchedulesPublisher.factory(self.dr.schedules, self),
             'repositories': RepositoriesPublisher.factory(self.dr.repositories, self),
             'management': ManagementPublisher.factory(self.dr.ext, self),
-        }
+        })
 
     def view(self, request):
         recent_jobs = itertools.islice(reversed(self.dr.jobs), 20)
@@ -1156,9 +1176,9 @@ class RepositoryPublisher(Publisher):
     views = ('edit', )
 
     def children(self):
-        return {
+        return self.children_hook({
             'check-configs': RepositoryCheckConfigsPublisher(self.repository, self),
-        }
+        })
 
     def view(self, request):
         return TemplateResponse(request, 'core/repository/view.html', {
@@ -1237,8 +1257,10 @@ class RepositoryCheckConfigPublisher(Publisher):
         return self.parent.parent.redirect_to()
 
 
-class ManagementPublisher(Publisher):
+class ManagementPublisher(Publisher, PublisherMenu):
     name = 'management'
+    menu_descend = True
+    menu_text = _('Management')
 
     def view(self, request):
         return TemplateResponse(request, 'management.html', {

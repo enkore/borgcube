@@ -31,14 +31,6 @@ class SidebarMiddleware:
     def __call__(self, request):
         return self.get_response(request)
 
-    def process_menu_items(self, items):
-        for item in items:
-            self.process_menu_items(item.setdefault('items', []))
-            try:
-                item['url'] = reverse(item['view'])
-            except KeyError:
-                pass
-
     def process_template_response(self, request, response):
         try:
             context = response.context_data
@@ -46,7 +38,7 @@ class SidebarMiddleware:
         except (AttributeError, KeyError):
             return response
 
-        mp = RootPublisher(utils.data_root()).resolve(['management'])
+        mp = RootPublisher(utils.data_root()).resolve(['management']).__self__
 
         def construct(pub):
             try:
@@ -55,18 +47,18 @@ class SidebarMiddleware:
                 descend = False
             if not descend:
                 return
-            text = pub.menu_text
-            items = []
-            for pub in pub.children().values():
-                e = construct(pub)
-                if e:
-                    items.append(e)
-            return {
-                'text': text,
-                'items': items,
+            item = {
+                'text': pub.menu_text,
+                'url': pub.reverse(),
+                'items': [],
             }
+            for pub in pub.children().values():
+                subitem = construct(pub)
+                if subitem:
+                    item['items'].append(subitem)
+            return item
 
-        context['management'] = construct(mp)
+        context['management'] = [construct(mp)]
 
         return response
 
