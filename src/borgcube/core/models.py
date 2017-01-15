@@ -77,7 +77,7 @@ class PersistentDefaultDict(PersistentDict):
 class StringObjectID:
     @property
     def oid(self):
-        return self._p_oid.hex()
+        return self._p_oid.lstrip(b'\0').hex()
 
 
 class Updateable:
