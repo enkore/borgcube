@@ -809,10 +809,10 @@ class Publisher:
         path += urlquote(self.segment) + '/'
         if view:
             view = view.replace('_', '-')
-            path += ':' + view + '/'
+            path += '?view=' + view
         return path
 
-    def resolve(self, path_segments):
+    def resolve(self, path_segments, view=None):
         """
         Resolve reversed *path_segments* to a view or raise `Http404`.
 
@@ -825,7 +825,7 @@ class Publisher:
             child = hook.borgcube_web_publish(publisher=self, segment=segment)
             if child:
                 # A plugin publisher is mounted here, resolve further.
-                return child.resolve(path_segments)
+                return child.resolve(path_segments, view)
             else:
                 # No matches at all -> 404.
                 raise Http404
@@ -835,32 +835,31 @@ class Publisher:
             if not segment:
                 return self.view
         except IndexError:
-            # End of the path -> default view
-            return self.view
+            # End of the path -> resolve view
+            if view:
+                # Canonicalize the view name, replacing HTTP-style dashes with underscores,
+                # eg. /client/foo/?view=latest-job means the same as /client/foo/?view=latest_job
+                view = view.replace('-', '_')
 
-        if segment.startswith(':'):
-            # Canonicalize the view name, replacing HTTP-style dashes with underscores,
-            # eg. /client/foo/latest-job => /client/foo/latest_job
-            segment = segment[1:].replace('-', '_')
+                try:
+                    # Make sure that this is an intentionally accessible view, not some coincidentally named method.
+                    self.views.index(view)
+                except ValueError:
+                    raise Http404
 
-            try:
-                # Make sure that this is an intentionally accessible view, not some coincidentally
-                # named method.
-                self.views.index(segment)
-            except ValueError:
-                return out_of_hierarchy(segment)
+                # Append view_ namespace eg. latest_job_view
+                view_name = view + '_view'
+                return getattr(self, view_name)
+            else:
+                return self.view
 
-            # Append view_ namespace eg. latest_job_view
-            view_name = segment + '_view'
-            return getattr(self, view_name)
-        else:
-            try:
-                child = self[segment]
-                child.segment = segment
-                return child.resolve(path_segments)
-            except KeyError:
-                # This segment is not published, it might be a view of the publisher
-                return out_of_hierarchy(segment)
+        try:
+            child = self[segment]
+            child.segment = segment
+            return child.resolve(path_segments, view)
+        except KeyError:
+            # This segment is not published, it might be a view of the publisher
+            return out_of_hierarchy(segment)
 
     def view(self, request):
         """
@@ -1015,7 +1014,7 @@ def schedule_add_and_edit(request, data, schedule=None, context=None):
 
 class SchedulesPublisher(Publisher):
     companion = 'schedules'
-    views = ('list', )
+    views = ('list', 'add', )
 
     def __getitem__(self, index):
         try:
@@ -1142,11 +1141,12 @@ def object_publisher(request, path):
     """
     Renders a *path* against the *RootPublisher*.
     """
+    view = request.GET.get('view')
     path_segments = path.split('/')
     path_segments.reverse()
 
     root_publisher = RootPublisher(data_root())
-    view = root_publisher.resolve(path_segments)
+    view = root_publisher.resolve(path_segments, view)
 
     try:
         request.publisher = view.__self__
