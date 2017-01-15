@@ -45,7 +45,7 @@ def borgcube_web_management_nav(nav):
 
 
 @hookspec(firstresult=True)
-def borgcube_web_publish(publisher, segment):
+def borgcube_web_resolve(publisher, segment):
     """
 
     """

@@ -218,6 +218,6 @@ def prune_config_delete(request, config_id):
 """
 
 
-def borgcube_web_publish(publisher, segment):
+def borgcube_web_resolve(publisher, segment):
     if publisher.name == 'management' and segment == 'prune':
         return PrunePublisher(prune_root())

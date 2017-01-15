@@ -820,9 +820,7 @@ class Publisher:
         """
 
         def out_of_hierarchy(segment):
-            # If the segment is not a view of the publisher, it does not exist in it,
-            # but a plugin might have something.
-            child = hook.borgcube_web_publish(publisher=self, segment=segment)
+            child = hook.borgcube_web_resolve(publisher=self, segment=segment)
             if child:
                 # A plugin publisher is mounted here, resolve further.
                 return child.resolve(path_segments, view)
