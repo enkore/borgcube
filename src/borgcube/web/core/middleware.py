@@ -58,7 +58,7 @@ class SidebarMiddleware:
                     item['items'].append(subitem)
             return item
 
-        context['management'] = [construct(mp)]
+        context['management'] = construct(mp)['items']
 
         return response
 
