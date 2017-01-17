@@ -24,7 +24,7 @@
 
       <!-- TODO last execution overall outcome -->
       <td>
-        <a href='{% url 'core.schedules' %}?schedule={{ forloop.counter0 }}'>
+        <a href='.?schedule={{ forloop.counter0 }}'>
           {% if schedule.recurrence_enabled %}
           {{ schedule.recurrence|describe_recurrence }}
           {% else %}
@@ -35,7 +35,7 @@
 
       <td>
         {% with pub=request.publisher|get:schedule.id %}
-        <a href='{{ schedule.id }}'>edit</a>
+        <a href='{{ schedule.id }}/'>edit</a>
         {# url 'core.schedule_delete' schedule.id as url #}
         {% trans 'delete' as label %}
         {% trans 'Are you sure you want to delete this schedule?' as confirm %}

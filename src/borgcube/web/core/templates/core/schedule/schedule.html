@@ -60,7 +60,7 @@
           </span><br>
 
           {% for schedule in day.schedules %}
-            <a href='{% url 'core.schedule_edit' schedule.id %}'
+            <a href='{{ schedule.id }}/'
                class='schedule-link'
                style='background-color: {{ schedule.color }};'
                title='{{ schedule.occurs }}

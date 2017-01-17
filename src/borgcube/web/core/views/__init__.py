@@ -113,134 +113,6 @@ def job_cancel(request, job_id):
     return redirect(client_view, job.client.hostname)
 
 
-class JobConfigForm(forms.Form):
-    COMPRESSION_CHOICES = [
-        ('none', _('No compression')),
-        ('lz4', _('LZ4 (fast)')),
-    ] \
-        + [('zlib,%d' % level, _('zlib level %d') % level) for level in range(1, 10)] \
-        + [('lzma,%d' % level, _('LZMA level %d') % level) for level in range(1, 7)]
-
-    label = forms.CharField()
-
-    repository = Repository.ChoiceField()
-
-    one_file_system = forms.BooleanField(initial=True, required=False,
-                                         help_text=_('Don\'t cross over file system boundaries.'))
-
-    compression = forms.ChoiceField(initial='lz4', choices=COMPRESSION_CHOICES,
-                                    help_text=_('Compression is performed on the client, not on the server.'))
-
-    paths = forms.CharField(widget=forms.Textarea,
-                            help_text=_('Paths to include in the backup, one per line. At least one path is required.'))
-
-    # TODO explain format
-    excludes = forms.CharField(widget=forms.Textarea, required=False,
-                               help_text=_('Patterns to exclude from the backup, one per line.'))
-
-    class AdvancedForm(forms.Form):
-        prefix = 'advanced'
-
-        # TODO DurationField instead?
-        checkpoint_interval = forms.IntegerField(min_value=0, initial=1800)
-
-        read_special = forms.BooleanField(initial=False, required=False,
-                                          help_text=_('Open and read block and char device files as well as FIFOs as if '
-                                                      'they were regular files. Also follow symlinks pointing to these '
-                                                      'kinds of files.'))
-        ignore_inode = forms.BooleanField(initial=False, required=False,
-                                          help_text=_('Ignore inode data in the file metadata cache used to detect '
-                                                      'unchanged file.'))
-        extra_options = forms.CharField(required=False,
-                                        help_text=_('These options are passed verbatim to Borg on the client. Please '
-                                                    'don\'t specify any logging options or --remote-path.'))
-
-
-def job_config_add(request, client_id):
-    client = data_root().clients[client_id]
-    data = request.POST or None
-    form = JobConfigForm(data=data)
-    advanced_form = JobConfigForm.AdvancedForm(data=data)
-    if data and form.is_valid() and advanced_form.is_valid():
-        config = form.cleaned_data
-        config.update(advanced_form.cleaned_data)
-        config['paths'] = config.get('paths', '').split('\n')
-        config['excludes'] = [s for s in config.get('excludes', '').split('\n') if s]
-
-        repository = config.pop('repository')
-        job_config = BackupConfig(client=client, repository=repository, label=config['label'])
-        job_config._update(config)
-        client.job_configs.append(job_config)
-
-        transaction.get().note('Added job config to client %s' % client.hostname)
-        transaction.commit()
-
-        # TODO StringListValidator
-        # TODO Pattern validation
-        # TODO fancy pattern editor with test area
-
-        return redirect(reverse(client_view, args=[client.hostname]) + '#jobconfig-%s' % job_config.oid)
-    return TemplateResponse(request, 'core/client/config_add.html', {
-        'form': form,
-        'advanced_form': advanced_form,
-    })
-
-
-def job_config_edit(request, client_id, config_id):
-    client = data_root().clients[client_id]
-    job_config = find_oid_or_404(client.job_configs, config_id)
-    data = request.POST or None
-    job_config._p_activate()
-    initial_data = dict(job_config.__dict__)
-    initial_data['paths'] = '\n'.join(initial_data['paths'])
-    initial_data['excludes'] = '\n'.join(initial_data['excludes'])
-    form = JobConfigForm(data=data, initial=initial_data)
-    advanced_form = JobConfigForm.AdvancedForm(data=data, initial=initial_data)
-    if data and form.is_valid() and advanced_form.is_valid():
-        config = form.cleaned_data
-        config.update(advanced_form.cleaned_data)
-        config['paths'] = config.get('paths', '').split('\n')
-        config['excludes'] = [s for s in config.get('excludes', '').split('\n') if s]
-        job_config._update(config)
-        # TODO StringListValidator
-        # TODO Pattern validation
-        # TODO fancy pattern editor with test area
-
-        transaction.get().note('Edited job config %s of client %s' % (job_config.oid, client.hostname))
-        transaction.commit()
-        return redirect(reverse(client_view, args=[job_config.client.hostname]) + '#jobconfig-%s' % job_config.oid)
-    return TemplateResponse(request, 'core/client/config_edit.html', {
-        'client': client,
-        'form': form,
-        'advanced_form': advanced_form,
-        'job_config': job_config,
-    })
-
-
-def job_config_delete(request, client_id, config_id):
-    client = data_root().clients[client_id]
-    job_config = find_oid_or_404(client.job_configs, config_id)
-    if request.method == 'POST':
-        client.job_configs.remove(job_config)
-        # Could just leave it there, but likely not the intention behind clicking (delete).
-        for schedule in data_root().schedules:
-            for action in list(schedule.actions):
-                if getattr(action, 'job_config', None) == job_config:
-                    schedule.actions.remove(action)
-        transaction.get().note('Deleted job config %s from client %s' % (job_config.oid, client.hostname))
-        transaction.commit()
-    return redirect(client_view, client_id)
-
-
-def job_config_trigger(request, client_id, config_id):
-    client = data_root().clients[client_id]
-    config = find_oid_or_404(client.job_configs, config_id)
-    if request.method == 'POST':
-        job = config.create_job()
-        transaction.commit()
-    return redirect(client_view, client_id)
-
-
 def repositories(request):
     return TemplateResponse(request, 'core/repository/list.html', {
         'm': Repository,
@@ -333,53 +205,6 @@ def repository_check_config_trigger(request, repository_id, config_id):
         job = check_config.create_job()
         transaction.commit()
     return redirect(repository_view, repository_id)
-
-
-from dateutil.relativedelta import relativedelta
-
-
-class CalendarSheet:
-    # FYI I'm a masochist
-
-    class Week:
-        def __init__(self, first_day, days):
-            self.first_day = first_day
-            self.days = days
-            self.number = first_day.datetime.isocalendar()[1]
-
-    class Day:
-        def __init__(self, datetime, off_month):
-            self.begin = self.datetime = datetime
-            self.end = datetime + relativedelta(days=1) - relativedelta(microseconds=1)
-            self.date = datetime.date()
-            self.off_month = off_month
-
-    def __init__(self, datetime_month):
-        self.month = datetime_month.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        self.month_end = self.month + relativedelta(months=1)
-
-        weekday_delta = -self.month.weekday()
-        self.sheet_begin = self.month + relativedelta(days=weekday_delta)
-
-        weekday_delta = 7 - self.month_end.isoweekday()
-        self.sheet_end = self.month_end
-        if weekday_delta != 6:
-            # Don't append a full week of the following month
-            self.sheet_end += relativedelta(days=weekday_delta)
-
-        self.weeks = []
-        current = self.sheet_begin
-
-        def day():
-            off_month = current.month != self.month.month
-            return self.Day(datetime=current, off_month=off_month)
-
-        while current < self.sheet_end:
-            week = self.Week(day(), [])
-            self.weeks.append(week)
-            for i in range(7):
-                week.days.append(day())
-                current += relativedelta(days=1)
 
 
 def schedules(request):
@@ -849,6 +674,8 @@ class Publisher:
             child = hook.borgcube_web_resolve(publisher=self, segment=segment)
             if child:
                 # A plugin publisher is mounted here, resolve further.
+                child.parent = self
+                child.segment = segment
                 return child.resolve(path_segments, view)
             else:
                 # No matches at all -> 404.
@@ -879,6 +706,7 @@ class Publisher:
 
         try:
             child = self[segment]
+            child.parent = self
             child.segment = segment
             return child.resolve(path_segments, view)
         except KeyError:
@@ -948,7 +776,12 @@ class ClientsPublisher(Publisher):
 
 class ClientPublisher(Publisher):
     companion = 'client'
-    views = ('edit',)
+    views = ('edit', )
+
+    def children(self):
+        return self.children_hook({
+            'job-configs': JobConfigsPublisher(self.client.job_configs),
+        })
 
     def view(self, request):
         jobs = paginate(request, self.client.jobs.values(), prefix='jobs')
@@ -975,6 +808,147 @@ class ClientPublisher(Publisher):
             'client_form': client_form,
             'connection_form': connection_form,
         })
+
+
+class JobConfigForm(forms.Form):
+    COMPRESSION_CHOICES = [
+        ('none', _('No compression')),
+        ('lz4', _('LZ4 (fast)')),
+    ] \
+        + [('zlib,%d' % level, _('zlib level %d') % level) for level in range(1, 10)] \
+        + [('lzma,%d' % level, _('LZMA level %d') % level) for level in range(1, 7)]
+
+    label = forms.CharField()
+
+    repository = Repository.ChoiceField()
+
+    one_file_system = forms.BooleanField(initial=True, required=False,
+                                         help_text=_('Don\'t cross over file system boundaries.'))
+
+    compression = forms.ChoiceField(initial='lz4', choices=COMPRESSION_CHOICES,
+                                    help_text=_('Compression is performed on the client, not on the server.'))
+
+    paths = forms.CharField(widget=forms.Textarea,
+                            help_text=_('Paths to include in the backup, one per line. At least one path is required.'))
+
+    # TODO explain format
+    excludes = forms.CharField(widget=forms.Textarea, required=False,
+                               help_text=_('Patterns to exclude from the backup, one per line.'))
+
+    class AdvancedForm(forms.Form):
+        prefix = 'advanced'
+
+        # TODO DurationField instead?
+        checkpoint_interval = forms.IntegerField(min_value=0, initial=1800)
+
+        read_special = forms.BooleanField(initial=False, required=False,
+                                          help_text=_('Open and read block and char device files as well as FIFOs as if '
+                                                      'they were regular files. Also follow symlinks pointing to these '
+                                                      'kinds of files.'))
+        ignore_inode = forms.BooleanField(initial=False, required=False,
+                                          help_text=_('Ignore inode data in the file metadata cache used to detect '
+                                                      'unchanged file.'))
+        extra_options = forms.CharField(required=False,
+                                        help_text=_('These options are passed verbatim to Borg on the client. Please '
+                                                    'don\'t specify any logging options or --remote-path.'))
+
+
+class JobConfigsPublisher(Publisher):
+    companion = 'configs'
+    views = ('add', )
+
+    def __getitem__(self, oid):
+        return JobConfigPublisher(find_oid_or_404(self.configs, oid))
+
+    def add_view(self, request):
+        client = self.parent.client
+        data = request.POST or None
+        form = JobConfigForm(data=data)
+        advanced_form = JobConfigForm.AdvancedForm(data=data)
+        if data and form.is_valid() and advanced_form.is_valid():
+            config = form.cleaned_data
+            config.update(advanced_form.cleaned_data)
+            config['paths'] = config.get('paths', '').split('\n')
+            config['excludes'] = [s for s in config.get('excludes', '').split('\n') if s]
+
+            repository = config.pop('repository')
+            job_config = BackupConfig(client=client, repository=repository, label=config['label'])
+            job_config._update(config)
+            client.job_configs.append(job_config)
+
+            transaction.get().note('Added job config to client %s' % client.hostname)
+            transaction.commit()
+
+            # TODO StringListValidator
+            # TODO Pattern validation
+            # TODO fancy pattern editor with test area
+
+            return self[job_config.oid].redirect_to()
+        return TemplateResponse(request, 'core/client/config_add.html', {
+            'form': form,
+            'advanced_form': advanced_form,
+        })
+
+
+class JobConfigPublisher(Publisher):
+    companion = 'config'
+    views = ('delete', 'trigger', )
+
+    def reverse(self, view=None):
+        if view:
+            return super().reverse(view)
+        else:
+            return self.parent.parent.reverse() + '#job-config-' + self.config.oid
+
+    def view(self, request):
+        client = self.config.client
+        job_config = self.config
+        data = request.POST or None
+        job_config._p_activate()
+        initial_data = dict(job_config.__dict__)
+        initial_data['paths'] = '\n'.join(initial_data['paths'])
+        initial_data['excludes'] = '\n'.join(initial_data['excludes'])
+        form = JobConfigForm(data=data, initial=initial_data)
+        advanced_form = JobConfigForm.AdvancedForm(data=data, initial=initial_data)
+        if data and form.is_valid() and advanced_form.is_valid():
+            config = form.cleaned_data
+            config.update(advanced_form.cleaned_data)
+            config['paths'] = config.get('paths', '').split('\n')
+            config['excludes'] = [s for s in config.get('excludes', '').split('\n') if s]
+            job_config._update(config)
+            # TODO StringListValidator
+            # TODO Pattern validation
+            # TODO fancy pattern editor with test area
+
+            transaction.get().note('Edited job config %s of client %s' % (job_config.oid, client.hostname))
+            transaction.commit()
+
+            return self.redirect_to()
+        return TemplateResponse(request, 'core/client/config_edit.html', {
+            'client': client,
+            'form': form,
+            'advanced_form': advanced_form,
+            'job_config': job_config,
+        })
+
+    def delete_view(self, request):
+        client = self.parent.parent.client
+        if request.method == 'POST':
+            client.job_configs.remove(self.config)
+            # Could just leave it there, but likely not the intention behind clicking (delete).
+            for schedule in data_root().schedules:
+                for action in list(schedule.actions):
+                    if getattr(action, 'job_config', None) == self.config:
+                        schedule.actions.remove(action)
+            transaction.get().note('Deleted job config %s from client %s' % (self.config.oid, client.hostname))
+            transaction.commit()
+        return self.redirect_to()
+
+    def trigger_view(self, request):
+        if request.method == 'POST':
+            job = self.config.create_job()
+            transaction.commit()
+        return self.redirect_to()
 
 
 def schedule_add_and_edit(request, data, schedule=None, context=None):
@@ -1038,6 +1012,9 @@ def schedule_add_and_edit(request, data, schedule=None, context=None):
     return TemplateResponse(request, 'core/schedule/add.html', context)
 
 
+from dateutil.relativedelta import relativedelta
+
+
 class SchedulesPublisher(Publisher):
     companion = 'schedules'
     views = ('list', 'add', )
@@ -1054,7 +1031,7 @@ class SchedulesPublisher(Publisher):
             month = localtime(now()).replace(year=int(request.GET['year']), month=int(request.GET['month']), day=1)
         except (KeyError, TypeError):
             month = localtime(now())
-        sheet = CalendarSheet(month)
+        sheet = self.CalendarSheet(month)
         schedules = self.schedules
 
         keep = request.GET.getlist('schedule')
@@ -1119,6 +1096,49 @@ class SchedulesPublisher(Publisher):
             'title': _('Add schedule'),
             'submit': _('Add schedule'),
         })
+
+    class CalendarSheet:
+        # FYI I'm a masochist
+
+        class Week:
+            def __init__(self, first_day, days):
+                self.first_day = first_day
+                self.days = days
+                self.number = first_day.datetime.isocalendar()[1]
+
+        class Day:
+            def __init__(self, datetime, off_month):
+                self.begin = self.datetime = datetime
+                self.end = datetime + relativedelta(days=1) - relativedelta(microseconds=1)
+                self.date = datetime.date()
+                self.off_month = off_month
+
+        def __init__(self, datetime_month):
+            self.month = datetime_month.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            self.month_end = self.month + relativedelta(months=1)
+
+            weekday_delta = -self.month.weekday()
+            self.sheet_begin = self.month + relativedelta(days=weekday_delta)
+
+            weekday_delta = 7 - self.month_end.isoweekday()
+            self.sheet_end = self.month_end
+            if weekday_delta != 6:
+                # Don't append a full week of the following month
+                self.sheet_end += relativedelta(days=weekday_delta)
+
+            self.weeks = []
+            current = self.sheet_begin
+
+            def day():
+                off_month = current.month != self.month.month
+                return self.Day(datetime=current, off_month=off_month)
+
+            while current < self.sheet_end:
+                week = self.Week(day(), [])
+                self.weeks.append(week)
+                for i in range(7):
+                    week.days.append(day())
+                    current += relativedelta(days=1)
 
 
 class SchedulePublisher(Publisher):

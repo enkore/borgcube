@@ -19,7 +19,7 @@ from django.views import i18n
 from .core import views as core_views
 from .core.views import staticfiles
 from borgcube.utils import hook
-
+"""
 client_urls = [
     url(r'^$', core_views.client_view, name='core.client_view'),
     url(r'^edit/$', core_views.client_edit, name='core.client_edit'),
@@ -67,6 +67,7 @@ prune_urls = [
     url(r'^configs/(?P<config_id>[a-f0-9]+)/trigger/$', core_views.prune_config_trigger, name='prune.config_trigger'),
     url(r'^configs/(?P<config_id>[a-f0-9]+)/delete/$', core_views.prune_config_delete, name='prune.config_delete'),
 ]
+"""
 
 js_info_dict = {
     'packages': ('recurrence', ),
@@ -79,7 +80,8 @@ urlpatterns = [
 
     url(r'^$', core_views.object_publisher, kwargs={'path': '/'}),
     url(r'^(.*)/$', core_views.object_publisher),
-
+]
+"""
     url(r'^$', core_views.dashboard, name='core.dashboard'),
     url(r'^clients/$', core_views.clients, name='core.clients'),
     url(r'^clients/add/$', core_views.client_add, name='core.client_add'),
@@ -95,7 +97,7 @@ urlpatterns = [
 
     url(r'^management/$', core_views.management, name='core.management'),
     url(r'^management/prune/', include(prune_urls)),
-
 ]
+"""
 
 hook.borgcube_web_urlpatterns(urlpatterns=urlpatterns, js_info_dict=js_info_dict)
