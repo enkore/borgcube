@@ -41,6 +41,7 @@ def get_url(model_instance):
 
     This has some core classes coded in and otherwise works through `hookspec.borgcube_web_get_url`.
     """
+    return ''
     obj = model_instance
     if not obj:
         return ''
