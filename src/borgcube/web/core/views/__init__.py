@@ -614,9 +614,13 @@ class Publisher:
     @property
     def name(self):
         """
-        Name of the publisher for hookspec purposes. Defaults to *self.companion*.
+        Name of the publisher for hookspec purposes. Defaults to *class.companion*.
         """
-        return self.companion
+        return type(self).companion
+
+    def get_companion(self):
+        """Returns the companion object."""
+        return getattr(self, type(self).companion)
 
     def children(self):
         """
@@ -724,6 +728,35 @@ class Publisher:
             return child.resolve(path_segments, view)
         except KeyError:
             return out_of_hierarchy(segment)
+
+    ###################
+    # View functions
+    ###################
+
+    def response(self, request, template, context={}):
+        """
+        Return a TemplateResponse for *request*, *template* and *context*.
+
+        The final context is constructed as follows:
+
+        1. Start with an empty dictionary
+        2. Add *publisher* (=self), and the correctly named companion (=self.companion)
+        3. Add what `self.context` returns
+        4. Add *context*.
+        """
+        base_context = {
+            'publisher': self,
+            type(self).companion: self.companion,
+        }
+        base_context.update(self.context(request))
+        base_context.update(context)
+        return TemplateResponse(request, template, context)
+
+    def context(self, request):
+        """
+        Return "base context" for *request*.
+        """
+        return {}
 
     def view(self, request):
         """

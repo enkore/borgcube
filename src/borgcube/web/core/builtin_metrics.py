@@ -241,7 +241,7 @@ def borgcube_web_children(publisher, children):
         return {
             'prune': PrunePublisher(prune_root()),
         }
-    if isinstance(getattr(publisher.companion, 'trigger', None), Trigger):
+    if isinstance(getattr(publisher.get_companion(), 'trigger', None), Trigger):
         return {
             'trigger': TriggerPublisher(publisher.companion.trigger),
         }
