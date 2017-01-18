@@ -4,13 +4,16 @@
   {% block ctitle %}{% endblock %}
 
   {% block secondary-menu %}
-    <nav id='secondary-menu'>
-      <ul>
-        {% for menu_item in secondary_menu %}
-          <li><a href='{{ menu_item.url }}' {% if request.path == menu_item.url %}class='active'{% endif %}>{{ menu_item.text }}</a></li>
-        {% endfor %}
-      </ul>
-    </nav>
+    <div id='secondary-menu'>
+      <nav>
+        <ul>
+          {% for menu_item in secondary_menu %}
+            <li><a href='{{ menu_item.url }}' {% if request.path == menu_item.url %}class='active'{% endif %}>{{ menu_item.text }}</a></li>
+          {% endfor %}
+        </ul>
+      </nav>
+      <div style='clear:both;'></div>
+    </div>
   {% endblock %}
 
   {% block ccontent %}
