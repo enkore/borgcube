@@ -1006,7 +1006,7 @@ class RepositoryPublisher(Publisher):
             repository._update(repository_form.cleaned_data)
             transaction.get().note('Edited repository %s' % repository.oid)
             transaction.commit()
-            return redirect(repository_view, repository.oid)
+            return self.redirect_to()
         return TemplateResponse(request, 'core/repository/edit.html', {
             'repository': repository,
             'repository_form': repository_form,
