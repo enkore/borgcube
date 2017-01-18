@@ -226,6 +226,14 @@ from borgcube.core.models import Trigger
 from borgcube.web.core.views import ExtendingPublisher
 
 
+class TriggerManagementPublisher(Publisher, PublisherMenu):
+    companion = 'trigger_ids'
+    menu_text = ugettext_lazy('Trigger')
+
+    def view(self, request):
+        pass
+
+
 class TriggerPublisher(ExtendingPublisher):
     companion = 'trigger'
     menu_text = ugettext_lazy('Trigger')
@@ -238,6 +246,7 @@ def borgcube_web_children(publisher, children):
     if publisher.name == 'management':
         return {
             'prune': PrunePublisher(prune_root()),
+            'trigger': TriggerManagementPublisher(data_root().trigger_ids),
         }
     if isinstance(getattr(publisher.get_companion(), 'trigger', None), Trigger):
         return {
