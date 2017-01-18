@@ -517,7 +517,7 @@ class RootPublisher(Publisher):
 
     def view(self, request):
         recent_jobs = itertools.islice(reversed(self.dr.jobs), 20)
-        return TemplateResponse(request, 'core/dashboard.html', {
+        return self.render(request, 'core/dashboard.html', {
             'metrics': self.dr.plugin_data(WebData).metrics,
             'recent_jobs': recent_jobs,
         })
@@ -550,7 +550,7 @@ class ClientsPublisher(Publisher):
             transaction.get().note('Added client %s' % client.hostname)
             transaction.commit()
             return self.redirect_to()
-        return TemplateResponse(request, 'core/client/add.html', {
+        return self.render(request, 'core/client/add.html', {
             'client_form': client_form,
             'connection_form': connection_form,
         })
@@ -567,7 +567,7 @@ class ClientPublisher(Publisher):
 
     def view(self, request):
         jobs = paginate(request, self.client.jobs.values(), prefix='jobs')
-        return TemplateResponse(request, 'core/client/view.html', {
+        return self.render(request, 'core/client/view.html', {
             'client': self.client,
             'jobs': jobs,
         })
@@ -585,7 +585,7 @@ class ClientPublisher(Publisher):
             transaction.get().note('Edited client %s' % client.hostname)
             transaction.commit()
             return self.redirect_to()
-        return TemplateResponse(request, 'core/client/edit.html', {
+        return self.render(request, 'core/client/edit.html', {
             'client': client,
             'client_form': client_form,
             'connection_form': connection_form,
@@ -666,7 +666,7 @@ class JobConfigsPublisher(Publisher):
             # TODO fancy pattern editor with test area
 
             return self[job_config.oid].redirect_to()
-        return TemplateResponse(request, 'core/client/config_add.html', {
+        return self.render(request, 'core/client/config_add.html', {
             'form': form,
             'advanced_form': advanced_form,
         })
@@ -706,7 +706,7 @@ class JobConfigPublisher(Publisher):
             transaction.commit()
 
             return self.redirect_to()
-        return TemplateResponse(request, 'core/client/config_edit.html', {
+        return self.render(request, 'core/client/config_edit.html', {
             'client': client,
             'form': form,
             'advanced_form': advanced_form,
@@ -869,7 +869,7 @@ class SchedulesPublisher(Publisher, ScheduledActionFormMixin):
                         schedule.occurs = ', '.join(occurs)
                         day.schedules.append(schedule)
 
-        return TemplateResponse(request, 'core/schedule/schedule.html', {
+        return self.render(request, 'core/schedule/schedule.html', {
             'calsheet': sheet,
             'schedules': schedules,
             'prev_month': sheet.month - relativedelta(months=1),
@@ -877,7 +877,7 @@ class SchedulesPublisher(Publisher, ScheduledActionFormMixin):
         })
 
     def list_view(self, request):
-        return TemplateResponse(request, 'core/schedule/list.html', {
+        return self.render(request, 'core/schedule/list.html', {
             'm': Schedule,
             'schedules': self.schedules,
         })
@@ -951,8 +951,7 @@ class SchedulePublisher(ExtensiblePublisher, ScheduledActionFormMixin):
             data_root().schedules.remove(self.schedule)
             transaction.get().note('Deleted schedule %s' % self.schedule.oid)
             transaction.commit()
-            return self.parent.redirect_to()
-        return redirect(schedules)
+        return self.parent.redirect_to()
 
 
 class RepositoriesPublisher(Publisher):
@@ -978,7 +977,7 @@ class RepositoriesPublisher(Publisher):
             transaction.get().note('Added repository %s' % repository.name)
             transaction.commit()
             return self.redirect_to()
-        return TemplateResponse(request, 'core/repository/add.html', {
+        return self.render(request, 'core/repository/add.html', {
             'repository_form': repository_form,
         })
 
@@ -993,7 +992,7 @@ class RepositoryPublisher(Publisher):
         })
 
     def view(self, request):
-        return TemplateResponse(request, 'core/repository/view.html', {
+        return self.render(request, 'core/repository/view.html', {
             'repository': self.repository,
         })
 
@@ -1007,7 +1006,7 @@ class RepositoryPublisher(Publisher):
             transaction.get().note('Edited repository %s' % repository.oid)
             transaction.commit()
             return self.redirect_to()
-        return TemplateResponse(request, 'core/repository/edit.html', {
+        return self.render(request, 'core/repository/edit.html', {
             'repository': repository,
             'repository_form': repository_form,
         })
@@ -1031,7 +1030,7 @@ class RepositoryCheckConfigsPublisher(Publisher):
             transaction.get().note('Added check config to repository %s' % self.repository.oid)
             transaction.commit()
             return self.parent.redirect_to()
-        return TemplateResponse(request, 'core/repository/config_add.html', {
+        return self.render(request, 'core/repository/config_add.html', {
             'form': config_form,
         })
 
@@ -1050,7 +1049,7 @@ class RepositoryCheckConfigPublisher(Publisher):
             transaction.get().note('Edited check config %s on repository %s' % (check_config.oid, self.parent.repository.oid))
             transaction.commit()
             return self.parent.parent.redirect_to()
-        return TemplateResponse(request, 'core/repository/config_edit.html', {
+        return self.render(request, 'core/repository/config_edit.html', {
             'form': config_form,
         })
 
@@ -1075,7 +1074,7 @@ class ManagementPublisher(Publisher, PublisherMenu):
     menu_text = _('Management')
 
     def view(self, request):
-        return TemplateResponse(request, 'management.html', {
+        return self.render(request, 'management.html', {
             'management': True
         })
 
