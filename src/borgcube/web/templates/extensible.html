@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  {% block ctitle %}{% endblock %}
+
+  {% block secondary-menu %}
+    <nav id='secondary-menu'>
+      <ul>
+        {% for menu_item in secondary_menu %}
+          <li><a href='{{ menu_item.url }}' {% if request.path == menu_item.url %}class='active'{% endif %}>{{ menu_item.text }}</a></li>
+        {% endfor %}
+      </ul>
+    </nav>
+  {% endblock %}
+
+  {% block ccontent %}
+  {% endblock %}
+{% endblock %}

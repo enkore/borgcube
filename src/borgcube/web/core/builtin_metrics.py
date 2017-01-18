@@ -223,12 +223,12 @@ def prune_config_delete(request, config_id):
 #        return PrunePublisher(prune_root())
 
 from borgcube.core.models import Trigger
+from borgcube.web.core.views import ExtendingPublisher
 
 
-class TriggerPublisher(Publisher, PublisherMenu):
+class TriggerPublisher(ExtendingPublisher):
     companion = 'trigger'
-    menu_text = _('Trigger')
-    menu_descend = True
+    menu_text = ugettext_lazy('Trigger')
 
     def view(self, request):
         return TemplateResponse(request, 'core/trigger/list.html', {
@@ -243,5 +243,5 @@ def borgcube_web_children(publisher, children):
         }
     if isinstance(getattr(publisher.get_companion(), 'trigger', None), Trigger):
         return {
-            'trigger': TriggerPublisher(publisher.companion.trigger),
+            'trigger': TriggerPublisher(publisher.get_companion().trigger),
         }

@@ -28,13 +28,13 @@
   <table class='calendar' width='100%'>
     <tr class='month-nav'>
       <td colspan='3'>
-        <a href='{% url 'core.schedules' %}?year={{ prev_month.year }}&month={{ prev_month.month }}'>{% trans '« previous month' %}</a>
+        <a href='.?year={{ prev_month.year }}&month={{ prev_month.month }}'>{% trans '« previous month' %}</a>
       </td>
       <td colspan='2' style='text-align: center;'>
-        <a href='{% url 'core.schedules' %}'>{% trans 'current month' %}</a>
+        <a href='.'>{% trans 'current month' %}</a>
       </td>
       <td colspan='3' style='text-align: right'>
-        <a href='{% url 'core.schedules' %}?year={{ next_month.year }}&month={{ next_month.month }}'>{% trans 'next month »' %}</a>
+        <a href='.?year={{ next_month.year }}&month={{ next_month.month }}'>{% trans 'next month »' %}</a>
       </td>
     </tr>
 
@@ -77,7 +77,7 @@
 
   {% for item in schedules %}
     <h2 id='item-{{ item.oid }}'>{{ item.name }}
-      <small>(<a href='{% url 'core.schedule_edit' item.id %}'>{% trans 'edit' %}</a>)</small></h2>
+      <small>(<a href='{{ item.id }}'>{% trans 'edit' %}</a>)</small></h2>
 
     <p>{{ item.description }}</p>
 

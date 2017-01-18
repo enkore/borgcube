@@ -273,7 +273,7 @@ def schedule_list(request):
     })
 
 
-def schedule_add_and_edit(request, data, schedule=None, context=None):
+def schedule_add_and_edit(render, request, data, schedule=None, context=None):
     if schedule:
         schedule._p_activate()
         form = Schedule.Form(data, initial=schedule.__dict__)
@@ -331,7 +331,7 @@ def schedule_add_and_edit(request, data, schedule=None, context=None):
         'classes': {cls.dotted_path(): cls.name for cls in classes},
         'action_forms': action_forms,
     })
-    return TemplateResponse(request, 'core/schedule/add.html', context)
+    return render(request, 'core/schedule/add.html', context)
 
 
 def schedule_add(request):
@@ -519,7 +519,7 @@ from functools import partial
 
 
 class PublisherMenu:
-    menu_descend = False
+    menu_descend = True
     menu_text = ''
 
 
@@ -733,7 +733,7 @@ class Publisher:
     # View functions
     ###################
 
-    def response(self, request, template, context={}):
+    def render(self, request, template, context={}):
         """
         Return a TemplateResponse for *request*, *template* and *context*.
 
@@ -765,6 +765,52 @@ class Publisher:
         This implementation raises `Http404`.
         """
         raise Http404
+
+
+class ExtensiblePublisher(Publisher, PublisherMenu):
+    menu_text = ''
+
+    def render(self, request, template, context=None):
+        """
+        Return a TemplateResponse for *request*, *template* and *context*.
+
+        The final context is constructed as follows:
+
+        1. Start with an empty dictionary
+        2. Add *publisher* (=self), and the correctly named companion (=self.companion)
+        3. Add what `self.context` returns
+        4. Add *context*.
+
+        *template* refers to a content template that dynamically extends the
+        *base_template* passed in the template context.
+        """
+        context = context or {}
+        context.setdefault('base_template', self.base_template(request))
+        context.setdefault('secondary_menu', self._construct_menu(request))
+        return super().render(request, template, context)
+
+    def base_template(self, request):
+        return 'extensible.html'
+
+    def _construct_menu(self, request):
+        def item(publisher):
+            return {
+                'url': publisher.reverse(),
+                'text': publisher.menu_text,
+                'items': []
+            }
+
+        menu = [item(self)]
+        for child in self.children().values():
+            if not getattr(child, 'menu_descend', False):
+                continue
+            menu.append(item(child))
+        return menu
+
+
+class ExtendingPublisher(Publisher, PublisherMenu):
+    def render(self, request, template, context=None):
+        return self.parent.render(request, template, context)
 
 
 class RootPublisher(Publisher):
@@ -997,7 +1043,7 @@ class JobConfigPublisher(Publisher):
         return self.redirect_to()
 
 
-def schedule_add_and_edit(request, data, schedule=None, context=None):
+def schedule_add_and_edit(render, request, data, schedule=None, context=None):
     if schedule:
         schedule._p_activate()
         form = Schedule.Form(data, initial=schedule.__dict__)
@@ -1055,15 +1101,25 @@ def schedule_add_and_edit(request, data, schedule=None, context=None):
         'classes': {cls.dotted_path(): cls.name for cls in classes},
         'action_forms': action_forms,
     })
-    return TemplateResponse(request, 'core/schedule/add.html', context)
+    return render(request, 'core/schedule/add.html', context)
 
 
 from dateutil.relativedelta import relativedelta
 
 
-class SchedulesPublisher(Publisher):
+class ScheduledActionFormMixin:
+    def action_form_view(self, request):
+        dotted_path = request.GET.get('class')
+        cls = ScheduledAction.get_class(dotted_path)
+        if not cls:
+            log.error('scheduled_action_form request for %r which is not a schedulable action', dotted_path)
+            return HttpResponseBadRequest()
+        return HttpResponse(cls.Form().as_table())
+
+
+class SchedulesPublisher(Publisher, ScheduledActionFormMixin):
     companion = 'schedules'
-    views = ('list', 'add', )
+    views = ('list', 'add', 'action_form', )
 
     def __getitem__(self, index):
         try:
@@ -1138,7 +1194,7 @@ class SchedulesPublisher(Publisher):
 
     def add_view(self, request):
         data = request.POST or None
-        return schedule_add_and_edit(request, data, context={
+        return schedule_add_and_edit(self.render, request, data, context={
             'title': _('Add schedule'),
             'submit': _('Add schedule'),
         })
@@ -1187,13 +1243,14 @@ class SchedulesPublisher(Publisher):
                     current += relativedelta(days=1)
 
 
-class SchedulePublisher(Publisher):
+class SchedulePublisher(ExtensiblePublisher, ScheduledActionFormMixin):
     companion = 'schedule'
     views = ('delete', 'action_form', )
+    menu_text = _('Schedule')
 
     def view(self, request):
         data = request.POST or None
-        return schedule_add_and_edit(request, data, self.schedule, context={
+        return schedule_add_and_edit(self.render, request, data, self.schedule, context={
             'title': _('Edit schedule {}').format(self.schedule.name),
             'submit': _('Save changes'),
             'schedule': self.schedule,
@@ -1206,14 +1263,6 @@ class SchedulePublisher(Publisher):
             transaction.commit()
             return self.parent.redirect_to()
         return redirect(schedules)
-
-    def action_form_view(self, request):
-        dotted_path = request.GET.get('class')
-        cls = ScheduledAction.get_class(dotted_path)
-        if not cls:
-            log.error('scheduled_action_form request for %r which is not a schedulable action', dotted_path)
-            return HttpResponseBadRequest()
-        return HttpResponse(cls.Form().as_table())
 
 
 class RepositoriesPublisher(Publisher):
@@ -1345,15 +1394,16 @@ def object_publisher(request, path):
     """
     Renders a *path* against the *RootPublisher*.
     """
-    view = request.GET.get('view')
+    view_name = request.GET.get('view')
     path_segments = path.split('/')
     path_segments.reverse()
 
     root_publisher = RootPublisher(data_root())
-    view = root_publisher.resolve(path_segments, view)
+    view = root_publisher.resolve(path_segments, view_name)
 
     try:
         request.publisher = view.__self__
+        request.view_name = view_name
     except AttributeError:
         # We don't explicitly prohibit the resolver to return a view callable that isn't
         # part of a publisher.
