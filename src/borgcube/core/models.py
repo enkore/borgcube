@@ -4,6 +4,7 @@ import logging
 import re
 from pathlib import Path
 
+import uuid
 from django.conf import settings
 from django.core import validators
 from django.core.exceptions import ValidationError
@@ -292,7 +293,7 @@ class DataRoot(Evolvable):
     :ivar schedules: a `PersistentList` of `Schedule` instances.
     :ivar ext: a `PersistentDict` of extension data (see `plugin_data`, **do not use directly**).
     """
-    version = 5
+    version = 6
 
     @evolve(1, 2)
     def add_ext_dict(self):
@@ -314,6 +315,10 @@ class DataRoot(Evolvable):
             for id, job in self.jobs.items():
                 self.jobs_by_state[state][id] = job
 
+    @evolve(5, 6)
+    def add_triggers(self):
+        self.trigger_ids = OOBTree()
+
     def __init__(self):
         self.repositories = PersistentList()
         # hex archive id -> Archive
@@ -328,6 +333,8 @@ class DataRoot(Evolvable):
         self.jobs_by_state = PersistentDefaultDict(factory=LOBTree)
 
         self.schedules = PersistentList()
+
+        self.trigger_ids = OOBTree()
 
         self.ext = PersistentDict()
 
@@ -719,8 +726,38 @@ class Job(Evolvable):
         return str(self.id)
 
 
+class TriggerID(Evolvable):
+    def __init__(self, trigger, enabled=True, access=(), comment=''):
+        self.trigger = trigger
+        self.enabled = enabled
+        self.access = tuple(access)
+        self.comment = comment
+        self.id = str(uuid.uuid4())
+        data_root().trigger_ids[self.id] = self
+
+    def __str__(self):
+        return '{} ({})'.format(self.id, self.comment)
+
+    def run(self, access_context):
+        if not self.enabled:
+            log.debug('Ignoring disabled trigger ID %s', self)
+            return
+        if access_context not in self.access:
+            log.warning('Ignoring trigger request from context %s (only %s is permitted)', access_context, ', '.join(self.access))
+            return
+        log.debug('Running trigger ID %s', self)
+        self.trigger.target()
+        log.debug('Completed trigger ID %s', self)
+
+
+class Trigger(Evolvable):
+    def __init__(self, target):
+        self.target = target
+        self.trigger_ids = PersistentList()
+
+
 class Schedule(Evolvable):
-    version = 3
+    version = 4
 
     @evolve(1, 2)
     def make_dtstart_implicit(self):
@@ -731,6 +768,10 @@ class Schedule(Evolvable):
     def add_recurrence_enabled(self):
         self.recurrence_enabled = True
 
+    @evolve(3, 4)
+    def add_trigger(self):
+        self.trigger = Trigger(self.run_from_trigger)
+
     def __init__(self, name, recurrence, recurrence_enabled=True, description=''):
         self.name = name
         self.description = description
@@ -739,6 +780,9 @@ class Schedule(Evolvable):
         self.recurrence_enabled = recurrence_enabled
 
         self.actions = PersistentList()
+
+    def run_from_trigger(self):
+        pass
 
     @property
     def id(self):

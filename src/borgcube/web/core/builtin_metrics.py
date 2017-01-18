@@ -222,9 +222,26 @@ def prune_config_delete(request, config_id):
 #    if publisher.name == 'management' and segment == 'prune':
 #        return PrunePublisher(prune_root())
 
+from borgcube.core.models import Trigger
+
+
+class TriggerPublisher(Publisher, PublisherMenu):
+    companion = 'trigger'
+    menu_text = _('Trigger')
+    menu_descend = True
+
+    def view(self, request):
+        return TemplateResponse(request, 'core/trigger/list.html', {
+
+        })
+
 
 def borgcube_web_children(publisher, children):
     if publisher.name == 'management':
         return {
             'prune': PrunePublisher(prune_root()),
+        }
+    if isinstance(getattr(publisher.companion, 'trigger', None), Trigger):
+        return {
+            'trigger': TriggerPublisher(publisher.companion.trigger),
         }

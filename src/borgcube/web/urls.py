@@ -78,6 +78,8 @@ urlpatterns = [
     url(r'^javascript-i18n/$', i18n.javascript_catalog, js_info_dict),
     url(r'^static/(?P<file>[a-zA-Z0-9\.]+)$', staticfiles.staticfiles),
 
+    url(r'^trigger/(?P<trigger_id>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/$', core_views.trigger),
+
     url(r'^$', core_views.object_publisher, kwargs={'path': '/'}),
     url(r'^(.*)/$', core_views.object_publisher),
 ]
