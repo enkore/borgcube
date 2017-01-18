@@ -755,10 +755,12 @@ class Publisher:
         base_context = {
             'publisher': self,
             type(self).companion: self.companion,
+            'base_template': 'base.html',
+            'secondary_menu': None,
         }
         base_context.update(self.context(request))
         base_context.update(context)
-        return TemplateResponse(request, template, context)
+        return TemplateResponse(request, template, base_context)
 
     def context(self, request):
         """

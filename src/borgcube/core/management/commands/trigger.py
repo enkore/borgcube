@@ -26,4 +26,4 @@ class Command(BaseCommand):
             trig = data_root().trigger_ids[options['trigger_id']]
         except KeyError:
             raise CommandError('Trigger %s not found' % options['trigger_id'])
-        trig.run(access_context='local')
+        trig.run(access_context='local-cli')

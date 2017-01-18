@@ -727,6 +727,13 @@ class Job(Evolvable):
 
 
 class TriggerID(Evolvable):
+    """
+
+    Defined access contexts are:
+
+    - anonymous-web
+    - local-cli
+    """
     def __init__(self, trigger, enabled=True, access=(), comment=''):
         self.trigger = trigger
         self.enabled = enabled
