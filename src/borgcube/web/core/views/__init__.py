@@ -622,6 +622,10 @@ class Publisher:
         """Returns the companion object."""
         return getattr(self, type(self).companion)
 
+    ###################
+    # Children
+    ###################
+
     def children(self):
         """
         Return a mapping of child names to child publishers or factories.
@@ -665,6 +669,10 @@ class Publisher:
             return v()
         except TypeError:
             return v
+
+    ###################
+    # Traversal
+    ###################
 
     def redirect_to(self, view=None):
         return redirect(self.reverse(view))
@@ -730,7 +738,7 @@ class Publisher:
             return out_of_hierarchy(segment)
 
     ###################
-    # View functions
+    # Views
     ###################
 
     def render(self, request, template, context={}):
