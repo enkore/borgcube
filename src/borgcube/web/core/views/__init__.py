@@ -1097,4 +1097,8 @@ def object_publisher(request, path):
         # We don't explicitly prohibit the resolver to return a view callable that isn't
         # part of a publisher.
         pass
-    return view(request)
+    response = view(request)
+    if response is None:
+        qualname = view.__module__ + '.' + view.__qualname__
+        raise ValueError('The view %s returned None instead of a HTTPResponse' % qualname)
+    return response
