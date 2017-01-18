@@ -7,7 +7,7 @@
 {% block content %}
   <h1>{{ repository.name }}
     <small>
-      (<a href='{% url 'core.repository_edit' repository.oid %}'>{% trans 'edit' %}</a>)
+      (<a href='?view=edit'>{% trans 'edit' %}</a>)
     </small>
   </h1>
 
@@ -29,7 +29,7 @@
   </table>
 
   <h2>{% trans 'Job configurations' %}
-    <small>(<a href='{% url 'core.repository_check_config_add' repository.oid %}'>{% trans 'add' %}</a>)</small></h2>
+    <small>(<a href='check-configs/?view=add'>{% trans 'add' %}</a>)</small></h2>
 
     {% for check_config in repository.job_configs %}
 
@@ -38,7 +38,7 @@
         {% url 'core.repository_check_config_trigger' repository.oid check_config.oid as url %}
         {% trans 'run now' as label %}
         ({% include 'core/post_link.html' with url=url label=label %})
-        (<a href='{% url 'core.repository_check_config_edit' repository.oid check_config.oid %}'>{% trans 'edit' %}</a>)
+        (<a href='check-configs/{{ check_config.oid }}/?view=edit'>{% trans 'edit' %}</a>)
       </small></h3>
 
 
@@ -53,9 +53,7 @@
         {% endwith %}
         </table>
     </section>
-
   {% endfor %}
-
 
   <h2>{% trans 'Jobs' %}</h2>
 

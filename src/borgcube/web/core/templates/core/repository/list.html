@@ -6,7 +6,7 @@
 
 {% block content %}
   <h1>{% trans 'Repositories' %}
-    <small>(<a href='{% url 'core.repository_add' %}'>{% trans 'add' %}</a>)</small></h1>
+    <small>(<a href='?view=add'>{% trans 'add' %}</a>)</small></h1>
 
   <table class='repositories jobs' cellpadding='3px'>
     <tr>
@@ -18,7 +18,7 @@
     {% for repository in repositories %}
     {% with job=repository.latest_job %}
     <tr {% if job.failed %}class='failed'{% endif %}>
-      <td><a href='{{ repository|get_url }}'>{{ repository.name }}</a></td>
+      <td><a href='{{ repository.oid }}'>{{ repository.name }}</a></td>
       {% if job %}
       <td><a href='{{ job|get_url }}'>{{ job.timestamp_start|default:job.created }}</a></td>
       <td>{{ job|job_outcome }}</td>
