@@ -752,7 +752,10 @@ def schedule_add_and_edit(render, request, data, schedule=None, context=None):
             action_forms.append(action_form)
 
     if data:
-        actions_data = json.loads(data['actions-data'])
+        try:
+            actions_data = json.loads(data['actions-data'])
+        except KeyError:
+            return HttpResponseBadRequest('Invalid POST data for schedule form. Is JavaScript disabled?')
         all_valid = form.is_valid()
         txn = transaction.get()
 
