@@ -231,9 +231,7 @@ class TriggerPublisher(ExtendingPublisher):
     menu_text = ugettext_lazy('Trigger')
 
     def view(self, request):
-        return TemplateResponse(request, 'core/trigger/list.html', {
-
-        })
+        return self.render(request, 'core/trigger/list.html', {})
 
 
 def borgcube_web_children(publisher, children):
