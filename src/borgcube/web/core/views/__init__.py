@@ -811,11 +811,8 @@ class SchedulesPublisher(Publisher, ScheduledActionFormMixin):
     companion = 'schedules'
     views = ('list', 'add', 'action_form', )
 
-    def __getitem__(self, index):
-        try:
-            schedule = self.schedules[int(index)]
-        except ValueError:
-            raise KeyError(index)
+    def __getitem__(self, oid):
+        schedule = find_oid_or_404(self.schedules, oid)
         return SchedulePublisher(schedule, self)
 
     def view(self, request):
