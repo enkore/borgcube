@@ -964,6 +964,14 @@ class RepositoryCheckConfigPublisher(Publisher):
 
 
 class ManagementPublisher(Publisher, PublisherMenu):
+    """
+    Base class for management publishers (that want to be part of the management area).
+
+    Inherits `PublisherMenu` to enable the menu entry, and uses *management.html* as a
+    base_template, which enables the sidebar used for navigation in the management area.
+    It also adds the *management* key to the template context which is used for signalling
+    middleware.
+    """
     def base_template(self, request):
         return 'management.html'
 
@@ -974,6 +982,10 @@ class ManagementPublisher(Publisher, PublisherMenu):
 
 
 class ManagementAreaPublisher(ManagementPublisher):
+    """
+    Publisher responsible for the /management/ area; it does not publish anything on it's own,
+    but is an anchor point for plugins and other parts to add their management functionality.
+    """
     name = 'management'
     menu_descend = True
     menu_text = _('Management')
