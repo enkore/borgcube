@@ -44,13 +44,6 @@ def borgcube_web_management_nav(nav):
     """
 
 
-@hookspec(firstresult=True)
-def borgcube_web_resolve(publisher, segment):
-    """
-
-    """
-
-
 @hookspec
 def borgcube_web_children(publisher, children):
     """
@@ -61,5 +54,5 @@ def borgcube_web_children(publisher, children):
 @hookspec
 def borgcube_web_jinja_env(env):
     """
-
     """
+    # TODO what about Environment options? do we even *want* to expose those?

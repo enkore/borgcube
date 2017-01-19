@@ -212,10 +212,6 @@ class ConfigPublisher(ManagementPublisher):
         return self.parent.redirect_to()
 
 
-#def borgcube_web_resolve(publisher, segment):
-#    if publisher.name == 'management' and segment == 'prune':
-#        return PrunePublisher(prune_root())
-
 from borgcube.core.models import Trigger
 from .publishers import ExtendingPublisher
 

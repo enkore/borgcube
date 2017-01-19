@@ -206,17 +206,6 @@ class Publisher:
         Note: *path_segments* is destroyed in the process.
         """
 
-        def out_of_hierarchy(segment):
-            child = hook.borgcube_web_resolve(publisher=self, segment=segment)
-            if child:
-                # A plugin publisher is mounted here, resolve further.
-                child.parent = self
-                child.segment = segment
-                return child.resolve(path_segments, view)
-            else:
-                # No matches at all -> 404.
-                raise Http404
-
         try:
             segment = path_segments.pop()
             if not segment:
@@ -241,12 +230,9 @@ class Publisher:
                 return self.view
 
         try:
-            child = self[segment]
-            child.parent = self
-            child.segment = segment
-            return child.resolve(path_segments, view)
+            return self.get(segment).resolve(path_segments, view)
         except KeyError:
-            return out_of_hierarchy(segment)
+            raise Http404
 
     ###################
     # Views
