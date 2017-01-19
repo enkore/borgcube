@@ -15,6 +15,7 @@ from borg.helpers import format_file_size
 from borgcube.core import models
 from borgcube.job.backup import BackupConfig, BackupJob
 from borgcube.utils import hook
+from borgcube.web.core.publishers import client
 from .. import views
 
 register = template.Library()
@@ -63,7 +64,7 @@ def get_url(model_instance):
 
 @register.filter
 def compression_name(compression_id):
-    return dict(views.JobConfigForm.COMPRESSION_CHOICES).get(compression_id, compression_id)
+    return dict(client.JobConfigForm.COMPRESSION_CHOICES).get(compression_id, compression_id)
 
 
 @register.filter

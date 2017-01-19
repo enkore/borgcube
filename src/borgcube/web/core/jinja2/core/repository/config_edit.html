@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+
+{% block title %}{% trans label=config.label %}Edit job configuration {{ label }}{% endtrans %}{% endblock %}
+
+{% block content %}
+  <h1>{% trans label=config.label %}Edit job configuration {{ label }}{% endtrans %}</h1>
+
+  <form method='POST'>
+    <table>
+      {% block form %}
+        {{ csrf_input }}
+        {{ form }}
+      {% endblock %}
+
+      <tr>
+        <td></td>
+        <td><input type='submit' value='{{ _('Save changes') }}'/></td>
+      </tr>
+    </table>
+  </form>
+{% endblock %}

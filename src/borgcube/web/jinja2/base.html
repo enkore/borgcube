@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf8">
+    <title>{% block fulltitle %}{% block title %}{{ title }}{% endblock %} - BorgCube{% endblock %}</title>
+    <style type="text/css">
+      /* http://colorschemedesigner.com/csd-3.5/#3.31Tw0w0w0w0 */
+      /* 0C5AA6        26527C        04396C        408AD2        679ED2 */
+      /* FFC300        BF9E30        A67F00        FFD240        FFDE73 */
+      /* FF5300        BF5E30        A63600        FF7E40        FFA073 */
+
+      /*
+       * The main face color is #0C5AA6, used for the top-bar, links, generic borders etc.
+       * #04396C is the intense variant of it to highlight things, like active links.
+       * #679ED2 is a slightly brighter variant of the main color,
+       * used to off-set chrome from a background with the main color.
+       * #FFC300 is the chosen complement to the main color.
+       */
+
+      /* The basics: no unnecessary margins, and the preferred sans-serif font of the user, please */
+      html, body {
+        margin: 0;
+        padding: 0;
+        font-family: sans-serif;
+      }
+
+      html {
+        position: relative;
+        min-height: 100%;
+      }
+
+      body {
+        margin-bottom: 1em;
+      }
+
+      a,
+      a:visited {
+        color: #0C5AA6;
+      }
+
+      a:active,
+      a.active,
+      a:hover {
+        color: #04396C;
+      }
+
+      /* The header is a top navigation bar. */
+      header {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        overflow: hidden;
+        background-color: #0C5AA6;
+      }
+
+      /* As usual for navigation bars the unordered list is a fake list that doesn't look like a list :) */
+      header ul {
+        margin: 0;
+      }
+
+      header li {
+        display: block;
+        float: left;
+      }
+
+      header a,
+      header a:visited {
+        display: block;
+        padding: 0.77em;
+        color: white;
+        text-decoration: none;
+        text-transform: capitalize;
+        font-size: 1.3em;
+        /* These aren't *real* small caps, it looks like at least Firefox emulates them by changing the font size.
+         * Well, they're kinda unusual nowadays. Anyway, I like em. And this will be the only place I use em.
+         * Promise.
+         */
+        font-variant: small-caps;
+      }
+
+      header a:active,
+      header a.active,
+      header a:hover {
+        color: #FFC300;
+        background-color: #04396C;
+
+        border-left: 1px solid #679ED2;
+        border-right: 1px solid #679ED2;
+        /* The negative margin keeps the effective width of the element the same, so that adjacent
+         * menu elements don't move around when the user hovers over different elements.
+         */
+        margin-left: -1px;
+        margin-right: -1px;
+      }
+
+      /* Align the link that goes to the project page into the right top corner */
+      header #project-link {
+        float: right;
+      }
+
+      #secondary-menu {
+        margin-bottom: 1em;
+        border-bottom: 4px solid #679ED2;
+      }
+
+      #secondary-menu ul {
+        margin: 0;
+      }
+
+      #secondary-menu li {
+        display: block;
+        float: left;
+        margin-bottom: -4px;
+      }
+
+      #secondary-menu a,
+      #secondary-menu a:visited {
+        display: block;
+        text-decoration: None;
+        color: black;
+        padding: 0.77em;
+      }
+
+      #secondary-menu a:active,
+      #secondary-menu a.active,
+      #secondary-menu a:hover {
+        border-bottom: 4px solid #04396C;
+      }
+
+      /* The footer has no content. It's a subtle pattern at the bottom of the page/screen. */
+      footer {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        /* This matches the height of /static/seigaiha.png */
+        height: 400px;
+        /* z-index = -1 so that it is behind the page */
+        z-index: -1;
+
+        /* Awesome Seigaha background pattern by Olga Libby (via subtlepatterns.com),
+         * slight modifications by me
+         */
+        background-image: url('/static/seigaiha.png');
+        background-repeat: repeat-x;
+      }
+
+      #sidebar {
+        width: 250px;
+        float: left;
+        margin-right: 3.3em;
+      }
+
+      #content {
+        margin-left: 3.3em;
+        /* This makes it expand in width to occupy available space */
+        overflow: hidden;
+        position: relative;
+      }
+
+      .plist th,
+      form table th {
+        text-align: right;
+        font-weight: normal;
+        padding-right: 1em;
+      }
+
+      .plist pre {
+        margin: 0;
+      }
+
+      section {
+        margin-left: 0.5em;
+        padding-left: 0.5em;
+        border-left: 4px solid #04396C;
+      }
+
+      section section {
+        border-left: 4px solid #679ED2;
+      }
+
+      hr {
+        border: none;
+        border-bottom: 4px solid #679ED2;
+      }
+
+      .jobs {
+        border-collapse: collapse;
+        width: 100%;
+      }
+
+      .jobs th {
+        text-align: left;
+      }
+
+      .jobs .failed {
+        background-color: #FFA073;
+      }
+
+      .longtext {
+        width: 700px;
+      }
+
+      .message-warning {
+        position: relative;
+        padding: 0.5em;
+        margin: 0.5em;
+        width: 700px;
+        background-color: #FFA073;
+      }
+
+      .message-warning .symbol {
+        vertical-align: text-top;
+        font-family: monospace;
+        font-size: 2.5em;
+        font-weight: bold;
+        letter-spacing: -0.1em;
+      }
+
+      .message-warning .body {
+        padding-left: 0.75em;
+      }
+
+      .message-warning .body p:first-child {
+        margin-top: 0;
+      }
+
+      .message-warning .body p:last-child {
+        margin-bottom: 0;
+      }
+
+      textarea.recurrence-widget {
+        /* this way the "please fill this field" pop-over produced by modern browsers
+         * will be in approximately the correct place.
+         */
+        width: 1px;
+        height: 1px;
+        display: inline !important;
+        visibility: hidden;
+        pointer-events: none;
+        tab-index: -1;
+      }
+
+      form th {
+        vertical-align: top;
+      }
+
+      form th label {
+        margin-top: 0.4em;
+        display: inline-block;
+      }
+
+      .pagination {
+        margin-top: 1em;
+        text-align: center;
+      }
+    </style>
+    {% block extracss %}
+    {% endblock %}
+  </head>
+  <body>
+    <header>
+      <nav>
+        <ul>
+          {# TODO: real detection of current item ;) #}
+          {# TODO: just use request.root to enumerate these #}
+          <li><a href='/' {% if request.path == '/' %}class='active'{% endif %}>{{ _('Dashboard') }}</a></li>
+          <li><a href='/schedules/' {% if '/schedules/' in request.path %}class='active'{% endif %}>{{ _('Schedule') }}</a></li>
+          <li><a href='/clients/' {% if '/clients/' in request.path %}class='active'{% endif %}>{{ _('Clients') }}</a></li>
+          <li><a href='/repositories/' {% if '/repositories/' in request.path %}class='active'{% endif %}>{{ _('Repositories') }}</a></li>
+          <li><a href='/management/' {% if '/management/' in request.path %}class='active'{% endif %}>{{ _('Management') }}</a></li>
+
+          <li id='project-link'><a href='http://borgcube.rtfd.io/'>BorgCube</a></li>
+        </ul>
+      </nav>
+      <div style='clear:both;'></div>
+    </header>
+
+    {% block sidebarloc %}
+    {% endblock %}
+
+    <div id='content'>
+      {% block content %}
+      {% endblock %}
+    </div>
+
+    <div style='clear:both;'></div>
+
+    <footer>
+    </footer>
+
+    {% block extrajs %}
+    {% endblock %}
+  </body>
+</html>

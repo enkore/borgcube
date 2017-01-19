@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% from 'core/post_link.html' import post_link with context %}
+
+{% block title %}{% trans label=job_config.label %}Edit job configuration {{ label }}{% endtrans %}{% endblock %}
+
+{% block content %}
+  <h1>
+    {% trans label=job_config.label %}Edit job configuration {{ label }}{% endtrans %}
+    <small>({{ post_link('?view=delete', _('delete'), _('Are you sure you want to delete this configuration?')) }})</small>
+  </h1>
+
+  <form method='POST'>
+    <table>
+      {% block form %}
+        {{ csrf_input }}
+        {{ form }}
+
+        <tr>
+          <td colspan='2'><h2>{{ _('Advanced options') }}</h2></td>
+        </tr>
+
+        {{ advanced_form }}
+      {% endblock %}
+
+      <tr>
+        <td></td>
+        <td><input type='submit' value='{{ _('Save changes') }}'/></td>
+      </tr>
+    </table>
+  </form>
+{% endblock %}

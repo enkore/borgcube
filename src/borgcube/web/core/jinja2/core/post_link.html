@@ -1,0 +1,3 @@
+{% macro post_link(url, label, confirm=False) -%}
+<form style='display: inline;' action='{{ url }}' method='POST'>{{ csrf_input }}<a href='#' onclick='if({% if confirm %}confirm("{{ confirm|escapejs }}"){% else %}true{% endif %}) this.parentElement.submit();'>{{ label }}</a></form>
+{%- endmacro %}

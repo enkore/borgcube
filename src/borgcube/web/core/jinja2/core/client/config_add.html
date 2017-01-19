@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ _('Add job configuration') }}{% endblock %}
+
+{% block content %}
+  <h1>{{ _('Add job configuration') }}</h1>
+
+  <form method='POST'>
+    <table>
+      {% block form %}
+        {{ csrf_input }}
+        {{ form }}
+
+        <tr>
+          <td colspan='2'><h2>{{ _('Advanced options') }}</h2></td>
+        </tr>
+
+        {{ advanced_form }}
+      {% endblock %}
+
+      <tr>
+        <td></td>
+        <td><input type='submit' value='{{ _('Add configuration') }}'/></td>
+      </tr>
+    </table>
+  </form>
+{% endblock %}

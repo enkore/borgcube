@@ -1,0 +1,29 @@
+{% extends 'sidebar.html' %}
+
+{% macro management_nav(nav) %}
+<nav>
+  <ul>
+    {% for item in nav %}
+      <li><a href='{{ item['url'] }}'
+             {% if request.path == item['url'] %}class='active'{% endif %}>{{ item['text'] }}</a>
+        {% if item.items %}
+          {{ management_nav(item['items']) }}
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+</nav>
+{% endmacro %}
+
+{% block title %}{{ _('Management') }}{% endblock %}
+{% block sidebar %}
+  {% if not management or management == True %}
+    <h3>error: you need to set 'management' = True in the context of the TemplateResponse</h3>
+  {% else %}
+    {{ management_nav(management) }}
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+  <p>{{ _('(Select something to manage from the menu at the left.)') }}</p>
+{% endblock %}

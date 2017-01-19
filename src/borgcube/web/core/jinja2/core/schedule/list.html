@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+{% from 'core/post_link.html' import post_link with context %}
+
+{% block title %}{{ _('Schedules') }}{% endblock %}
+
+{% block content %}
+  <h1>{{ _('Schedules') }}
+    <small>
+      (<a href='.'>{{ _('calendar') }}</a>)
+      (<a href='.?view=add'>{{ _('add') }}</a>)
+    </small>
+  </h1>
+
+  <table class='schedules' cellpadding='3px'>
+    <tr>
+      <th>{{ m|field_name('name') }}</th>
+      <th>{{ _('Recurrence') }}</th>
+      <th></th>
+    </tr>
+    {% for schedule in schedules %}
+    <tr>
+      <td>{{ schedule.name }}</td>
+
+      <!-- TODO last execution overall outcome -->
+      <td>
+        <a href='.?schedule={{ schedule.oid }}'>
+          {% if schedule.recurrence_enabled %}
+          {{ schedule.recurrence|describe_recurrence }}
+          {% else %}
+          {{ _('recurrence disabled') }}
+          {% endif %}
+        </a>
+      </td>
+
+      <td>
+        {% set pub = request.publisher[schedule.oid] %}
+        <a href='{{ schedule.oid }}/'>edit</a>
+        {{ post_link(pub.reverse('delete'), _('delete'),  _('Are you sure you want to delete this schedule?')) }}
+      </td>
+    </tr>
+    <tr>
+      <td colspan='2'><div style='padding-left: 1em;'>{{ schedule.description|linebreaksbr }}</div></td>
+    </tr>
+    {% endfor %}
+  </table>
+{% endblock %}

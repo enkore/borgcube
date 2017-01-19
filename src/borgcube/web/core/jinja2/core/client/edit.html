@@ -1,0 +1,21 @@
+{% extends 'core/client/add.html' %}
+
+{% block title %}{% trans id=client.hostname %}Edit client {{ id }}{% endtrans %}{% endblock %}
+
+{% block content %}
+  <h1>{{ client.hostname }}
+    <small>(<a href='.'>{{ _('view') }}</a>)
+    </small>
+  </h1>
+
+  <form method='POST'>
+    <table>
+      {% block form %}{{ super() }}{% endblock %}
+
+      <tr>
+        <td></td>
+        <td><input type='submit' value='{{ _('Save changes') }}'/></td>
+      </tr>
+    </table>
+  </form>
+{% endblock %}

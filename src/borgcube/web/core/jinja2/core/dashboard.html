@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+
+{% block fulltitle %}{{ _('BorgCube') }}{% endblock %}
+
+{% block sidebar %}
+{% endblock %}
+
+{% block extracss %}
+  <style type='text/css'>
+    /* The overview presents itself as a couple of bubbly-things with some facts/metrics in them.
+     * Some metrics may have limits (eg. storage use), these get a pie-chart like bubble.
+     */
+    #metrics {
+      text-align: center;
+    }
+
+    #metrics .metric {
+      /* The inline-block causes this element to be subject to the text centering of #overview,
+       * while the centering of this element causes the text to be centered within it.
+       */
+      display: inline-block;
+      text-align: center;
+      position: relative;
+      width: 12em;
+      height: 12em;
+
+      margin: 1em;
+
+      border-color: #f5f5f5;
+      background: #f5f5f5;
+      border-style: solid;
+      /* Fun-fact: a border-radius of 50 % gives you a circle */
+      border-radius: 50%;
+
+      white-space: nowrap;
+
+      color: #04396C;
+    }
+
+    #metrics .metric .wrap {
+      /* This little CSS-transform hack offsets the text into the center */
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    #metrics .metric .value {
+      /* Big numbers, little labels */
+      font-size: 2em;
+      padding: 0.5em;
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+  <div id='metrics'>
+    {% for metric in metrics %}
+    <div class='metric'>
+      <div class='wrap'>
+        <span class='value'>{{ metric.formatted_value() }}</span><br>
+        <span class='name'>{{ metric.label }}</span>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div style='clear:both;'></div>
+
+  <h2>{{ _('Recent Jobs') }}</h2>
+
+  {% from 'core/jobs_table.html' import jobs_table %}
+
+  {{ jobs_table(recent_jobs, client_column=True, repository_column=True) }}
+{% endblock %}

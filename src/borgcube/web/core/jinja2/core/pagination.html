@@ -1,0 +1,33 @@
+{#
+Expected variables:
+- page: Django Paginator page
+
+Options:
+- prefix: prefix of paginator (trailing underscore will be added). Links to pages
+  will reference the prefix in the hash for correct alignment of the loaded page.
+#}
+
+{% macro pagination(page, prefix='') %}
+  {% if page.paginator.num_pages > 1 %}
+    {% if prefix %}
+      {% set fullprefix = prefix + '_' %}
+    {% endif %}
+    <div class='pagination'>
+        <span class='step-links'>
+            {% if page.has_previous() %}
+                <a href='?{{ fullprefix }}page={{ page.previous_page_number() }}#{{ prefix }}'>{{ _('Previous page') }}</a>
+            {% endif %}
+
+            <span class='current'>
+              {% trans current=page.number, total=page.paginator.num_pages %}
+                Page {{ current }} of {{ total }}
+              {% endtrans %}
+            </span>
+
+            {% if page.has_next() %}
+                <a href='?{{ fullprefix }}page={{ page.next_page_number() }}#{{ prefix }}'>{{ _('Next page') }}</a>
+            {% endif %}
+        </span>
+    </div>
+  {% endif %}
+{% endmacro %}

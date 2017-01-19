@@ -1,0 +1,71 @@
+{#
+Expected variables:
+- jobs: list of Job instances
+
+Options:
+- client_column: show client link for each job
+- config_column: show configuration column
+- repository_column: show repository column
+#}
+{% macro jobs_table(jobs, client_column=False, config_column=False, repository_column=False) -%}
+{% if jobs %}
+<table class='jobs' cellpadding='3px'>
+  <tr>
+    <th>{{ _('Timestamp') }}</th>
+    {% if repository_column %}
+      <th>{{ _('Repository') }}</th>
+    {% endif %}
+    {% if client_column %}
+      <th>{{ _('Client') }}</th>
+    {% endif %}
+    {% if config_column %}
+    <th>{{ _('Configuration') }}</th>
+    {% endif %}
+    <th>{{ _('Outcome') }}</th>
+    <th>{{ _('Duration') }}</th>
+    <th></th>
+  </tr>
+
+  {% for job in jobs %}
+    <tr {% if job.failed %}class='failed'{% elif job.borg_warning %}class='warning'{% endif %}>
+    <td><a href='{{ job|get_url }}'>{{ job.timestamp_start|default(job.created) }}</a></td>
+    {% if repository_column %}
+      <td>
+        {% if job.repository %}
+        <a href='{{ job.repository|get_url }}'>{{ job.repository.name }}</a>
+        {% endif %}
+      </td>
+    {% endif %}
+    {% if client_column %}
+      {% if job.client %}
+      <td><a href='{{ job.client|get_url }}'>{{ job.client.hostname }}</a>
+        {% if job.config %}
+          ({{ job.config.label }})
+        {% endif %}
+      </td>
+      {% else %}
+      <td>({{ job.verbose_name }})</td>
+      {% endif %}
+    {% endif %}
+    {% if config_column %}
+    {% if job.config %}
+    <td><a href='{{ job.get_jobconfig|get_url }}'>{{ job.config.label }}</a></td>
+    {% else %}
+    <td>{{ _('Unknown') }}</td>
+    {% endif %}
+    {% endif %}
+    <td>{{ job|job_outcome }}</td>
+    {% if job.stable %}
+    <td>{{ job.duration|format_timedelta }}</td>
+    <td></td>
+    {% else %}
+    <td><em>{{ job.duration|format_timedelta }}</em></td>
+    <td><a href='{{ job|get_url }}?view=cancel'>C</a></td>
+    {% endif %}
+    </tr>
+  {% endfor %}
+</table>
+{% else %}
+No jobs found.
+{% endif %}
+{%- endmacro %}

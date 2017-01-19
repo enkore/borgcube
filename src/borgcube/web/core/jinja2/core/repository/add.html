@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ _('Add repository') }}{% endblock %}
+
+{% block content %}
+  <h1>{{ _('Add repository') }}</h1>
+
+  <form method='POST'>
+    <table>
+      {% block form %}
+        {{ csrf_input }}
+        {{ repository_form }}
+      {% endblock %}
+
+      <tr>
+        <td></td>
+        <td><input type='submit' value='{{ _('Add repository') }}'/></td>
+      </tr>
+    </table>
+  </form>
+{% endblock %}

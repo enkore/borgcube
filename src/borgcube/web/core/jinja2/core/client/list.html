@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ _('Clients') }}{% endblock %}
+
+{% block content %}
+  <h1>{{ _('Clients') }}
+   <small>(<a href='?view=add'>{{ _('add') }}</a>)</small></h1>
+
+  <table class='jobs' cellpadding='3px'>
+    <tr>
+      <th>{{ m|field_name('hostname') }}</th>
+      <th>{{ _('Last job') }}</th>
+      <th>{{ _('Outcome') }}</th>
+    </tr>
+    {% for client in clients %}
+      {% set job = client.latest_job() %}
+      <tr {% if job.failed %}class='failed'{% endif %}>
+        <td><a href='{{ client.hostname }}'>{{ client.hostname }}</a></td>
+        {% if job %}
+        <td><a href='{{ job|get_url }}'>{{ job.timestamp_start|default(job.created) }}</a></td>
+        <td>{{ job|job_outcome }}</td>
+        {% else %}
+        <td colspan='2'>{{ _('No job on file') }}</td>
+        {% endif %}
+      </tr>
+    {% endfor %}
+  </table>
+{% endblock %}

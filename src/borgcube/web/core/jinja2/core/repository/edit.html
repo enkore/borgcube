@@ -1,0 +1,25 @@
+{% extends 'core/repository/add.html' %}
+
+{% block title %}{% trans name=repository.name%}Edit repository {{ name }}{% endtrans %}{% endblock %}
+
+{% block content %}
+  <h1>{{ repository.name }}
+    <small>
+      (<a href='.'>{{ _('view') }}</a>)
+    </small>
+  </h1>
+
+  <form method='POST'>
+    <table>
+      {% block form %}
+        {{ csrf_input }}
+        {{ repository_form }}
+      {% endblock %}
+
+      <tr>
+        <td></td>
+        <td><input type='submit' value='{{ _('Save changes') }}'/></td>
+      </tr>
+    </table>
+  </form>
+{% endblock %}

@@ -3,6 +3,8 @@ import logging
 
 import transaction
 
+from dateutil.relativedelta import relativedelta
+
 from django.http import HttpResponse
 from django.http import HttpResponseBadRequest
 from django.utils.timezone import localtime, now
@@ -79,7 +81,48 @@ def schedule_add_and_edit(render, request, data, schedule=None, context=None):
     return render(request, 'core/schedule/add.html', context)
 
 
-from dateutil.relativedelta import relativedelta
+class CalendarSheet:
+    # FYI I'm a masochist
+
+    class Week:
+        def __init__(self, first_day, days):
+            self.first_day = first_day
+            self.days = days
+            self.number = first_day.datetime.isocalendar()[1]
+
+    class Day:
+        def __init__(self, datetime, off_month):
+            self.begin = self.datetime = datetime
+            self.end = datetime + relativedelta(days=1) - relativedelta(microseconds=1)
+            self.date = datetime.date()
+            self.off_month = off_month
+
+    def __init__(self, datetime_month):
+        self.month = datetime_month.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        self.month_end = self.month + relativedelta(months=1)
+
+        weekday_delta = -self.month.weekday()
+        self.sheet_begin = self.month + relativedelta(days=weekday_delta)
+
+        weekday_delta = 7 - self.month_end.isoweekday()
+        self.sheet_end = self.month_end
+        if weekday_delta != 6:
+            # Don't append a full week of the following month
+            self.sheet_end += relativedelta(days=weekday_delta)
+
+        self.weeks = []
+        current = self.sheet_begin
+
+        def day():
+            off_month = current.month != self.month.month
+            return self.Day(datetime=current, off_month=off_month)
+
+        while current < self.sheet_end:
+            week = self.Week(day(), [])
+            self.weeks.append(week)
+            for i in range(7):
+                week.days.append(day())
+                current += relativedelta(days=1)
 
 
 class ScheduledActionFormMixin:
@@ -98,14 +141,14 @@ class SchedulesPublisher(Publisher, ScheduledActionFormMixin):
 
     def __getitem__(self, oid):
         schedule = find_oid(self.schedules, oid)
-        return SchedulePublisher(schedule, self)
+        return SchedulePublisher(schedule, self, oid)
 
     def view(self, request):
         try:
             month = localtime(now()).replace(year=int(request.GET['year']), month=int(request.GET['month']), day=1)
         except (KeyError, TypeError):
             month = localtime(now())
-        sheet = self.CalendarSheet(month)
+        sheet = CalendarSheet(month)
         schedules = self.schedules
 
         keep = request.GET.getlist('schedule')
@@ -170,49 +213,6 @@ class SchedulesPublisher(Publisher, ScheduledActionFormMixin):
             'title': _('Add schedule'),
             'submit': _('Add schedule'),
         })
-
-    class CalendarSheet:
-        # FYI I'm a masochist
-
-        class Week:
-            def __init__(self, first_day, days):
-                self.first_day = first_day
-                self.days = days
-                self.number = first_day.datetime.isocalendar()[1]
-
-        class Day:
-            def __init__(self, datetime, off_month):
-                self.begin = self.datetime = datetime
-                self.end = datetime + relativedelta(days=1) - relativedelta(microseconds=1)
-                self.date = datetime.date()
-                self.off_month = off_month
-
-        def __init__(self, datetime_month):
-            self.month = datetime_month.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-            self.month_end = self.month + relativedelta(months=1)
-
-            weekday_delta = -self.month.weekday()
-            self.sheet_begin = self.month + relativedelta(days=weekday_delta)
-
-            weekday_delta = 7 - self.month_end.isoweekday()
-            self.sheet_end = self.month_end
-            if weekday_delta != 6:
-                # Don't append a full week of the following month
-                self.sheet_end += relativedelta(days=weekday_delta)
-
-            self.weeks = []
-            current = self.sheet_begin
-
-            def day():
-                off_month = current.month != self.month.month
-                return self.Day(datetime=current, off_month=off_month)
-
-            while current < self.sheet_end:
-                week = self.Week(day(), [])
-                self.weeks.append(week)
-                for i in range(7):
-                    week.days.append(day())
-                    current += relativedelta(days=1)
 
 
 class SchedulePublisher(ExtensiblePublisher, ScheduledActionFormMixin):

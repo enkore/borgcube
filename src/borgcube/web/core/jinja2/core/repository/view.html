@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% from 'core/post_link.html' import post_link with context %}
+
+{% block title %}{% trans name=repository.name%}Repository {{ name }}{% endtrans %}{% endblock %}
+
+{% block content %}
+  <h1>{{ repository.name }}
+    <small>
+      (<a href='?view=edit'>{{ _('edit') }}</a>)
+    </small>
+  </h1>
+
+  <p>{{ repository.description }}</p>
+
+  <table class='plist'>
+      <tr>
+        <th>{{ repository|field_name('url') }}</th>
+        <td>{{ repository.url }}</td>
+      </tr>
+      <tr>
+        <th>{{ repository|field_name('repository_id') }}</th>
+        <td>{{ repository.repository_id }}</td>
+      </tr>
+      <tr>
+        <th>{{ repository|field_name('remote_borg') }}</th>
+        <td><pre>{{ repository.remote_borg }}</pre></td>
+      </tr>
+  </table>
+
+  <h2>{{ _('Job configurations') }}
+    <small>(<a href='check-configs/?view=add'>{{ _('add') }}</a>)</small></h2>
+
+    {% for check_config in repository.job_configs %}
+
+    <section class='check-config' id='check-config-{{ check_config.oid }}'>
+      <h3>{{ check_config.label }} <small>
+        {% set pub = request.publisher.children().get('check-configs').get(check_config.oid) %}
+        ({{ post_link(pub.reverse('trigger'), _('run now')) }})
+        (<a href='check-configs/{{ check_config.oid }}/?view=edit'>{{ _('edit') }}</a>)
+      </small></h3>
+
+
+        <table class='plist'>
+        {% set fields = 'check_repository verify_data check_archives check_only_new_archives' %}
+        {% for field in fields.split() %}
+          <tr>
+            <th>{{ check_config|field_name(field) }}</th>
+            <td>{{ check_config[field]|yesno }}</td>
+          </tr>
+        {% endfor %}
+        </table>
+    </section>
+  {% endfor %}
+
+  <h2>{{ _('Jobs') }}</h2>
+
+  {% from 'core/jobs_table.html' import jobs_table %}
+
+  {{ jobs_table(recent_jobs, client_column=True) }}
+{% endblock %}

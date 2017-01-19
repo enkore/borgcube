@@ -138,7 +138,7 @@ class JobConfigsPublisher(Publisher):
     views = ('add', )
 
     def __getitem__(self, oid):
-        return JobConfigPublisher(find_oid(self.configs, oid))
+        return JobConfigPublisher(find_oid(self.configs, oid), self, oid)
 
     def add_view(self, request):
         client = self.parent.client
@@ -172,7 +172,7 @@ class JobConfigsPublisher(Publisher):
 
 class JobConfigPublisher(Publisher):
     companion = 'config'
-    views = ('delete', 'trigger', )
+    views = ('edit', 'delete', 'trigger', )
 
     def reverse(self, view=None):
         if view:
@@ -180,7 +180,7 @@ class JobConfigPublisher(Publisher):
         else:
             return self.parent.parent.reverse() + '#job-config-' + self.config.oid
 
-    def view(self, request):
+    def edit_view(self, request):
         client = self.config.client
         job_config = self.config
         data = request.POST or None

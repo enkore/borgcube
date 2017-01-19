@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ _('Add client') }}{% endblock %}
+
+{% block content %}
+  <h1>{{ _('Add client') }}</h1>
+
+  <form method='POST'>
+    <table>
+      {% block form %}
+        {{ csrf_input }}
+        {{ client_form }}
+
+        <tr>
+          <td colspan='2'>
+            <h2>{{ _('Connection') }}</h2>
+          </td>
+        </tr>
+
+        {{ connection_form }}
+      {% endblock %}
+
+      <tr>
+        <td></td>
+        <td><input type='submit' value='{{ _('Add client') }}'/></td>
+      </tr>
+    </table>
+  </form>
+{% endblock %}
+
+{% block extrajs %}
+  <script>
+    window.addEventListener('load', function () {
+      function update_if_derived(field, new_value) {
+        if (!field.value.length || new_value.startsWith(field.value) ||
+                (new_value.length && field.value.startsWith(new_value))) {
+          field.value = new_value;
+        }
+      }
+
+      var id = document.getElementById('id_hostname');
+      var remote = document.getElementById('id_connection-remote');
+
+      function id_changed() {
+        var value = id.value;
+        var rhost = 'root@' + value;
+        update_if_derived(remote, rhost);
+      }
+
+      id.addEventListener('input', id_changed);
+      id.addEventListener('propertychange', id_changed);
+    });
+  </script>
+{% endblock %}

@@ -1,0 +1,135 @@
+{% extends 'base.html' %}
+
+{% block title %}
+  {# translators: schedule heading strftime string for month #}
+  {# translators: reference https://docs.python.org/3/library/datetime.html#strftime-and-strptime-behavior #}
+  {% set fmt = _('%%B %%Y') %}
+  {% trans from=calsheet.month.date().strftime(fmt), to=calsheet.month_end.date().strftime(fmt) %}
+  {{ from }} schedule
+  {% endtrans %}
+{% endblock %}
+
+{% block content %}
+  <h1>
+    {# translators: schedule heading strftime string for month #}
+    {% set fmt = _('%%B %%Y') %}
+    {% trans from=calsheet.month.date().strftime(fmt), to=calsheet.month_end.date().strftime(fmt) %}
+    {{ from }} schedule
+    {% endtrans %}
+
+    <small>
+      (<a href='.?view=list'>{{ _('list') }}</a>)
+      (<a href='.?view=add'>{{ _('add') }}</a>)
+    </small>
+  </h1>
+
+  <h2>
+
+  </h2>
+
+  <table class='calendar' width='100%'>
+    <tr class='month-nav'>
+      <td colspan='3'>
+        <a href='.?year={{ prev_month.year }}&month={{ prev_month.month }}'>{{ _('« previous month') }}</a>
+      </td>
+      <td colspan='2' style='text-align: center;'>
+        <a href='.'>{{ _('current month') }}</a>
+      </td>
+      <td colspan='3' style='text-align: right'>
+        <a href='.?year={{ next_month.year }}&month={{ next_month.month }}'>{{ _('next month »') }}</a>
+      </td>
+    </tr>
+
+    <tr class='month-header'>
+      <th>{{ _('KW') }}</th>
+      <th width='14%'>{{ _('Monday') }}</th>
+      <th width='14%'>{{ _('Tuesday') }}</th>
+      <th width='14%'>{{ _('Wednesday') }}</th>
+      <th width='14%'>{{ _('Thursday') }}</th>
+      <th width='14%'>{{ _('Friday') }}</th>
+      <th width='14%'>{{ _('Saturday') }}</th>
+      <th width='14%'>{{ _('Sunday') }}</th>
+    </tr>
+
+    {% for week in calsheet.weeks %}
+    <tr>
+      <td>{{ week.number }}</td>
+      {% for day in week.days %}
+        <td class='{% if day.off_month %}day-off-month{% endif %} day'>
+          <span class='day-number'>
+            {# translators: calender day cell date format #}
+            {# translators: %-d is a Linux/BSD-only hack that removes leading zeroes. #}
+            {% set fmt = _('%%-d') %}
+            {{ day.date.strftime(fmt) }}
+          </span><br>
+
+          {% for schedule in day.schedules %}
+            <a href='{{ schedule.oid }}/'
+               class='schedule-link'
+               style='background-color: {{ schedule.color }};'
+               title='{{ schedule.occurs }}
+{% for action in schedule.actions %}
+{{ action }}{% endfor %}'>
+              {{ schedule.name }}
+            </a><br>
+          {% endfor %}
+        </td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+  </table>
+
+  {% for item in schedules %}
+    <h2 id='item-{{ item.oid }}'>{{ item.name }}
+      <small>(<a href='{{ item.id }}'>{{ _('edit') }}</a>)</small></h2>
+
+    <p>{{ item.description }}</p>
+
+    <ul>
+      {% for occurence in item.occurences %}
+      <li>{{ occurence }}</li>
+      {% endfor %}
+    </ul>
+  {% endfor %}
+
+  <script type='application/javascript'>
+    window.addEventListener('load', function() {
+      var days = document.querySelectorAll('.calendar .day');
+      var heightus_longus = 0;
+      days.forEach(function(day) {
+        var height = day.offsetHeight;  /* ... I believe */
+        if (height > heightus_longus) {
+          heightus_longus = height;
+        }
+      });
+      heightus_longus = heightus_longus + 1 + 'px';
+      days.forEach(function(day){
+        day.style.height = heightus_longus;
+      });
+    });
+  </script>
+{% endblock %}
+
+{% block extracss %}
+<style type="text/css">
+  .calendar .day {
+    height: 3em;
+    vertical-align: text-top;
+  }
+
+  .calendar .day-off-month {
+    opacity: 0.5;
+  }
+
+  .calendar .day-number {
+    font-weight: bold;
+  }
+
+  .calendar .schedule-link {
+    display: inline-block;
+    text-decoration: none;
+    padding: 3px;
+    border-radius: 5px;
+  }
+</style>
+{% endblock %}

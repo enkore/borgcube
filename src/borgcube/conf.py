@@ -55,17 +55,16 @@ ROOT_URLCONF = 'borgcube.web.urls'
 
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'BACKEND': 'django.template.backends.jinja2.Jinja2',
         'DIRS': [
-            str(Path(__file__).parent / 'web' / 'templates'),
+            str(Path(__file__).parent / 'web' / 'jinja2'),
         ],
         'APP_DIRS': True,
         'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.debug',
-                'django.template.context_processors.request',
-                'django.contrib.messages.context_processors.messages',
-            ],
+            'environment': 'borgcube.web.core.template_env.environment',
+            'extensions': [
+                'jinja2.ext.i18n',
+            ]
         },
     },
 ]

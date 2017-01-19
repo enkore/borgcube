@@ -56,3 +56,10 @@ def borgcube_web_children(publisher, children):
     """
 
     """
+
+
+@hookspec
+def borgcube_web_jinja_env(env):
+    """
+
+    """

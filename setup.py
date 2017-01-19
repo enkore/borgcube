@@ -50,6 +50,7 @@ setup(
         'ZODB>=5',
         'ZEO>=5',
         'zodburi>=2',
+        'jinja2',
     ],
     extras_require={
         'proctitle': ['setproctitle'],

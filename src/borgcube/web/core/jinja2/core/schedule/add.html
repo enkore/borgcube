@@ -1,0 +1,304 @@
+{% extends base_template %}
+{% from 'core/post_link.html' import post_link with context %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+{% block ctitle %}
+  <h1>{{ title }}
+    {% if schedule %}
+      <small>({{ post_link('?view=delete', _('delete'), _('Are you sure you want to delete this schedule?')) }})</small>
+    {% endif %}
+  </h1>
+{% endblock %}
+
+{% block secondary_menu %}
+  {{ super() }}
+{% endblock %}
+
+{% block ccontent %}
+  <form method='POST' id='form'>
+    <table>
+      {% block form %}
+        {{ csrf_input }}
+        {{ form.media }}
+        {{ form }}
+
+        <tr>
+          <td></td>
+          <td>
+            <table class='message-warning'>
+              <tr>
+                <td class='symbol'>[!]</td>
+                <td class='body'>
+                  {% trans %}
+                    <p>While the above widget allows you to specify very complicated recurrence rules,
+                      I (as in the developer of this thing) suggest to not do that.</p>
+
+                    <p>They <em>practically never</em> mean what you think. Stick to the basics - daily,
+                      every other day, weekly etc., avoid exclusions - otherwise it becomes confusing
+                      <em>fast</em>.
+                    </p>
+                  {% endtrans %}
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      {% endblock %}
+
+      <tr id='before-actions'>
+        <td colspan='2'>
+          <h2 style='float: left;'>{{ _('Scheduled actions') }}</h2>
+          <hr style='margin-top: 2em; margin-left: 1em;'>
+          <div style='clear:both;'></div>
+
+          <div class='longtext'>
+            {% trans %}
+            <p>In this area you can setup what will happen on this schedule by adding separate actions,
+              typically initiating a backup, repository check or similar. All actions will be scheduled at
+              the time indicated above and the order presented here and will be processed by the system
+              as soon as possible.</p>
+            {% endtrans %}
+          </div>
+
+          <select name='_doesntmatter' id='action-selector' size=1>
+            {% for class, name in classes.items() %}
+            <option value='{{ class }}'>{{ name }}</option>
+            {% endfor %}
+          </select>
+
+          <button id='add-action' type='button'>{{ _('Add') }}</button>
+        </td>
+      </tr>
+
+      <!-- TODO support reordering -->
+
+      <tr id='actions-end'>
+        <td colspan='2'><hr></td>
+      </tr>
+
+      <tr>
+        <td></td>
+        <td><input type='submit' id='submit-button' value='{{ submit }}'/></td>
+      </tr>
+    </table>
+
+    <!--
+      To more easily parse the form and preserve the structure the actions are packed into JSON via JS,
+      the other values sent by the browsers are simply ignored.
+      -->
+    <input type='hidden' id='actions-data' name='actions-data'>
+
+    <div style='display: none;' id='node-storage'>
+      <!-- node storage -->
+
+      <table>
+        <tr class='action-header'>
+          <td></td>
+          <td>
+            <h3> <small>(<a href='javascript:' class='remove-action'>{{ _('remove') }}</a>)</small></h3>
+          </td>
+        </tr>
+      </table>
+
+      {% for action_form in action_forms %}
+      <table class='action-pre-rows' data-action='{{ loop.index0 }}'>
+        <tr class='action-header' data-class='{{ action_form.dotted_path }}'>
+          <td></td>
+          <td>
+            <h3>{{ action_form.name }}
+              <small>(<a href='javascript:' class='remove-action'>{{ _('remove') }}</a>)</small></h3>
+          </td>
+        </tr>
+
+        {{ action_form }}
+      </table>
+      {% endfor %}
+    </div>
+
+    <script type='application/javascript'>
+      function html_to_dom(html) {
+        var template = document.createElement('template');
+        template.innerHTML = html;
+        return template.content.childNodes;
+      }
+
+      function escape_html(str) {
+          var div = document.createElement('div');
+          div.appendChild(document.createTextNode(str));
+          return div.innerHTML;
+      }
+
+      function form_part_props(object, part_element) {
+        var elements = part_element.querySelectorAll('input,textarea,select,button');
+        for (var i = 0; i < elements.length; i++) {
+          var element = elements[i];
+          var value = null;
+          if (element.name === "") {
+            continue;
+          }
+          switch (element.nodeName) {
+            case 'INPUT':
+              switch (element.type) {
+                case 'text':
+                case 'hidden':
+                case 'password':
+                case 'button':
+                case 'reset':
+                case 'submit':
+                  value = element.value;
+                  break;
+                case 'checkbox':
+                case 'radio':
+                  if (element.checked) {
+                    value = element.value;
+                  }
+                  break;
+              }
+              break;
+            case 'TEXTAREA':
+              value = element.value;
+              break;
+            case 'SELECT':
+              switch (element.type) {
+                case 'select-one':
+                  value = element.value;
+                  break;
+                case 'select-multiple':
+                  value = [];
+                  for (var j = 0; j < element.options.length; j++) {
+                    var option = element.options[j];
+                    if (option.selected) {
+                      value.push(option.value);
+                    }
+                  }
+                  break;
+              }
+              break;
+            case 'BUTTON':
+              value = element.value;
+              break;
+          }
+          if (value !== null) {
+            object[element.name] = value;
+          }
+        }
+      }
+
+      function remove_action () {
+        //           a    small      h3         td         tr[data-action]
+        var action = this.parentNode.parentNode.parentNode.parentNode;
+        var rows = document.querySelectorAll("[data-action='" + action.dataset.action + "']");
+        var parent = rows[0].parentNode;
+        /* reverse iteration since *rows* is a live HTMLCollection */
+        for (var i = rows.length - 1; i >= 0; i--) {
+          parent.removeChild(rows[i]);
+        }
+      }
+
+      window.addEventListener('load', function () {
+        /* add event listener and row attrs for prerendered rows
+         * mainly because I'm lazy and don't want to modify the form rendering
+         * (though you can do that as well).
+         */
+        var prerendered_actions = document.getElementsByClassName('action-pre-rows');
+        var end = document.getElementById('actions-end');
+
+        for (var i = prerendered_actions.length - 1; i >= 0; i--) {
+          var prerendered_action = prerendered_actions[i];
+          var rows = prerendered_action.getElementsByTagName('tr');
+          var action = prerendered_action.dataset.action;
+
+          prerendered_action.getElementsByClassName('action-header')[0].getElementsByClassName('remove-action')[0].addEventListener('click', remove_action);
+          while (rows.length) {
+            var row = rows[0];
+            if (row instanceof HTMLElement) {
+              row.setAttribute('data-action', action);
+            }
+            end.parentNode.insertBefore(row, end);
+          }
+          prerendered_action.parentNode.removeChild(prerendered_action);
+        }
+      });
+
+      /* note that this is not racy, because event listeners are called in registration order,
+       * hence the below listener can't attach itself to the add-action button until the
+       * prerendered rows were handled above.
+       */
+
+      window.addEventListener('load', function () {
+        var action_selector = document.getElementById('action-selector');
+        var add_action = document.getElementById('add-action');
+
+        var end = document.getElementById('actions-end');
+
+        var actions_index = {{ action_forms|length }}; /* adjust if pre-gen actions are present */
+
+        var node_storage = document.getElementById('node-storage');
+
+        add_action.addEventListener('click', function () {
+          var selected_action = action_selector.selectedOptions[0];
+          console.log('Fetching HTML for selected action', selected_action);
+          var xhr = new XMLHttpRequest();
+
+          xhr.addEventListener('readystatechange', function () {
+            if (xhr.readyState == 4) {
+              var header_row = node_storage.getElementsByClassName('action-header')[0].cloneNode(true);
+
+              /* Modify header row with data + scripting */
+              var heading = header_row.getElementsByTagName('h3')[0];
+              var save_html = heading.innerHTML;
+              heading.textContent = escape_html(selected_action.text);
+              heading.innerHTML += save_html;
+              heading.getElementsByClassName('remove-action')[0].addEventListener('click', remove_action);
+
+              header_row.dataset.action = actions_index;
+              header_row.dataset.class = selected_action.value;
+              end.parentNode.insertBefore(header_row, end);
+
+              var dom_elements = html_to_dom(xhr.responseText);
+              for (var i = 0; i < dom_elements.length; i++) {
+                var dom_element = dom_elements[i];
+                dom_element.dataset.action = actions_index;
+                end.parentNode.insertBefore(dom_element, end);
+              }
+
+              actions_index++;
+            }
+          });
+          /* TODO escape selected_action.value and/or %url%? */
+          xhr.open('GET', '?view=action-form&class=' + selected_action.value, true);
+          xhr.send();
+        });
+
+        document.getElementById('form').addEventListener('submit', function (event) {
+          event.preventDefault();
+
+          var data = [];
+          for (var i = 0; i < actions_index; i++) {
+            var rows = document.querySelectorAll("[data-action='" + i + "']");
+            var action_data = {};
+
+            if (!rows.length) {
+              continue;
+            }
+
+            for (var j = 0; j < rows.length; j++) {
+              form_part_props(action_data, rows[j]);
+            }
+
+            action_data['class'] = rows[0].dataset.class;
+
+            data.push(action_data);
+          }
+
+          document.getElementById('actions-data').value = JSON.stringify(data);
+
+          document.getElementById('form').submit();
+        });
+      });
+    </script>
+  </form>
+{% endblock %}
+{% endblock %}

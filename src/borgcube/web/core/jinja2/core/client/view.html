@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+{% from 'core/post_link.html' import post_link with context %}
+{% from 'core/jobs_table.html' import jobs_table %}
+{% from 'core/pagination.html' import pagination %}
+
+{% block title %}{% trans id=client.hostname %}Client {{ id }}{% endtrans %}{% endblock %}
+
+{% block content %}
+  <h1>{{ client.hostname }}
+    <small>
+      (<a href='?view=edit'>{{ _('edit') }}</a>)
+    </small>
+  </h1>
+
+  <p>{{ client.description }}</p>
+
+  <h2>{{ _('Connection') }}</h2>
+
+  <table class='plist'>
+    {% with conn=client.connection %}
+      <tr>
+        <th>{{ conn|field_name('remote') }}</th>
+        <td>{{ conn.remote }}</td>
+      </tr>
+      <tr>
+        <th>{{ conn|field_name('rsh') }}</th>
+        <td>{{ conn.rsh }}</td>
+      </tr>
+      {% if conn.rsh_options %}
+        <tr>
+          <th>{{ conn|field_name('rsh_options') }}</th>
+          <td>{{ conn.rsh_options }}</td>
+        </tr>
+      {% endif %}
+      {% if conn.ssh_identity_file %}
+        <tr>
+          <th>{{ conn|field_name('ssh_identity_file') }}</th>
+          <td>{{ conn.ssh_identity_file }}</td>
+        </tr>
+      {% endif %}
+      <tr>
+        <th>{{ conn|field_name('remote_borg') }}</th>
+        <td>{{ conn.remote_borg }}</td>
+      </tr>
+      {% if conn.remote_cache_dir %}
+        <tr>
+          <th>{{ conn|field_name('remote_cache_dir') }}</th>
+          <td>{{ conn.remote_cache_dir }}</td>
+        </tr>
+      {% endif %}
+    {% endwith %}
+  </table>
+
+  <h2>{{ _('Job configurations') }}
+    <small>(<a href='job-configs?view=add'>add</a>)</small></h2>
+
+  {% for job_config in client.job_configs %}
+
+    <section class='job-config' id='job-config-{{ job_config.oid }}'>
+      <h3>{{ job_config.label }} <small>
+        {# TODO: Publisher.get() for unified lookup #}
+        {% set pub = request.publisher.children().get('job-configs').get(job_config.oid) %}
+        {# url 'core.job_config_trigger' client.hostname job_config.oid as url #}
+
+        (<a href='{{ pub.reverse('trigger') }}'>{{ _('run now') }}</a>)
+        (<a href='{{ pub.reverse('edit') }}'>{{ _('edit') }}</a>)
+      </small></h3>
+
+
+        <table class='plist'>
+          <tr>
+            <th>{{ job_config|field_name('repository') }}</th>
+            <td><a href='{{ job_config.repository|get_url }}'>{{ job_config.repository.name }}</a></td>
+          </tr>
+          <tr>
+            <th>{{ _('One file system') }}</th>
+            <td>{{ job_config.one_file_system|yesno }}</td>
+          </tr>
+          <tr>
+            <th>{{ _('Compression') }}</th>
+            <td>{{ job_config.compression|compression_name }}</td>
+          </tr>
+          <tr>
+            <th>{{ _('Paths') }}</th>
+            <td>
+              {% for path in job_config.paths %}
+                <pre>{{ path }}</pre>
+                {% if loop.index0 %}<br>{% endif %}
+              {% endfor %}
+            </td>
+          </tr>
+          {% if job_config.excludes %}
+          <tr>
+            <th>{{ _('Exclusion patterns') }}</th>
+            <td>
+              {% for pattern in job_config.excludes %}
+                <pre>{{ pattern }}</pre>
+                {% if loop.index0 %}<br>{% endif %}
+              {% endfor %}
+            </td>
+          </tr>
+          {% endif %}
+        </table>
+    </section>
+
+  {% endfor %}
+
+  <h2>{{ _('Jobs') }}</h2>
+
+  {{ jobs_table(jobs, config_column=True, repository_column=True) }}
+
+  {{ pagination(jobs, 'jobs') }}
+{% endblock %}
