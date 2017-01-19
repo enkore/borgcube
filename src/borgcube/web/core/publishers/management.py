@@ -17,9 +17,9 @@ class ManagementPublisher(Publisher, PublisherMenu):
         return 'management.html'
 
     def context(self, request):
-        return {
-            'management': self._construct_menu(request),
-        }
+        context = super().context(request)
+        context['management'] = self._construct_menu(request)
+        return context
 
     def _construct_menu(self, request):
         mp = request.root.resolve(['management']).__self__

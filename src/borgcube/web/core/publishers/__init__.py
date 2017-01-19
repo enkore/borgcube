@@ -1,11 +1,11 @@
 import logging
-from functools import partial
 from urllib.parse import quote as urlquote
 
 from borgcube.utils import hook
 
-from django.http import Http404
+from django.http import Http404, HttpResponse
 from django.shortcuts import redirect
+from django.template.loader import get_template
 from django.template.response import TemplateResponse
 
 log = logging.getLogger(__name__)
@@ -232,26 +232,14 @@ class Publisher:
         """
         Return a TemplateResponse for *request*, *template* and *context*.
 
-        The final context is constructed as follows:
-
-        1. Start with an empty dictionary
-        2. Add *publisher* (=self), the correctly named companion (=self.companion), *base_template*
-           and a None *secondary_menu*.
-        3. Add what `self.context` returns
-        4. Add *context*.
+        The actual context is constructed by obtaining the return of `context` and updating that
+        with the passed *context*.
 
         If *template* is None, then the `base_template` is used.
         """
-        base_template = self.base_template(request)
-        base_context = {
-            'publisher': self,
-            type(self).companion: self.get_companion(),
-            'base_template': base_template,
-            'secondary_menu': None,
-        }
-        base_context.update(self.context(request))
+        base_context = self.context(request)
         base_context.update(context)
-        return TemplateResponse(request, template or base_template, base_context)
+        return TemplateResponse(request, template or self.base_template(request), base_context)
 
     def base_template(self, request):
         return 'base.html'
@@ -259,8 +247,21 @@ class Publisher:
     def context(self, request):
         """
         Return the "base context" for *request*.
+
+        Make sure to always call the base implementation, which provides the following keys:
+
+        - *publisher* (self)
+        - *cls.companion* (correctly named companion obtained from self.get_companion())
+        - *base_template*
+        - *secondary_menu* (None, overridden in subclasses)
         """
-        return {}
+        base_template = self.base_template(request)
+        return {
+            'publisher': self,
+            type(self).companion: self.get_companion(),
+            'base_template': base_template,
+            'secondary_menu': None,
+        }
 
     def view(self, request):
         """
@@ -284,29 +285,25 @@ class ExtensiblePublisher(Publisher, PublisherMenu):
     at the same level (although the are technically subordinate).
 
     The extending publishers are attached in the regular way through `children_hook`.
+
+    .. rubric:: Templates and contexts
+
+    An extensible publisher should designate a template with `default_template` whose `title`
+    and `ctitle` blocks are renderable with the standard `context`. ExtendingPublishers
+    will use this to render their content into the ccontent block (indirectly).
     """
     menu_text = ''
 
-    def render(self, request, template=None, context=None):
-        """
-        Return a TemplateResponse for *request*, *template* and *context*.
-
-        The final context is constructed as follows:
-
-        1. Start with an empty dictionary
-        2. Add *publisher* (=self), and the correctly named companion (=self.companion)
-        3. Add what `self.context` returns
-        4. Add *context*.
-
-        *template* refers to a content template that dynamically extends the
-        *base_template* passed in the template context.
-        """
-        context = context or {}
-        context.setdefault('secondary_menu', self._construct_menu(request))
-        return super().render(request, template, context)
+    def context(self, request):
+        context = super().context(request)
+        context['secondary_menu'] = self._construct_menu(request)
+        return context
 
     def base_template(self, request):
         return 'extensible.html'
+
+    def default_template(self, request):
+        return self.base_template(request)
 
     def _construct_menu(self, request):
         def item(publisher):
@@ -326,4 +323,11 @@ class ExtensiblePublisher(Publisher, PublisherMenu):
 
 class ExtendingPublisher(Publisher, PublisherMenu):
     def render(self, request, template=None, context=None):
-        return self.parent.render(request, template, context)
+        chrome_template = get_template('core/_chrome_glue.html')
+        chrome_context = self.parent.context(request)
+        chrome_context['ext_template'] = self.parent.default_template(request)
+        chrome = chrome_template.render(chrome_context, request)
+
+        content = super().render(request, template, context).rendered_content
+        page = chrome.replace('<extending-publisher-content/>', content)
+        return HttpResponse(page, charset='utf-8')

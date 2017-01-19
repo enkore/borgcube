@@ -220,10 +220,17 @@ class SchedulePublisher(ExtensiblePublisher, ScheduledActionFormMixin):
     views = ('delete', 'action_form', )
     menu_text = _('Schedule')
 
+    def context(self, request):
+        context = super().context(request)
+        context['title'] = _('Edit schedule {}').format(self.schedule.name)
+        return context
+
+    def default_template(self, request):
+        return 'core/schedule/add.html'
+
     def view(self, request):
         data = request.POST or None
         return schedule_add_and_edit(self.render, request, data, self.schedule, context={
-            'title': _('Edit schedule {}').format(self.schedule.name),
             'submit': _('Save changes'),
             'schedule': self.schedule,
         })

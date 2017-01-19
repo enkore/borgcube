@@ -1,0 +1,23 @@
+{% extends ext_template %}
+{#
+This template is instanciated by ExtendingPublisher to create the chrome into which
+the actual contents are inserted at the extending-publisher-content tag.
+#}
+
+{% block title %}
+  {{ super() }}
+{% endblock %}
+
+{% block content %}
+{% block ctitle %}
+  {{ super() }}
+{% endblock %}
+
+{% block secondary_menu %}
+  {{ super() }}
+{% endblock %}
+
+{% block ccontent %}
+<extending-publisher-content/>
+{% endblock %}
+{% endblock %}
