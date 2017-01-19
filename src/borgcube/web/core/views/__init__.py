@@ -421,30 +421,37 @@ class Publisher:
     # Views
     ###################
 
-    def render(self, request, template, context={}):
+    def render(self, request, template=None, context={}):
         """
         Return a TemplateResponse for *request*, *template* and *context*.
 
         The final context is constructed as follows:
 
         1. Start with an empty dictionary
-        2. Add *publisher* (=self), and the correctly named companion (=self.companion)
+        2. Add *publisher* (=self), the correctly named companion (=self.companion), *base_template*
+           and a None *secondary_menu*.
         3. Add what `self.context` returns
         4. Add *context*.
+
+        If *template* is None, then the `base_template` is used.
         """
+        base_template = self.base_template(request)
         base_context = {
             'publisher': self,
-            type(self).companion: self.companion,
-            'base_template': 'base.html',
+            type(self).companion: self.get_companion(),
+            'base_template': base_template,
             'secondary_menu': None,
         }
         base_context.update(self.context(request))
         base_context.update(context)
-        return TemplateResponse(request, template, base_context)
+        return TemplateResponse(request, template or base_template, base_context)
+
+    def base_template(self, request):
+        return 'base.html'
 
     def context(self, request):
         """
-        Return "base context" for *request*.
+        Return the "base context" for *request*.
         """
         return {}
 
@@ -475,7 +482,6 @@ class ExtensiblePublisher(Publisher, PublisherMenu):
         *base_template* passed in the template context.
         """
         context = context or {}
-        context.setdefault('base_template', self.base_template(request))
         context.setdefault('secondary_menu', self._construct_menu(request))
         return super().render(request, template, context)
 
@@ -512,7 +518,7 @@ class RootPublisher(Publisher):
             'clients': ClientsPublisher.factory(self.dr.clients, self),
             'schedules': SchedulesPublisher.factory(self.dr.schedules, self),
             'repositories': RepositoriesPublisher.factory(self.dr.repositories, self),
-            'management': ManagementPublisher.factory(self.dr.ext, self),
+            'management': ManagementAreaPublisher.factory(self.dr.ext, self),
         })
 
     def view(self, request):
@@ -1069,19 +1075,32 @@ class RepositoryCheckConfigPublisher(Publisher):
 
 
 class ManagementPublisher(Publisher, PublisherMenu):
+    def base_template(self, request):
+        return 'management.html'
+
+    def context(self, request):
+        return {
+            'management': True,
+        }
+
+
+class ManagementAreaPublisher(ManagementPublisher):
     name = 'management'
     menu_descend = True
     menu_text = _('Management')
 
     def view(self, request):
-        return self.render(request, 'management.html', {
-            'management': True
-        })
+        return self.render(request)
 
 
 def object_publisher(request, path):
     """
     Renders a *path* against the *RootPublisher*.
+
+    The request will receive the following attributes:
+
+    - *publisher*: the publisher handling the request
+    - *view_name*: the verbatim view name (?view=...)
     """
     view_name = request.GET.get('view')
     path_segments = path.split('/')
