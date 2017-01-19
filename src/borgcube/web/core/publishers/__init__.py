@@ -120,6 +120,21 @@ class Publisher:
     # Children
     ###################
 
+    def get(self, segment):
+        """
+        Return child from *segment* or raise KeyError.
+
+        First tries subscription (`__getitem__`), then looks up in `children`.
+        Ensures that *child.segment* and *child.parent* are set correctly.
+        """
+        try:
+            child = self[segment]
+        except KeyError:
+            child = self.children()[segment]
+        child.segment = segment
+        child.parent = self
+        return child
+
     def children(self):
         """
         Return a mapping of child names to child publishers or factories.
