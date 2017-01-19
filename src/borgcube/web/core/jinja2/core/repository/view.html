@@ -56,5 +56,5 @@
 
   {% from 'core/jobs_table.html' import jobs_table %}
 
-  {{ jobs_table(recent_jobs, client_column=True) }}
+  {{ jobs_table(repository.jobs.values(), client_column=True) }}
 {% endblock %}
