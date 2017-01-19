@@ -74,6 +74,11 @@ def data_root():  # type: borgcube.core.models.DataRoot
 _sentinel = object()
 
 
+def oid_bytes(oid):
+    """Convert hex object id to bytes."""
+    return bytes.fromhex(oid).rjust(8, b'\0')
+
+
 def find_oid(iterable, oid, default=_sentinel):
     for object in iterable:
         if object.oid == oid:

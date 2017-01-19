@@ -26,7 +26,7 @@ from borg.locking import LockTimeout, LockFailed, LockError, LockErrorT
 
 from borgcube.core.models import Evolvable, ScheduledAction, Job, JobExecutor, s
 from borgcube.keymgt import synthesize_client_key, SyntheticManifest
-from borgcube.utils import open_repository, tee_job_logs, data_root, validate_regex
+from borgcube.utils import open_repository, tee_job_logs, data_root, validate_regex, oid_bytes
 
 log = logging.getLogger(__name__)
 
@@ -433,7 +433,7 @@ class ScheduledBackup(ScheduledAction):
 
         def clean(self):
             data = super().clean()
-            o = data_root()._p_jar[bytes.fromhex(data['job_config'])]
+            o = data_root()._p_jar[oid_bytes(data['job_config'])]
             if not isinstance(o, BackupConfig):
                 raise ValidationError('Invalid object reference')
             data['job_config'] = o
