@@ -24,45 +24,6 @@ def transaction_middleware(get_response):
     return middleware
 
 
-class SidebarMiddleware:
-    def __init__(self, get_response):
-        self.get_response = get_response
-
-    def __call__(self, request):
-        return self.get_response(request)
-
-    def process_template_response(self, request, response):
-        try:
-            context = response.context_data
-            context.pop('management')
-        except (AttributeError, KeyError):
-            return response
-
-        mp = RootPublisher(utils.data_root()).resolve(['management']).__self__
-
-        def construct(pub):
-            try:
-                descend = pub.menu_descend
-            except AttributeError:
-                descend = False
-            if not descend:
-                return
-            item = {
-                'text': pub.menu_text,
-                'url': pub.reverse(),
-                'items': [],
-            }
-            for pub in pub.children().values():
-                subitem = construct(pub)
-                if subitem:
-                    item['items'].append(subitem)
-            return item
-
-        context['management'] = construct(mp)['items']
-
-        return response
-
-
 class ZODBErrorMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response

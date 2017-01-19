@@ -969,16 +969,39 @@ class ManagementPublisher(Publisher, PublisherMenu):
 
     Inherits `PublisherMenu` to enable the menu entry, and uses *management.html* as a
     base_template, which enables the sidebar used for navigation in the management area.
-    It also adds the *management* key to the template context which is used for signalling
-    middleware.
+    It also adds the *management* key to the template context which contains the
+    actual sidebar navigation.
     """
     def base_template(self, request):
         return 'management.html'
 
     def context(self, request):
         return {
-            'management': True,
+            'management': self._construct_menu(),
         }
+
+    def _construct_menu(self):
+        mp = RootPublisher(data_root()).resolve(['management']).__self__
+
+        def construct(pub):
+            try:
+                descend = pub.menu_descend
+            except AttributeError:
+                descend = False
+            if not descend:
+                return
+            item = {
+                'text': pub.menu_text,
+                'url': pub.reverse(),
+                'items': [],
+            }
+            for pub in pub.children().values():
+                subitem = construct(pub)
+                if subitem:
+                    item['items'].append(subitem)
+            return item
+
+        return construct(mp)['items']
 
 
 class ManagementAreaPublisher(ManagementPublisher):
