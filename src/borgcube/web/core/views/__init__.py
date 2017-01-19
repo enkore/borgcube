@@ -135,7 +135,7 @@ class Publisher:
     by the hierarchy, so plugins can just "hook into" the system and don't need to
     bother defining URLs that don't conflict with core URLs.
 
-    .. rubric:: Extra views
+    .. rubric:: Additional views
 
     Additional views can be added by adding *something_view* methods and adding it to
     the `views` property::
@@ -149,8 +149,9 @@ class Publisher:
             def edit_view(self, request):
                 ...
 
-    In the URL hierarchy these are rendered as a segment starting with a colon and
-    continuing with the view name, eg. */clients/foo/:edit*.
+    In the URL hierarchy these are addressed through the ``view`` query parameter, eg.
+    */clients/foo/?view=edit*. The query parameter converts dashes to underscores, eg.
+    *?view=latest_job* and *?view=latest-job* are identical.
     """
     companion = 'companion'
     views = ()
@@ -227,10 +228,12 @@ class Publisher:
     # Traversal
     ###################
 
-    def redirect_to(self, view=None):
-        return redirect(self.reverse(view))
+    def redirect_to(self, view=None, permanent=False):
+        """Return a HTTP redirect response to this publisher and *view*."""
+        return redirect(self.reverse(view), permanent=permanent)
 
     def reverse(self, view=None):
+        """Return the path to this publisher and *view*."""
         assert self.parent, 'Cannot reverse Publisher without a parent'
         assert self.segment, 'Cannot reverse Publisher without segment'
         path = self.parent.reverse()
@@ -245,7 +248,7 @@ class Publisher:
         """
         Resolve reversed *path_segments* to a view or raise `Http404`.
 
-        Note: *path_segments* can be destroyed.
+        Note: *path_segments* is destroyed in the process.
         """
 
         def out_of_hierarchy(segment):
@@ -338,6 +341,19 @@ class Publisher:
 
 
 class ExtensiblePublisher(Publisher, PublisherMenu):
+    """
+    An extensible publisher implements publishers which are extended by `ExtendingPublisher` s.
+
+    This allows to decouple the publishing of child objects from the publisher of an object,
+    by allowing other parts and plugins to hook into the display and present their content
+    wrapped up in your visual framework.
+
+    An extensible publisher always has a menu entry that is used for secondary navigation
+    between the ExtensiblePublisher and a number of ExtendingPublishers, which appear
+    at the same level (although the are technically subordinate).
+
+    The extending publishers are attached in the regular way through `children_hook`.
+    """
     menu_text = ''
 
     def render(self, request, template, context=None):
@@ -378,7 +394,7 @@ class ExtensiblePublisher(Publisher, PublisherMenu):
 
 
 class ExtendingPublisher(Publisher, PublisherMenu):
-    def render(self, request, template, context=None):
+    def render(self, request, template=None, context=None):
         return self.parent.render(request, template, context)
 
 
