@@ -73,10 +73,10 @@ def object_publisher(request, path):
     root_publisher = RootPublisher(data_root())
     view = root_publisher.resolve(path_segments, view_name)
 
+    request.root = root_publisher
+    request.view_name = view_name
     try:
-        request.root = root_publisher
         request.publisher = view.__self__
-        request.view_name = view_name
     except AttributeError:
         # We don't explicitly prohibit the resolver to return a view callable that isn't
         # part of a publisher.

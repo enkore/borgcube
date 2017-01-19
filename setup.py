@@ -63,10 +63,11 @@ setup(
             'borgcube-gandalf = borgcube.gandalf:_gandalf',
         ],
         'borgcube0': [
-            'web_builtin_metrics = borgcube.web.core.builtin_metrics',
+            'borgcubed_scheduler = borgcube.daemon.scheduler',
             'borgcubed_backupjob = borgcube.job.backup',
             'borgcubed_checkjob  = borgcube.job.check',
-            'borgcubed_scheduler = borgcube.daemon.scheduler',
+            'web_publish_trigger = borgcube.web.core.publishers.trigger',
+            'web_publish_prune   = borgcube.web.core.publishers.prune',
         ],
         'borgcube0_apps': [
             # core dependency
