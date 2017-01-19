@@ -65,7 +65,6 @@ class RepositoryCheckConfigsPublisher(Publisher):
     views = ('add', )
 
     def __getitem__(self, config_id):
-        print(config_id)
         config = find_oid(self.repository.job_configs, config_id)
         return RepositoryCheckConfigPublisher(config, self)
 
