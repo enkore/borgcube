@@ -7,7 +7,7 @@ from django import forms
 from django.utils.translation import ugettext_lazy as _
 
 from borgcube.core.models import Client, RshClientConnection, Repository
-from borgcube.utils import data_root, find_oid_or_404
+from borgcube.utils import data_root, find_oid
 from . import Publisher
 
 
@@ -138,7 +138,7 @@ class JobConfigsPublisher(Publisher):
     views = ('add', )
 
     def __getitem__(self, oid):
-        return JobConfigPublisher(find_oid_or_404(self.configs, oid))
+        return JobConfigPublisher(find_oid(self.configs, oid))
 
     def add_view(self, request):
         client = self.parent.client

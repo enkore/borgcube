@@ -74,7 +74,7 @@ from django.utils.translation import ugettext_lazy as _
 from .publishers import Publisher, PublisherMenu
 from .publishers.management import ManagementPublisher
 from borgcube.job.prune import prune_root, RetentionPolicy, PruneConfig
-from borgcube.utils import find_oid_or_404
+from borgcube.utils import find_oid
 
 
 class PrunePublisher(ManagementPublisher):

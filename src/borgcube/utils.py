@@ -71,12 +71,18 @@ def data_root():  # type: borgcube.core.models.DataRoot
             return root.data_root
 
 
-def find_oid_or_404(iterable, oid):
+_sentinel = object()
+
+
+def find_oid(iterable, oid, default=_sentinel):
     for object in iterable:
         if object.oid == oid:
             return object
     else:
-        raise KeyError
+        if default is _sentinel:
+            raise KeyError
+        else:
+            return default
 
 
 def validate_regex(regex):

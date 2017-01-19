@@ -2,7 +2,7 @@ import transaction
 
 from borgcube.core.models import Repository
 from borgcube.job.check import CheckConfig
-from borgcube.utils import data_root, find_oid_or_404
+from borgcube.utils import data_root, find_oid
 from . import Publisher
 
 
@@ -66,7 +66,7 @@ class RepositoryCheckConfigsPublisher(Publisher):
 
     def __getitem__(self, config_id):
         print(config_id)
-        config = find_oid_or_404(self.repository.job_configs, config_id)
+        config = find_oid(self.repository.job_configs, config_id)
         return RepositoryCheckConfigPublisher(config, self)
 
     def add_view(self, request):

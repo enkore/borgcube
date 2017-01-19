@@ -9,7 +9,7 @@ from django.utils.timezone import localtime, now
 from django.utils.translation import ugettext_lazy as _
 
 from borgcube.core.models import Schedule, ScheduledAction
-from borgcube.utils import data_root, find_oid_or_404
+from borgcube.utils import data_root, find_oid
 from . import Publisher, ExtensiblePublisher
 
 log = logging.getLogger(__name__)
@@ -97,7 +97,7 @@ class SchedulesPublisher(Publisher, ScheduledActionFormMixin):
     views = ('list', 'add', 'action_form', )
 
     def __getitem__(self, oid):
-        schedule = find_oid_or_404(self.schedules, oid)
+        schedule = find_oid(self.schedules, oid)
         return SchedulePublisher(schedule, self)
 
     def view(self, request):
