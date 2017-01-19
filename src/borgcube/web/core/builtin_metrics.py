@@ -51,23 +51,6 @@ class BackupsToday(Metric):
         return str(jobs)
 
 
-def borgcube_web_management_nav(nav):
-    nav.append({
-        'view': views.prune,
-        'text': ugettext_lazy('Pruning'),
-        'items': [
-            {
-                'view': views.prune_retention_policies,
-                'text': ugettext_lazy('Retention policies'),
-            },
-            {
-                'view': views.prune_configs,
-                'text': ugettext_lazy('Configurations'),
-            }
-        ],
-    })
-
-
 from django.template.response import TemplateResponse
 from django.utils.translation import ugettext_lazy as _
 

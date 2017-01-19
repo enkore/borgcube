@@ -77,9 +77,7 @@ def summarize_archive(archive):
 @register.filter
 def job_outcome(job):
     assert isinstance(job, models.Job)
-    outcome = hook.borgcube_web_job_outcome(job=job)
-    if outcome:
-        return outcome
+    # TODO: move this to BackupJob et al
     if job.failed:
         try:
             failure_cause = job.failure_cause
