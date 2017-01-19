@@ -12,7 +12,16 @@ log = logging.getLogger(__name__)
 
 
 class PublisherMenu:
+    """
+    Defines the interface for exposing menu entries directly by publishers.
+
+    Note that there is no way to specify an URL; the menu entry always points
+    to the default view of the instance.
+    """
+
+    #: Whether this publisher should be included. When absent, False.
     menu_descend = True
+    #: The text of the item. Normally a lazy translation object (eg. `ugettext_lazy`).
     menu_text = ''
 
 
@@ -91,7 +100,10 @@ class Publisher:
     */clients/foo/?view=edit*. The query parameter converts dashes to underscores, eg.
     *?view=latest_job* and *?view=latest-job* are identical.
     """
+
+    #: The name of the companion attribute
     companion = 'companion'
+    #: Exposed views (the default view is *always* exposed), base names, no trailing `_view`.
     views = ()
 
     def __init__(self, companion):
@@ -242,6 +254,7 @@ class Publisher:
         return TemplateResponse(request, template or self.base_template(request), base_context)
 
     def base_template(self, request):
+        """Return base template name. Default: base.html"""
         return 'base.html'
 
     def context(self, request):
@@ -303,6 +316,7 @@ class ExtensiblePublisher(Publisher, PublisherMenu):
         return 'extensible.html'
 
     def default_template(self, request):
+        """Return default template name (see class docstring). Default: `base_template`"""
         return self.base_template(request)
 
     def _construct_menu(self, request):

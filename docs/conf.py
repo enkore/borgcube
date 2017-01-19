@@ -385,3 +385,6 @@ intersphinx_mapping = {
     'zodb': ('https://zodb-docs.readthedocs.io/en/latest/', None),
     'persistent': ('https://persistent.readthedocs.io/en/latest/', None),
 }
+
+
+autodoc_member_order = 'bysource'

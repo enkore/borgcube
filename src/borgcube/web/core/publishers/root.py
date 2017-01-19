@@ -31,6 +31,12 @@ def job_cancel(request, job_id):
 
 
 class RootPublisher(Publisher):
+    """
+    Root publisher.
+
+    Technically it supports the same extension mechanisms as any other publisher,
+    but you probably shouldn't.
+    """
     companion = 'dr'
     views = ()
 

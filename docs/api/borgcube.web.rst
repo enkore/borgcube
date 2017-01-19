@@ -34,9 +34,9 @@ borgcube.web.core.templatetags.borgcube module
     :undoc-members:
     :show-inheritance:
 
-borgcube.web.core.views module
-------------------------------
+borgcube.web.core.publishers package
+------------------------------------
 
-.. automodule:: borgcube.web.core.views
+.. automodule:: borgcube.web.core.publishers
     :members:
     :show-inheritance:
