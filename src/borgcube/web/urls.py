@@ -18,6 +18,7 @@ from django.views import i18n
 
 from .core import views as core_views
 from .core.views import staticfiles
+from .core.publishers.root import object_publisher
 from borgcube.utils import hook
 """
 client_urls = [
@@ -80,8 +81,8 @@ urlpatterns = [
 
     url(r'^trigger/(?P<trigger_id>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/$', core_views.trigger),
 
-    url(r'^$', core_views.object_publisher, kwargs={'path': '/'}),
-    url(r'^(.*)/$', core_views.object_publisher),
+    url(r'^$', object_publisher, kwargs={'path': '/'}),
+    url(r'^(.*)/$', object_publisher),
 ]
 """
     url(r'^$', core_views.dashboard, name='core.dashboard'),

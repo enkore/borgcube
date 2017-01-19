@@ -1,13 +1,9 @@
 import logging
 
 from django.http import HttpResponseServerError
-from django.urls import reverse
 
 import transaction
 from ZODB.POSException import StorageError
-
-from borgcube import utils
-from borgcube.web.core.views import RootPublisher
 
 log = logging.getLogger(__name__)
 

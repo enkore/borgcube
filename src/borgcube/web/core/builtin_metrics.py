@@ -71,7 +71,8 @@ def borgcube_web_management_nav(nav):
 from django.template.response import TemplateResponse
 from django.utils.translation import ugettext_lazy as _
 
-from .views import ManagementPublisher, Publisher, PublisherMenu
+from .publishers import Publisher, PublisherMenu
+from .publishers.management import ManagementPublisher
 from borgcube.job.prune import prune_root, RetentionPolicy, PruneConfig
 from borgcube.utils import find_oid_or_404
 
@@ -216,7 +217,7 @@ class ConfigPublisher(ManagementPublisher):
 #        return PrunePublisher(prune_root())
 
 from borgcube.core.models import Trigger
-from borgcube.web.core.views import ExtendingPublisher
+from .publishers import ExtendingPublisher
 
 
 class TriggerManagementPublisher(Publisher, PublisherMenu):
