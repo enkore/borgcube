@@ -63,8 +63,12 @@ def object_publisher(request, path):
     - *view_name*: the verbatim view name (?view=...)
     """
     view_name = request.GET.get('view')
-    path_segments = path.split('/')
+    path_segments = [s for s in path.split('/') if s != '.']
     path_segments.reverse()
+
+    if '..' in path_segments:
+        log.warning('Bad request: Refusing path containing "..".')
+        return HttpResponse(status=400)
 
     root_publisher = RootPublisher(data_root())
     view = root_publisher.resolve(path_segments, view_name)
