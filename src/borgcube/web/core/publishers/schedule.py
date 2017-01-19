@@ -141,7 +141,7 @@ class SchedulesPublisher(Publisher, ScheduledActionFormMixin):
 
     def __getitem__(self, oid):
         schedule = find_oid(self.schedules, oid)
-        return SchedulePublisher(schedule, self, oid)
+        return SchedulePublisher(schedule)
 
     def view(self, request):
         try:

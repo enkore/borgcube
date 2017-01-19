@@ -46,12 +46,10 @@ class Publisher:
 
             def children(self):
                 return {
-                    'clients': ClientsPublisher.factory(self.dr.clients, self),
-                    'schedules': SchedulesPublisher.factory(self.dr.schedules, self),
+                    'clients': ClientsPublisher(self.dr.clients),
+                    'schedules': SchedulesPublisher(self.dr.schedules),
                     # ...
                 }
-
-    Note how `Publisher.factory` directly provides a factory.
 
     On the other hand, here is how `ClientsPublisher` handles it's children::
 
@@ -60,7 +58,7 @@ class Publisher:
 
             def __getitem__(self, hostname):
                 client = self.clients[hostname]
-                return ClientPublisher(client, self)
+                return ClientPublisher(client)
 
     Note that, since `ClientsPublisher` was provided by `RootPublisher` the companion
     of `ClientsPublisher` is `data_root().clients` -- so `__getitem__` here only
@@ -96,14 +94,10 @@ class Publisher:
     companion = 'companion'
     views = ()
 
-    @classmethod
-    def factory(cls, companion, parent=None):
-        return partial(cls, companion, parent)
-
-    def __init__(self, companion, parent=None, segment=None):
+    def __init__(self, companion):
         setattr(self, type(self).companion, companion)
-        self.parent = parent
-        self.segment = segment
+        self.parent = None
+        self.segment = None
 
     @property
     def name(self):
@@ -137,7 +131,7 @@ class Publisher:
 
     def children(self):
         """
-        Return a mapping of child names to child publishers or factories.
+        Return a mapping of child names to child publishers.
 
         Make sure to call into `children_hook`, like so::
 
@@ -171,13 +165,9 @@ class Publisher:
         """
         Return published child object or raise KeyError
 
-        Call `children` and index return value with *item* by default.
+        Defaults to always raising `KeyError`.
         """
-        v = self.children()[item]
-        try:
-            return v()
-        except TypeError:
-            return v
+        raise KeyError
 
     ###################
     # Traversal

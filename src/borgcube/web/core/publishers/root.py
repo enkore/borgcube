@@ -36,10 +36,10 @@ class RootPublisher(Publisher):
 
     def children(self):
         return self.children_hook({
-            'clients': ClientsPublisher.factory(self.dr.clients, self),
-            'schedules': SchedulesPublisher.factory(self.dr.schedules, self),
-            'repositories': RepositoriesPublisher.factory(self.dr.repositories, self),
-            'management': ManagementAreaPublisher.factory(self.dr.ext, self),
+            'clients': ClientsPublisher(self.dr.clients),
+            'schedules': SchedulesPublisher(self.dr.schedules),
+            'repositories': RepositoriesPublisher(self.dr.repositories),
+            'management': ManagementAreaPublisher(self.dr.ext),
         })
 
     def view(self, request):

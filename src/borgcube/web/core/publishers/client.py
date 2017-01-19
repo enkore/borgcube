@@ -30,7 +30,7 @@ class ClientsPublisher(Publisher):
 
     def __getitem__(self, hostname):
         client = self.clients[hostname]
-        return ClientPublisher(client, self)
+        return ClientPublisher(client)
 
     def view(self, request):
         return self.render(request, 'core/client/list.html', {
@@ -138,7 +138,7 @@ class JobConfigsPublisher(Publisher):
     views = ('add', )
 
     def __getitem__(self, oid):
-        return JobConfigPublisher(find_oid(self.configs, oid), self, oid)
+        return JobConfigPublisher(find_oid(self.configs, oid))
 
     def add_view(self, request):
         client = self.parent.client

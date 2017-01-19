@@ -12,7 +12,7 @@ class RepositoriesPublisher(Publisher):
 
     def __getitem__(self, repository_id):
         repository = Repository.oid_get(repository_id)
-        return RepositoryPublisher(repository, self)
+        return RepositoryPublisher(repository)
 
     def view(self, request):
         return self.render(request, 'core/repository/list.html', {
@@ -39,7 +39,7 @@ class RepositoryPublisher(Publisher):
 
     def children(self):
         return self.children_hook({
-            'check-configs': RepositoryCheckConfigsPublisher(self.repository, self),
+            'check-configs': RepositoryCheckConfigsPublisher(self.repository),
         })
 
     def view(self, request):
@@ -66,7 +66,7 @@ class RepositoryCheckConfigsPublisher(Publisher):
 
     def __getitem__(self, config_id):
         config = find_oid(self.repository.job_configs, config_id)
-        return RepositoryCheckConfigPublisher(config, self)
+        return RepositoryCheckConfigPublisher(config)
 
     def add_view(self, request):
         data = request.POST or None

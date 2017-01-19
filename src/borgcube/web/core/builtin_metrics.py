@@ -67,7 +67,7 @@ class PrunePublisher(ManagementPublisher):
     def children(self):
         return self.children_hook({
             'policies': PoliciesPublisher(self.pr.policies),
-            'configs': ConfigsPublisher(self.pr.configs, self),
+            'configs': ConfigsPublisher(self.pr.configs),
         })
 
     def base_template(self, request):
@@ -82,7 +82,7 @@ class PoliciesPublisher(ManagementPublisher):
     menu_text = _('Retention policies')
 
     def children(self):
-        return self.children_hook({policy.oid: PolicyPublisher(policy, self) for policy in self.policies})
+        return self.children_hook({policy.oid: PolicyPublisher(policy) for policy in self.policies})
 
     def view(self, request):
         return self.render(request, 'core/prune/retention.html')
@@ -137,7 +137,7 @@ class ConfigsPublisher(ManagementPublisher):
     menu_text = _('Configurations')
 
     def children(self):
-        return self.children_hook({config.oid: ConfigPublisher(config, self) for config in self.configs})
+        return self.children_hook({config.oid: ConfigPublisher(config) for config in self.configs})
 
     def view(self, request):
         return self.render(request, 'core/prune/configs.html')
