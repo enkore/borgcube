@@ -1,11 +1,12 @@
 import logging
 import logging.config
 import re
+from itertools import islice
 from threading import Lock, local
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.http import Http404
+from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 
 import zmq
 
@@ -71,12 +72,53 @@ def data_root():  # type: borgcube.core.models.DataRoot
             return root.data_root
 
 
-_sentinel = object()
+def paginate(request, things, num_per_page=40, prefix='', length=None):
+    if prefix:
+        prefix += '_'
+    page = request.GET.get(prefix + 'page')
+    paginator = IteratorPaginator(things, num_per_page, length=length)
+    try:
+        return paginator.page(page)
+    except PageNotAnInteger:
+        return paginator.page(1)
+    except EmptyPage:
+        return paginator.page(paginator.num_pages)
+
+
+class IteratorPaginator(Paginator):
+    """
+    Modified Django `Paginator` that works with iterables of known lengths, instead
+    of requiring a len()-able, slice-able iterable.
+
+    If *length* is left unspecified it behaves exactly like the standard Paginator.
+    """
+
+    def __init__(self, iterable, per_page, orphans=0,
+                 allow_empty_first_page=True, length=None):
+        super().__init__(None, per_page, orphans, allow_empty_first_page)
+        if length is None:
+            self.object_list = iterable
+        else:
+            self.count = length
+            self.object_list = self.IteratorSlicer(iterable, length)
+
+    class IteratorSlicer:
+        def __init__(self, iterable, length):
+            self.iterable = iterable
+            self.length = length
+
+        def __getitem__(self, item):
+            if isinstance(item, slice):
+                return list(islice(self.iterable, *item.indices(self.length)))
+            raise ValueError()
 
 
 def oid_bytes(oid):
     """Convert hex object id to bytes."""
     return bytes.fromhex(oid).rjust(8, b'\0')
+
+
+_sentinel = object()
 
 
 def find_oid(iterable, oid, default=_sentinel):

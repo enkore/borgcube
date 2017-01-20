@@ -51,6 +51,7 @@ class NumberTree(LOBTree):
         return key
 
     def __reversed__(self):
+        """Yield values in descending (high to low) key order.."""
         key = 2**63
         while True:
             try:

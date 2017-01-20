@@ -2,26 +2,12 @@
 import transaction
 from borgcube.job.backup import BackupConfig
 
-from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django import forms
 from django.utils.translation import ugettext_lazy as _
 
-from borgcube.core.models import Client, RshClientConnection, Repository
-from borgcube.utils import data_root, find_oid
+from borgcube.core.models import Client, RshClientConnection, Repository, NumberTree
+from borgcube.utils import data_root, find_oid, paginate
 from . import Publisher
-
-
-def paginate(request, things, num_per_page=40, prefix=''):
-    if prefix:
-        prefix += '_'
-    paginator = Paginator(things, num_per_page)
-    page = request.GET.get(prefix + 'page')
-    try:
-        return paginator.page(page)
-    except PageNotAnInteger:
-        return paginator.page(1)
-    except EmptyPage:
-        return paginator.page(paginator.num_pages)
 
 
 class ClientsPublisher(Publisher):
@@ -64,7 +50,12 @@ class ClientPublisher(Publisher):
         })
 
     def view(self, request):
-        jobs = paginate(request, self.client.jobs.values(), prefix='jobs')
+        # TODO/SCA
+        # What we would actually want here is more like being smart about this. Like it's now implemented,
+        # with iterator slicing, the newest page loads quickly, while the oldest page iterates over everything.
+        # But we actually have a BTree here, so that could be optimized a bit by just counting buckets, which
+        # would still be a bit expensive (but less by some linear n).
+        jobs = paginate(request, NumberTree.reversed(self.client.jobs), prefix='jobs', length=len(self.client.jobs))
         return self.render(request, 'core/client/view.html', {
             'client': self.client,
             'jobs': jobs,
