@@ -6,11 +6,7 @@ BorgCube
    :target: http://borgcube.readthedocs.io/en/latest/?badge=latest
    :alt: Documentation Status
 
-**WARNING: This is a work in progress.** It is exceedingly likely that from this point in development to a release
-no upgrade path will be provided. This software is **NOT READY FOR PRODUCTION USE**. A lot of functionality is missing,
-and a lot of tests aren't written yet. There is NO SECURITY IMPLEMENTED yet in the web console.
-
-NOTE: At this time I will not take pull requests.
+**Project status**: Dead. No patches will be accepted. I do not recommend forking this prototype's code base. Feel free to contact me if you are interested in doing something similar.
 
 A backup system built on Borg.
 
